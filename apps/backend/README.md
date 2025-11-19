@@ -1,98 +1,357 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Backend - Local Service Platform
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API Backend cho hệ thống đặt lịch dịch vụ tại nhà, xây dựng bằng **NestJS** + **Prisma** + **PostgreSQL (PostGIS)**.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 📋 Yêu cầu
 
-## Description
+- **Node.js** >= 18.x
+- **PostgreSQL** >= 13 (với extension PostGIS)
+- **Docker** (tùy chọn, để chạy PostgreSQL)
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+---
 
-## Project setup
+## 🚀 Quick Start
+
+### **Option 1: Sử dụng Docker (Khuyến nghị)**
 
 ```bash
-$ pnpm install
+# 1. Khởi động PostgreSQL container
+docker run -d \
+  --name local-service-postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=local_service_platform \
+  -p 5432:5432 \
+  -v postgres_data:/var/lib/postgresql/data \
+  postgis/postgis:15-3.3
+
+# 2. Chờ 5 giây để database khởi động
+# Sau đó enable PostGIS extensions
+docker exec -it local-service-postgres psql -U postgres -d local_service_platform \
+  -c "CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+
+# 3. Setup backend
+cd apps/backend
+cp .env.example .env  # (nếu chưa có .env)
+npm install
+npx prisma migrate dev --name init
+npx prisma generate
+npm run prisma:seed
+
+# 4. Chạy development server
+npm run dev
 ```
 
-## Compile and run the project
+**Windows PowerShell:**
+```powershell
+# 1. Khởi động PostgreSQL
+docker run -d `
+  --name local-service-postgres `
+  -e POSTGRES_PASSWORD=postgres `
+  -e POSTGRES_DB=local_service_platform `
+  -p 5432:5432 `
+  -v postgres_data:/var/lib/postgresql/data `
+  postgis/postgis:15-3.3
+
+# 2. Enable extensions
+Start-Sleep -Seconds 5
+docker exec -it local-service-postgres psql -U postgres -d local_service_platform `
+  -c "CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+
+# 3. Setup backend (tương tự như trên)
+```
+
+### **Option 2: PostgreSQL đã cài sẵn**
 
 ```bash
-# development
-$ pnpm run start
+# 1. Tạo database và enable extensions
+psql -U postgres
+CREATE DATABASE local_service_platform;
+\c local_service_platform
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+\q
 
-# watch mode
-$ pnpm run start:dev
+# 2. Tạo .env file
+cp .env.example .env
+# Edit .env với credentials của bạn
 
-# production mode
-$ pnpm run start:prod
+# 3. Setup backend
+npm install
+npx prisma migrate dev --name init
+npx prisma generate
+npm run prisma:seed
+
+# 4. Chạy server
+npm run dev
 ```
 
-## Run tests
+---
+
+## 📂 Cấu trúc thư mục
+
+```
+apps/backend/
+├── prisma/                    # Prisma configuration
+│   ├── schema.prisma         # Database schema (28 bảng)
+│   ├── seed.ts               # Seed data (roles, permissions, services)
+│   └── migrations/           # Migration files
+│
+├── src/                       # NestJS source code
+│   ├── prisma/               # Prisma module
+│   │   ├── prisma.service.ts # PrismaClient service
+│   │   └── prisma.module.ts  # Global Prisma module
+│   ├── app.module.ts         # Root module
+│   ├── app.controller.ts
+│   ├── app.service.ts
+│   └── main.ts               # Entry point
+│
+├── .env                       # Environment variables (không commit)
+├── .env.example              # Template cho .env
+└── package.json
+```
+
+---
+
+## ⚙️ Environment Variables
+
+Tạo file `.env` (copy từ `.env.example`):
+
+```env
+# Database
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/local_service_platform?schema=public"
+
+# Application
+NODE_ENV=development
+PORT=3000
+
+# JWT (sẽ dùng sau)
+JWT_SECRET=your-secret-key
+JWT_REFRESH_SECRET=your-refresh-key
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+```
+
+**Các DATABASE_URL khác:**
+
+```env
+# Docker (default)
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/local_service_platform?schema=public"
+
+# Docker network (backend cũng chạy trong Docker)
+DATABASE_URL="postgresql://postgres:postgres@postgres:5432/local_service_platform?schema=public"
+
+# PostgreSQL local
+DATABASE_URL="postgresql://username:password@localhost:5432/local_service_platform?schema=public"
+
+# Production với SSL
+DATABASE_URL="postgresql://user:pass@host:5432/dbname?schema=public&sslmode=require"
+```
+
+---
+
+## 🗄️ Database Schema
+
+Hệ thống gồm **28 bảng** chia thành **7 modules**:
+
+| Module | Bảng | Mô tả |
+|--------|------|-------|
+| **User & Auth** | 4 | users, user_profiles, otp_codes, sessions |
+| **RBAC** | 4 | roles, permissions, user_roles, role_permissions |
+| **Service & Provider** | 5 | provider_profiles, service_categories, services, provider_services, favorites |
+| **Booking & Location** | 3 | addresses, bookings, booking_events |
+| **Payment & Wallet** | 3 | payments, wallets, wallet_transactions |
+| **Interaction** | 4 | reviews, disputes, conversations, messages |
+| **System & Utilities** | 5 | media, notifications, audit_logs, blockchain_transactions, settings |
+
+Chi tiết đầy đủ xem tại [DATABASE.md](../../DATABASE.md)
+
+---
+
+## 🔧 Prisma Commands
 
 ```bash
-# unit tests
-$ pnpm run test
+# Generate Prisma Client (sau khi thay đổi schema)
+npm run prisma:generate
+# hoặc: npx prisma generate
 
-# e2e tests
-$ pnpm run test:e2e
+# Tạo migration mới
+npm run prisma:migrate
+# hoặc: npx prisma migrate dev --name migration_name
 
-# test coverage
-$ pnpm run test:cov
+# Apply migrations (production)
+npm run prisma:migrate:deploy
+
+# Seed database
+npm run prisma:seed
+
+# Mở Prisma Studio (Database GUI)
+npm run prisma:studio
+# Truy cập: http://localhost:5555
+
+# Reset database (xóa tất cả data)
+npm run prisma:reset
 ```
 
-## Deployment
+---
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## 🎯 Development Scripts
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+# Development mode (với hot reload)
+npm run dev
+# hoặc: npm run start:dev
+
+# Build production
+npm run build
+
+# Start production
+npm run start:prod
+
+# Linting
+npm run lint
+
+# Testing
+npm run test
+npm run test:watch
+npm run test:e2e
+npm run test:cov
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Resources
+## 🐳 Docker Commands (nếu dùng Docker)
 
-Check out a few resources that may come in handy when working with NestJS:
+```bash
+# Khởi động container
+docker start local-service-postgres
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+# Dừng container
+docker stop local-service-postgres
 
-## Support
+# Xem logs
+docker logs -f local-service-postgres
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+# Kết nối vào database
+docker exec -it local-service-postgres psql -U postgres -d local_service_platform
 
-## Stay in touch
+# Xóa container + data
+docker rm -f local-service-postgres
+docker volume rm postgres_data
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+# Backup database
+docker exec local-service-postgres pg_dump -U postgres local_service_platform > backup.sql
 
-## License
+# Restore database
+docker exec -i local-service-postgres psql -U postgres -d local_service_platform < backup.sql
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+---
+
+## 📊 Seed Data
+
+Sau khi chạy `npm run prisma:seed`, database sẽ có:
+
+✅ **4 Roles:**
+- `customer` - Khách hàng
+- `provider` - Nhà cung cấp dịch vụ
+- `moderator` - Quản trị viên cấp thấp
+- `super_admin` - Quản trị viên hệ thống
+
+✅ **13 Permissions:**
+- `bookings.create`, `bookings.update`, `bookings.cancel`, `bookings.view`
+- `providers.verify`, `providers.suspend`
+- `disputes.manage`, `disputes.resolve`
+- `users.ban`, `users.unban`
+- `reports.view`, `reports.export`
+- `settings.update`
+
+✅ **5 Service Categories:**
+- Điện lạnh
+- Vệ sinh
+- Sửa chữa điện
+- Ống nước
+- Nội thất
+
+✅ **8 Services** (mẫu)
+
+✅ **5 Settings** (cấu hình hệ thống)
+
+---
+
+## 🔒 Security Notes
+
+- ❗ **Đừng commit file `.env`** vào Git
+- ✅ Sử dụng `.env.example` làm template
+- ✅ Thay đổi `JWT_SECRET` trong production
+- ✅ Sử dụng SSL connection cho production database
+
+---
+
+## 🐛 Troubleshooting
+
+### **Lỗi: `DATABASE_URL` not found**
+```bash
+# Đảm bảo file .env đã tồn tại
+cp .env.example .env
+```
+
+### **Lỗi: Cannot connect to database**
+```bash
+# Kiểm tra PostgreSQL đang chạy
+docker ps
+
+# Hoặc nếu dùng local:
+pg_isready -h localhost -p 5432
+```
+
+### **Lỗi: PostGIS extension not found**
+```bash
+# Enable PostGIS
+docker exec -it local-service-postgres psql -U postgres -d local_service_platform \
+  -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+```
+
+### **Port 5432 đã bị chiếm**
+```bash
+# Đổi port trong docker:
+docker run -p 5433:5432 ...
+
+# Update .env:
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/..."
+```
+
+---
+
+## 📚 Tài liệu tham khảo
+
+- [NestJS Documentation](https://docs.nestjs.com/)
+- [Prisma Documentation](https://www.prisma.io/docs)
+- [PostGIS Documentation](https://postgis.net/documentation/)
+- [DATABASE.md](../../DATABASE.md) - Chi tiết thiết kế database
+
+---
+
+## 🤝 Team Guidelines
+
+1. **Tạo migration mới:**
+   ```bash
+   npx prisma migrate dev --name descriptive_name
+   ```
+
+2. **Sau khi pull code:**
+   ```bash
+   npm install
+   npx prisma generate
+   npx prisma migrate dev
+   ```
+
+3. **Trước khi commit:**
+   ```bash
+   npm run lint
+   npm run test
+   ```
+
+---
+
+**Version:** 1.0.0  
+**Last Updated:** 2025-01-16
