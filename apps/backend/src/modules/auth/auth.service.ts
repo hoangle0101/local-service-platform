@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { LoginDto, OtpPurpose, RegisterDto, ResetPasswordDto, SendOtpDto, VerifyOtpDto } from './dto/auth.dto';
 import { UserStatus } from '@prisma/client';
@@ -10,6 +11,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private configService: ConfigService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -75,8 +77,16 @@ export class AuthService {
 
   async generateTokens(userId: bigint, phone: string) {
     const payload = { sub: userId.toString(), phone };
-    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m', secret: 'access-secret' });
-    const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d', secret: 'refresh-secret' });
+    
+    const accessToken = this.jwtService.sign(payload, {
+      secret: this.configService.get<string>('jwt.accessSecret'),
+      expiresIn: this.configService.get<string>('jwt.accessExpiresIn') as any,
+    });
+    
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: this.configService.get<string>('jwt.refreshSecret'),
+      expiresIn: this.configService.get<string>('jwt.refreshExpiresIn') as any,
+    });
 
     await this.prisma.session.create({
       data: {
@@ -93,39 +103,79 @@ export class AuthService {
   }
 
   async sendOtp(dto: SendOtpDto) {
-    const code = '123456'; 
+    // Generate random 6-digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Hash the code for security
+    const salt = await bcrypt.genSalt();
+    const codeHash = await bcrypt.hash(code, salt);
+    
     await this.prisma.otpCode.create({
       data: {
         phone: dto.phone,
-        codeHash: code,
+        codeHash,
         purpose: dto.purpose,
         expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+        attemptCount: 0,
       },
     });
-    return { message: 'OTP sent successfully (Mock: 123456)' };
+    
+    // TODO: Send SMS via provider (Twilio, AWS SNS, etc.)
+    console.log(`[OTP] Phone: ${dto.phone}, Code: ${code}`);
+    
+    // Return code only in development
+    return {
+      message: 'OTP sent successfully',
+      ...(process.env.NODE_ENV === 'development' && { code }),
+    };
   }
 
   async verifyOtp(dto: VerifyOtpDto) {
-    const otp = await this.prisma.otpCode.findFirst({
+    // Get all valid OTPs for this phone and purpose
+    const otps = await this.prisma.otpCode.findMany({
       where: {
         phone: dto.phone,
         purpose: dto.purpose,
         used: false,
-        codeHash: dto.code,
         expiresAt: { gt: new Date() },
       },
+      orderBy: { createdAt: 'desc' },
     });
 
-    if (!otp) {
-      throw new BadRequestException('Invalid or expired OTP');
+    if (otps.length === 0) {
+      throw new BadRequestException('No valid OTP found');
     }
 
-    await this.prisma.otpCode.update({
-      where: { id: otp.id },
-      data: { used: true },
-    });
+    // Try to verify with each OTP (in case of multiple attempts)
+    for (const otp of otps) {
+      // Check max attempts
+      if (otp.attemptCount >= 5) {
+        continue;
+      }
 
-    return { message: 'OTP verified successfully' };
+      // Verify code using bcrypt
+      const isValid = await bcrypt.compare(dto.code, otp.codeHash);
+
+      if (isValid) {
+        // Mark as used
+        await this.prisma.otpCode.update({
+          where: { id: otp.id },
+          data: { used: true },
+        });
+        return { message: 'OTP verified successfully' };
+      }
+
+      // Increment attempt count
+      await this.prisma.otpCode.update({
+        where: { id: otp.id },
+        data: {
+          attemptCount: otp.attemptCount + 1,
+          lastAttemptAt: new Date(),
+        },
+      });
+    }
+
+    throw new BadRequestException('Invalid OTP code');
   }
   
   async resetPassword(dto: ResetPasswordDto) {
@@ -144,14 +194,23 @@ export class AuthService {
 
   async refreshToken(token: string) {
       try {
-          const payload = this.jwtService.verify(token, { secret: 'refresh-secret' });
+          const payload = this.jwtService.verify(token, {
+            secret: this.configService.get<string>('jwt.refreshSecret'),
+          });
+          
           const session = await this.prisma.session.findFirst({
               where: { refreshTokenHash: token, revoked: false }
           });
-          if (!session) throw new UnauthorizedException('Session not found or revoked');
+          
+          if (!session) {
+            throw new UnauthorizedException('Session not found or revoked');
+          }
 
           const newPayload = { sub: payload.sub, phone: payload.phone };
-          const accessToken = this.jwtService.sign(newPayload, { expiresIn: '15m', secret: 'access-secret' });
+          const accessToken = this.jwtService.sign(newPayload, {
+            secret: this.configService.get<string>('jwt.accessSecret'),
+            expiresIn: this.configService.get<string>('jwt.accessExpiresIn') as any,
+          });
           
           return { accessToken };
       } catch (e) {
