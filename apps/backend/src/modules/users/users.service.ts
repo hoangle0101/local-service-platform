@@ -21,12 +21,51 @@ export class UsersService {
   }
 
   async updateProfile(userId: bigint, dto: UpdateProfileDto) {
-    return this.prisma.userProfile.update({
-      where: { userId },
-      data: {
-        ...dto,
-      },
+    // Check if profile exists, create if not
+    const existingProfile = await this.prisma.userProfile.findUnique({
+      where: { userId }
     });
+
+    // Convert birthDate string to Date if provided
+    const data: any = { ...dto };
+    if (dto.birthDate) {
+      data.birthDate = new Date(dto.birthDate);
+    }
+
+    if (!existingProfile) {
+      // Create profile if doesn't exist
+      const newProfile = await this.prisma.userProfile.create({
+        data: {
+          userId,
+          fullName: dto.fullName || 'User',
+          ...data,
+        }
+      });
+      
+      return {
+        userId: newProfile.userId.toString(),
+        fullName: newProfile.fullName,
+        avatarUrl: newProfile.avatarUrl,
+        birthDate: newProfile.birthDate,
+        gender: newProfile.gender,
+        bio: newProfile.bio,
+      };
+    }
+
+    // Update existing profile
+    const updated = await this.prisma.userProfile.update({
+      where: { userId },
+      data,
+    });
+
+    return {
+      userId: updated.userId.toString(),
+      fullName: updated.fullName,
+      avatarUrl: updated.avatarUrl,
+      birthDate: updated.birthDate,
+      gender: updated.gender,
+      bio: updated.bio,
+    };
   }
 
   async changePassword(userId: bigint, dto: ChangePasswordDto) {
@@ -61,11 +100,10 @@ export class UsersService {
         });
     }
 
-    const point = `ST_SetSRID(ST_MakePoint(0, 0), 4326)`; 
-    
+    // Use Prisma.sql for raw SQL with PostGIS
     await this.prisma.$executeRaw`
       INSERT INTO addresses (user_id, label, address_text, location, is_default, created_at, updated_at)
-      VALUES (${userId}, ${dto.label}, ${dto.addressText}, ${point}::geography, ${isDefault}, NOW(), NOW())
+      VALUES (${userId}, ${dto.label || ''}, ${dto.addressText}, ST_SetSRID(ST_MakePoint(0, 0), 4326)::geography, ${isDefault}, NOW(), NOW())
     `;
     
     return { message: 'Address added successfully' };

@@ -18,11 +18,22 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         ? exception.getResponse()
         : 'Internal server error';
 
+    // Log full error for debugging
+    if (status === 500) {
+      console.error('=== 500 ERROR ===');
+      console.error('Path:', request.url);
+      console.error('Method:', request.method);
+      console.error('Body:', request.body);
+      console.error('Error:', exception);
+      console.error('Stack:', exception instanceof Error ? exception.stack : 'No stack trace');
+      console.error('================');
+    }
+
     response.status(status).json({
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
-      message,
+      message: typeof message === 'string' ? message : (message as any).message || 'Internal server error',
     });
   }
 }
