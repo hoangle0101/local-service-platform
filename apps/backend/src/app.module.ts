@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { SystemModule } from './modules/system/system.module';
+import { MarketplaceModule } from './modules/marketplace/marketplace.module';
 import { ProviderModule } from './modules/provider/provider.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { PaymentsModule } from './modules/payments/payments.module';
@@ -26,6 +27,7 @@ import configuration from './config/configuration';
     AuthModule,
     UsersModule,
     SystemModule,
+    MarketplaceModule,
     ProviderModule,
     BookingsModule,
     PaymentsModule,
