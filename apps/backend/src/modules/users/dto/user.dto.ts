@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, MinLength, IsEnum, IsBoolean, IsNumber } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MinLength, IsEnum, IsBoolean, IsNumber, IsDateString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
@@ -24,7 +24,8 @@ export class UpdateProfileDto {
 
   @ApiPropertyOptional({ example: '1990-01-01' })
   @IsOptional()
-  birthDate?: Date;
+  @IsDateString()
+  birthDate?: string;
 }
 
 export class ChangePasswordDto {
