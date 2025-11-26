@@ -56,12 +56,6 @@ enum TransactionStatus {
   failed
 }
 
-enum BlockchainTxStatus {
-  pending
-  confirmed
-  failed
-}
-
 enum OtpPurpose {
   login
   reset_password
@@ -82,7 +76,6 @@ enum PaymentMethod {
   momo
   bank_transfer
   wallet
-  crypto
 }
 
 // ============================================
@@ -103,25 +96,25 @@ model User {
   updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  profile           UserProfile?
-  providerProfile   ProviderProfile?
-  wallet            Wallet?
-  userRoles         UserRole[]
-  addresses         Address[]
-  bookingsCustomer  Booking[]          @relation("CustomerBookings")
-  bookingsProvider  Booking[]          @relation("ProviderBookings")
-  sessions          Session[]
-  notifications     Notification[]
-  reviewsGiven      Review[]           @relation("ReviewerReviews")
-  reviewsReceived   Review[]           @relation("RevieweeReviews")
-  disputesRaised    Dispute[]          @relation("DisputeRaisedBy")
-  disputesResolved  Dispute[]          @relation("DisputeResolvedBy")
-  conversationsCustomer Conversation[] @relation("CustomerConversations")
-  conversationsProvider Conversation[] @relation("ProviderConversations")
-  sentMessages      Message[]
-  mediaUploads      Media[]
-  auditLogs         AuditLog[]
-  favorites         Favorite[]
+  profile               UserProfile?
+  providerProfile       ProviderProfile?
+  wallet                Wallet?
+  userRoles             UserRole[]
+  addresses             Address[]
+  bookingsCustomer      Booking[]        @relation("CustomerBookings")
+  bookingsProvider      Booking[]        @relation("ProviderBookings")
+  sessions              Session[]
+  notifications         Notification[]
+  reviewsGiven          Review[]         @relation("ReviewerReviews")
+  reviewsReceived       Review[]         @relation("RevieweeReviews")
+  disputesRaised        Dispute[]        @relation("DisputeRaisedBy")
+  disputesResolved      Dispute[]        @relation("DisputeResolvedBy")
+  conversationsCustomer Conversation[]   @relation("CustomerConversations")
+  conversationsProvider Conversation[]   @relation("ProviderConversations")
+  sentMessages          Message[]
+  mediaUploads          Media[]
+  auditLogs             AuditLog[]
+  favorites             Favorite[]
 
   @@index([email])
   @@index([status])
@@ -130,16 +123,16 @@ model User {
 }
 
 model UserProfile {
-  userId      BigInt    @id @map("user_id")
-  fullName    String?   @map("full_name") @db.VarChar(200)
-  avatarUrl   String?   @map("avatar_url") @db.Text
-  bio         String?   @db.Text
-  gender      String?   @db.VarChar(20)
-  birthDate   DateTime? @map("birth_date") @db.Date
-  addressText String?   @map("address_text") @db.Text
+  userId      BigInt                                @id @map("user_id")
+  fullName    String?                               @map("full_name") @db.VarChar(200)
+  avatarUrl   String?                               @map("avatar_url") @db.Text
+  bio         String?                               @db.Text
+  gender      String?                               @db.VarChar(20)
+  birthDate   DateTime?                             @map("birth_date") @db.Date
+  addressText String?                               @map("address_text") @db.Text
   location    Unsupported("geography(Point,4326)")?
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt   DateTime                              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime                              @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -147,16 +140,16 @@ model UserProfile {
 }
 
 model OtpCode {
-  id             BigInt     @id @default(autoincrement())
-  phone          String     @db.VarChar(20)
-  codeHash       String     @map("code_hash") @db.VarChar(255)
-  purpose        OtpPurpose
-  expiresAt      DateTime   @map("expires_at") @db.Timestamptz(6)
-  used           Boolean    @default(false)
-  attemptCount   Int        @default(0) @map("attempt_count") @db.SmallInt
-  lastAttemptAt  DateTime?  @map("last_attempt_at") @db.Timestamptz(6)
-  ipAddress      String?    @map("ip_address") @db.VarChar(50)
-  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  id            BigInt     @id @default(autoincrement())
+  phone         String     @db.VarChar(20)
+  codeHash      String     @map("code_hash") @db.VarChar(255)
+  purpose       OtpPurpose
+  expiresAt     DateTime   @map("expires_at") @db.Timestamptz(6)
+  used          Boolean    @default(false)
+  attemptCount  Int        @default(0) @map("attempt_count") @db.SmallInt
+  lastAttemptAt DateTime?  @map("last_attempt_at") @db.Timestamptz(6)
+  ipAddress     String?    @map("ip_address") @db.VarChar(50)
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([phone, purpose, used])
   @@map("otp_codes")
@@ -236,18 +229,18 @@ model RolePermission {
 // ============================================
 
 model ProviderProfile {
-  userId             BigInt                      @id @map("user_id")
-  displayName        String                      @map("display_name") @db.VarChar(200)
-  bio                String?                     @db.Text
-  skills             Json?                       @db.JsonB
-  ratingAvg          Decimal                     @default(0) @map("rating_avg") @db.Decimal(3, 2)
-  ratingCount        Int                         @default(0) @map("rating_count")
-  isAvailable        Boolean                     @default(true) @map("is_available")
-  verificationStatus ProviderVerificationStatus  @default(unverified) @map("verification_status")
+  userId             BigInt                                @id @map("user_id")
+  displayName        String                                @map("display_name") @db.VarChar(200)
+  bio                String?                               @db.Text
+  skills             Json?                                 @db.JsonB
+  ratingAvg          Decimal                               @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount        Int                                   @default(0) @map("rating_count")
+  isAvailable        Boolean                               @default(true) @map("is_available")
+  verificationStatus ProviderVerificationStatus            @default(unverified) @map("verification_status")
   location           Unsupported("geography(Point,4326)")?
-  serviceRadiusM     Int                         @default(5000) @map("service_radius_m")
-  createdAt          DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime                    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  serviceRadiusM     Int                                   @default(5000) @map("service_radius_m")
+  createdAt          DateTime                              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime                              @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   providerServices ProviderService[]
@@ -258,15 +251,15 @@ model ProviderProfile {
 }
 
 model ServiceCategory {
-  id          Int       @id @default(autoincrement())
-  code        String    @unique @db.VarChar(50)
-  name        String    @db.VarChar(150)
-  slug        String?   @unique @db.VarChar(150)
-  description String?   @db.Text
-  iconUrl     String?   @map("icon_url") @db.Text
-  parentId    Int?      @map("parent_id")
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id          Int      @id @default(autoincrement())
+  code        String   @unique @db.VarChar(50)
+  name        String   @db.VarChar(150)
+  slug        String?  @unique @db.VarChar(150)
+  description String?  @db.Text
+  iconUrl     String?  @map("icon_url") @db.Text
+  parentId    Int?     @map("parent_id")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   parent   ServiceCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   children ServiceCategory[] @relation("CategoryHierarchy")
@@ -326,14 +319,14 @@ model Favorite {
 // ============================================
 
 model Address {
-  id          BigInt   @id @default(autoincrement())
-  userId      BigInt   @map("user_id")
-  label       String?  @db.VarChar(100)
-  addressText String   @map("address_text") @db.Text
+  id          BigInt                               @id @default(autoincrement())
+  userId      BigInt                               @map("user_id")
+  label       String?                              @db.VarChar(100)
+  addressText String                               @map("address_text") @db.Text
   location    Unsupported("geography(Point,4326)")
-  isDefault   Boolean  @default(false) @map("is_default")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  isDefault   Boolean                              @default(false) @map("is_default")
+  createdAt   DateTime                             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime                             @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -341,37 +334,35 @@ model Address {
 }
 
 model Booking {
-  id                       BigInt        @id @default(autoincrement())
-  code                     String?       @unique @db.VarChar(50)
-  customerId               BigInt        @map("customer_id")
-  providerId               BigInt?       @map("provider_id")
-  serviceId                Int           @map("service_id")
-  providerServicePrice     Decimal?      @map("provider_service_price") @db.Decimal(12, 2)
-  status                   BookingStatus @default(pending)
-  scheduledAt              DateTime      @map("scheduled_at") @db.Timestamptz(6)
-  addressText              String        @map("address_text") @db.Text
+  id                       BigInt                               @id @default(autoincrement())
+  code                     String?                              @unique @db.VarChar(50)
+  customerId               BigInt                               @map("customer_id")
+  providerId               BigInt?                              @map("provider_id")
+  serviceId                Int                                  @map("service_id")
+  providerServicePrice     Decimal?                             @map("provider_service_price") @db.Decimal(12, 2)
+  status                   BookingStatus                        @default(pending)
+  scheduledAt              DateTime                             @map("scheduled_at") @db.Timestamptz(6)
+  addressText              String                               @map("address_text") @db.Text
   location                 Unsupported("geography(Point,4326)")
-  notes                    String?       @db.Text
-  estimatedDurationMinutes Int?          @map("estimated_duration_minutes")
-  estimatedPrice           Decimal?      @map("estimated_price") @db.Decimal(12, 2)
-  actualPrice              Decimal?      @map("actual_price") @db.Decimal(12, 2)
-  platformFee              Decimal       @default(0) @map("platform_fee") @db.Decimal(12, 2)
-  providerEarning          Decimal       @default(0) @map("provider_earning") @db.Decimal(12, 2)
-  escrowContractAddress    String?       @map("escrow_contract_address") @db.VarChar(66)
-  createdAt                DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
-  completedAt              DateTime?     @map("completed_at") @db.Timestamptz(6)
-  cancelledAt              DateTime?     @map("cancelled_at") @db.Timestamptz(6)
+  notes                    String?                              @db.Text
+  estimatedDurationMinutes Int?                                 @map("estimated_duration_minutes")
+  estimatedPrice           Decimal?                             @map("estimated_price") @db.Decimal(12, 2)
+  actualPrice              Decimal?                             @map("actual_price") @db.Decimal(12, 2)
+  platformFee              Decimal                              @default(0) @map("platform_fee") @db.Decimal(12, 2)
+  providerEarning          Decimal                              @default(0) @map("provider_earning") @db.Decimal(12, 2)
+  createdAt                DateTime                             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime                             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  completedAt              DateTime?                            @map("completed_at") @db.Timestamptz(6)
+  cancelledAt              DateTime?                            @map("cancelled_at") @db.Timestamptz(6)
 
-  customer           User              @relation("CustomerBookings", fields: [customerId], references: [id], onDelete: Restrict)
-  providerUser       User?             @relation("ProviderBookings", fields: [providerId], references: [id], onDelete: Restrict)
-  service            Service           @relation(fields: [serviceId], references: [id], onDelete: Restrict)
-  bookingEvents      BookingEvent[]
-  payments           Payment[]
-  review             Review?
-  dispute            Dispute?
-  conversations      Conversation[]
-  blockchainTxs      BlockchainTransaction[]
+  customer      User           @relation("CustomerBookings", fields: [customerId], references: [id], onDelete: Restrict)
+  providerUser  User?          @relation("ProviderBookings", fields: [providerId], references: [id], onDelete: Restrict)
+  service       Service        @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  bookingEvents BookingEvent[]
+  payments      Payment[]
+  review        Review?
+  dispute       Dispute?
+  conversations Conversation[]
 
   @@index([customerId, status])
   @@index([providerId, status])
@@ -414,7 +405,7 @@ model Payment {
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  booking            Booking?             @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  booking            Booking?            @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   walletTransactions WalletTransaction[]
 
   @@unique([gateway, gatewayTxId, environment])
@@ -424,15 +415,14 @@ model Payment {
 }
 
 model Wallet {
-  userId            BigInt    @id @map("user_id")
-  balance           Decimal   @default(0) @db.Decimal(18, 4)
-  currency          String    @default("VND") @db.VarChar(10)
-  blockchainAddress String?   @unique @map("blockchain_address") @db.VarChar(66)
-  version           Int       @default(0)
-  lockedUntil       DateTime? @map("locked_until") @db.Timestamptz(6)
-  lockedBy          String?   @map("locked_by") @db.VarChar(100)
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  userId      BigInt    @id @map("user_id")
+  balance     Decimal   @default(0) @db.Decimal(18, 4)
+  currency    String    @default("VND") @db.VarChar(10)
+  version     Int       @default(0)
+  lockedUntil DateTime? @map("locked_until") @db.Timestamptz(6)
+  lockedBy    String?   @map("locked_by") @db.VarChar(100)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions WalletTransaction[]
@@ -466,15 +456,14 @@ model WalletTransaction {
 // ============================================
 
 model Review {
-  id               BigInt   @id @default(autoincrement())
-  bookingId        BigInt   @unique @map("booking_id")
-  reviewerId       BigInt   @map("reviewer_id")
-  revieweeId       BigInt   @map("reviewee_id")
-  rating           Int      @db.SmallInt
-  title            String?  @db.VarChar(255)
-  comment          String?  @db.Text
-  blockchainTxHash String?  @unique @map("blockchain_tx_hash") @db.VarChar(66)
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id         BigInt   @id @default(autoincrement())
+  bookingId  BigInt   @unique @map("booking_id")
+  reviewerId BigInt   @map("reviewer_id")
+  revieweeId BigInt   @map("reviewee_id")
+  rating     Int      @db.SmallInt
+  title      String?  @db.VarChar(255)
+  comment    String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   booking  Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   reviewer User    @relation("ReviewerReviews", fields: [reviewerId], references: [id], onDelete: Cascade)
@@ -497,9 +486,9 @@ model Dispute {
   createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   resolvedAt        DateTime?     @map("resolved_at") @db.Timestamptz(6)
 
-  booking      Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
-  raiser       User    @relation("DisputeRaisedBy", fields: [raisedBy], references: [id])
-  resolvedBy   User?   @relation("DisputeResolvedBy", fields: [resolvedByAdminId], references: [id])
+  booking    Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  raiser     User    @relation("DisputeRaisedBy", fields: [raisedBy], references: [id])
+  resolvedBy User?   @relation("DisputeResolvedBy", fields: [resolvedByAdminId], references: [id])
 
   @@map("disputes")
 }
@@ -515,9 +504,9 @@ model Conversation {
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  customer User     @relation("CustomerConversations", fields: [customerId], references: [id], onDelete: Cascade)
-  provider User     @relation("ProviderConversations", fields: [providerId], references: [id], onDelete: Cascade)
-  booking  Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  customer User      @relation("CustomerConversations", fields: [customerId], references: [id], onDelete: Cascade)
+  provider User      @relation("ProviderConversations", fields: [providerId], references: [id], onDelete: Cascade)
+  booking  Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   messages Message[]
 
   @@index([customerId])
@@ -543,7 +532,7 @@ model Message {
 }
 
 // ============================================
-// MODULE 7: SYSTEM & UTILITIES (5 bảng)
+// MODULE 7: SYSTEM & UTILITIES (4 bảng)
 // ============================================
 
 model Media {
@@ -604,28 +593,6 @@ model AuditLog {
   @@index([objectType, objectId])
   @@index([createdAt(sort: Desc)])
   @@map("audit_logs")
-}
-
-model BlockchainTransaction {
-  id               BigInt             @id @default(autoincrement())
-  txHash           String             @unique @map("tx_hash") @db.VarChar(66)
-  fromAddress      String             @map("from_address") @db.VarChar(66)
-  toAddress        String             @map("to_address") @db.VarChar(66)
-  value            Decimal?           @db.Decimal(36, 18)
-  tokenSymbol      String?            @map("token_symbol") @db.VarChar(20)
-  decimals         Int?
-  status           BlockchainTxStatus @default(pending)
-  relatedBookingId BigInt?            @map("related_booking_id")
-  payload          Json?              @db.JsonB
-  blockNumber      BigInt?            @map("block_number")
-  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  confirmedAt      DateTime?          @map("confirmed_at") @db.Timestamptz(6)
-
-  booking Booking? @relation(fields: [relatedBookingId], references: [id], onDelete: SetNull)
-
-  @@index([status])
-  @@index([relatedBookingId])
-  @@map("blockchain_transactions")
 }
 
 model Setting {
