@@ -77,7 +77,7 @@ export class AddServiceDto {
   currency?: string;
 }
 
-export class UpdateServiceDto {
+export class UpdateProviderServiceDto {
   @ApiPropertyOptional({ example: 250000 })
   @IsOptional()
   @Type(() => Number)
@@ -89,4 +89,23 @@ export class UpdateServiceDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+}
+
+export class UpdateLocationDto {
+  @ApiProperty({ example: 10.762622, description: 'Latitude coordinate' })
+  @IsNotEmpty()
+  @Type(() => Number)
+  @IsNumber()
+  latitude: number;
+
+  @ApiProperty({ example: 106.660172, description: 'Longitude coordinate' })
+  @IsNotEmpty()
+  @Type(() => Number)
+  @IsNumber()
+  longitude: number;
+
+  @ApiPropertyOptional({ example: '123 Nguyễn Huệ, Quận 1, TP.HCM' })
+  @IsOptional()
+  @IsString()
+  addressText?: string;
 }
