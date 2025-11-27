@@ -23,16 +23,13 @@ CREATE TYPE "DisputeStatus" AS ENUM ('open', 'under_review', 'resolved', 'closed
 CREATE TYPE "TransactionStatus" AS ENUM ('pending', 'completed', 'failed');
 
 -- CreateEnum
-CREATE TYPE "BlockchainTxStatus" AS ENUM ('pending', 'confirmed', 'failed');
-
--- CreateEnum
 CREATE TYPE "OtpPurpose" AS ENUM ('login', 'reset_password', 'verify_phone');
 
 -- CreateEnum
 CREATE TYPE "TransactionType" AS ENUM ('deposit', 'withdrawal', 'payment', 'fee', 'refund', 'earning');
 
 -- CreateEnum
-CREATE TYPE "PaymentMethod" AS ENUM ('card', 'momo', 'bank_transfer', 'wallet', 'crypto');
+CREATE TYPE "PaymentMethod" AS ENUM ('card', 'momo', 'bank_transfer', 'wallet');
 
 -- CreateTable
 CREATE TABLE "users" (
@@ -239,7 +236,6 @@ CREATE TABLE "bookings" (
     "actual_price" DECIMAL(12,2),
     "platform_fee" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "provider_earning" DECIMAL(12,2) NOT NULL DEFAULT 0,
-    "escrow_contract_address" VARCHAR(66),
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
     "completed_at" TIMESTAMPTZ(6),
@@ -285,7 +281,6 @@ CREATE TABLE "wallets" (
     "user_id" BIGINT NOT NULL,
     "balance" DECIMAL(18,4) NOT NULL DEFAULT 0,
     "currency" VARCHAR(10) NOT NULL DEFAULT 'VND',
-    "blockchain_address" VARCHAR(66),
     "version" INTEGER NOT NULL DEFAULT 0,
     "locked_until" TIMESTAMPTZ(6),
     "locked_by" VARCHAR(100),
@@ -320,7 +315,6 @@ CREATE TABLE "reviews" (
     "rating" SMALLINT NOT NULL,
     "title" VARCHAR(255),
     "comment" TEXT,
-    "blockchain_tx_hash" VARCHAR(66),
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "reviews_pkey" PRIMARY KEY ("id")
@@ -418,25 +412,6 @@ CREATE TABLE "audit_logs" (
 );
 
 -- CreateTable
-CREATE TABLE "blockchain_transactions" (
-    "id" BIGSERIAL NOT NULL,
-    "tx_hash" VARCHAR(66) NOT NULL,
-    "from_address" VARCHAR(66) NOT NULL,
-    "to_address" VARCHAR(66) NOT NULL,
-    "value" DECIMAL(36,18),
-    "token_symbol" VARCHAR(20),
-    "decimals" INTEGER,
-    "status" "BlockchainTxStatus" NOT NULL DEFAULT 'pending',
-    "related_booking_id" BIGINT,
-    "payload" JSONB,
-    "block_number" BIGINT,
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "confirmed_at" TIMESTAMPTZ(6),
-
-    CONSTRAINT "blockchain_transactions_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "settings" (
     "key" VARCHAR(200) NOT NULL,
     "value" JSONB NOT NULL,
@@ -516,9 +491,6 @@ CREATE INDEX "payments_status_idx" ON "payments"("status");
 CREATE UNIQUE INDEX "payments_gateway_gateway_tx_id_environment_key" ON "payments"("gateway", "gateway_tx_id", "environment");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "wallets_blockchain_address_key" ON "wallets"("blockchain_address");
-
--- CreateIndex
 CREATE UNIQUE INDEX "wallet_transactions_idempotency_key_key" ON "wallet_transactions"("idempotency_key");
 
 -- CreateIndex
@@ -532,9 +504,6 @@ CREATE INDEX "wallet_transactions_related_payment_id_idx" ON "wallet_transaction
 
 -- CreateIndex
 CREATE UNIQUE INDEX "reviews_booking_id_key" ON "reviews"("booking_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "reviews_blockchain_tx_hash_key" ON "reviews"("blockchain_tx_hash");
 
 -- CreateIndex
 CREATE INDEX "reviews_reviewee_id_rating_idx" ON "reviews"("reviewee_id", "rating");
@@ -587,15 +556,6 @@ CREATE INDEX "audit_logs_object_type_object_id_idx" ON "audit_logs"("object_type
 -- CreateIndex
 CREATE INDEX "audit_logs_created_at_idx" ON "audit_logs"("created_at" DESC);
 
--- CreateIndex
-CREATE UNIQUE INDEX "blockchain_transactions_tx_hash_key" ON "blockchain_transactions"("tx_hash");
-
--- CreateIndex
-CREATE INDEX "blockchain_transactions_status_idx" ON "blockchain_transactions"("status");
-
--- CreateIndex
-CREATE INDEX "blockchain_transactions_related_booking_id_idx" ON "blockchain_transactions"("related_booking_id");
-
 -- AddForeignKey
 ALTER TABLE "user_profiles" ADD CONSTRAINT "user_profiles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -639,7 +599,7 @@ ALTER TABLE "addresses" ADD CONSTRAINT "addresses_user_id_fkey" FOREIGN KEY ("us
 ALTER TABLE "bookings" ADD CONSTRAINT "bookings_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "bookings" ADD CONSTRAINT "bookings_provider_user_fkey" FOREIGN KEY ("provider_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_provider_id_fkey" FOREIGN KEY ("provider_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "bookings" ADD CONSTRAINT "bookings_service_id_fkey" FOREIGN KEY ("service_id") REFERENCES "services"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -700,6 +660,3 @@ ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_fkey" FOREIGN 
 
 -- AddForeignKey
 ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_actor_user_id_fkey" FOREIGN KEY ("actor_user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "blockchain_transactions" ADD CONSTRAINT "blockchain_transactions_related_booking_id_fkey" FOREIGN KEY ("related_booking_id") REFERENCES "bookings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
