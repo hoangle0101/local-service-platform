@@ -16,7 +16,8 @@ import {
   UpdateProviderProfileDto,
   UpdateAvailabilityDto,
   AddServiceDto,
-  UpdateServiceDto,
+  UpdateProviderServiceDto,
+  UpdateLocationDto,
 } from './dto/provider.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -90,7 +91,7 @@ export class ProviderController {
   async updateService(
     @CurrentUser() user: any,
     @Param('serviceId', ParseIntPipe) serviceId: number,
-    @Body() dto: UpdateServiceDto,
+    @Body() dto: UpdateProviderServiceDto,
   ) {
     return this.providerService.updateService(BigInt(user.userId), serviceId, dto);
   }
@@ -113,5 +114,18 @@ export class ProviderController {
   @ApiOperation({ summary: 'Get provider statistics' })
   async getStatistics(@CurrentUser() user: any) {
     return this.providerService.getStatistics(BigInt(user.userId));
+  }
+
+  @Patch('me/location')
+  @UseGuards(RolesGuard)
+  @Roles('provider')
+  @ApiOperation({ summary: 'Update provider location (GPS coordinates)' })
+  async updateLocation(@CurrentUser() user: any, @Body() dto: UpdateLocationDto) {
+    return this.providerService.updateLocation(
+      BigInt(user.userId),
+      dto.latitude,
+      dto.longitude,
+      dto.addressText,
+    );
   }
 }

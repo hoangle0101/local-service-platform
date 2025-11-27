@@ -5,7 +5,7 @@ import {
   UpdateProviderProfileDto,
   UpdateAvailabilityDto,
   AddServiceDto,
-  UpdateServiceDto,
+  UpdateProviderServiceDto,
 } from './dto/provider.dto';
 
 @Injectable()
@@ -255,7 +255,7 @@ export class ProviderService {
   }
 
   // PATCH /provider/services/:serviceId
-  async updateService(userId: bigint, serviceId: number, dto: UpdateServiceDto) {
+  async updateService(userId: bigint, serviceId: number, dto: UpdateProviderServiceDto) {
     const updated = await this.prisma.providerService.update({
       where: {
         providerUserId_serviceId: {
@@ -327,6 +327,47 @@ export class ProviderService {
       totalEarnings: earnings._sum?.providerEarning?.toString() || '0',
       ratingAvg: provider?.ratingAvg.toString() || '0',
       ratingCount: provider?.ratingCount || 0,
+    };
+  }
+
+  // PATCH /provider/me/location
+  async updateLocation(userId: bigint, latitude: number, longitude: number, addressText?: string) {
+    // Verify provider profile exists
+    const provider = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!provider) {
+      throw new NotFoundException('Provider profile not found');
+    }
+
+    // Validate coordinates
+    if (latitude < -90 || latitude > 90) {
+      throw new BadRequestException('Invalid latitude. Must be between -90 and 90');
+    }
+
+    if (longitude < -180 || longitude > 180) {
+      throw new BadRequestException('Invalid longitude. Must be between -180 and 180');
+    }
+
+    // Update location using PostGIS
+    await this.prisma.$executeRawUnsafe(
+      `
+      UPDATE provider_profiles
+      SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326),
+          updated_at = NOW()
+      WHERE user_id = $3
+    `,
+      longitude,
+      latitude,
+      userId,
+    );
+
+    return {
+      message: 'Location updated successfully',
+      latitude,
+      longitude,
+      addressText,
     };
   }
 }
