@@ -1,6 +1,6 @@
 import { Body, Controller, Post, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto, SendOtpDto, VerifyOtpDto, ResetPasswordDto, RefreshTokenDto } from './dto/auth.dto';
+import { LoginDto, LoginWithOtpDto, RegisterDto, SendOtpDto, VerifyOtpDto, ResetPasswordDto, RefreshTokenDto } from './dto/auth.dto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
 @ApiTags('Auth')
@@ -15,10 +15,20 @@ export class AuthController {
   }
 
   @Post('login')
-  @ApiOperation({ summary: 'Login with password' })
+  @ApiOperation({ summary: 'Login with password (requires verified account)' })
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Post('login-otp')
+  @ApiOperation({ 
+    summary: 'Login with OTP (alternative to password)',
+    description: 'Send OTP with purpose "login" first, then use this endpoint to login. Also activates unverified accounts.'
+  })
+  @HttpCode(HttpStatus.OK)
+  async loginWithOtp(@Body() dto: LoginWithOtpDto) {
+    return this.authService.loginWithOtp(dto);
   }
 
   @Post('refresh-token')

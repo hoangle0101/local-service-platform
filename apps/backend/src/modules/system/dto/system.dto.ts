@@ -26,3 +26,22 @@ export class UploadResponseDto {
   @ApiProperty()
   size: number | null;
 }
+
+export class UpsertSettingDto {
+  @ApiProperty({ example: 'platform_fee_percent' })
+  @IsNotEmpty()
+  @IsString()
+  key: string;
+
+  @ApiProperty({ 
+    example: { value: 15, type: 'percent' },
+    description: 'Value as JSON object'
+  })
+  @IsNotEmpty()
+  value: any;
+
+  @ApiPropertyOptional({ example: 'Platform fee percentage' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+}

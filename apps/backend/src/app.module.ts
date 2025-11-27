@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { SystemModule } from './modules/system/system.module';
+import { ServicesModule } from './modules/services/services.module';
 import { MarketplaceModule } from './modules/marketplace/marketplace.module';
 import { ProviderModule } from './modules/provider/provider.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
@@ -14,7 +15,6 @@ import { WalletsModule } from './modules/wallets/wallets.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { DisputesModule } from './modules/disputes/disputes.module';
 import { AdminModule } from './modules/admin/admin.module';
-import { ServicesModule } from './modules/services/services.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -27,6 +27,7 @@ import configuration from './config/configuration';
     AuthModule,
     UsersModule,
     SystemModule,
+    ServicesModule,
     MarketplaceModule,
     ProviderModule,
     BookingsModule,
@@ -35,7 +36,6 @@ import configuration from './config/configuration';
     ConversationsModule,
     DisputesModule,
     AdminModule,
-    ServicesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
