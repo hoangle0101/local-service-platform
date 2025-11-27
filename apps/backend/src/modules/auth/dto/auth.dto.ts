@@ -33,6 +33,17 @@ export class LoginDto {
   password: string;
 }
 
+export class LoginWithOtpDto {
+  @ApiProperty({ example: '+84987654321' })
+  @IsNotEmpty()
+  @IsPhoneNumber()
+  phone: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsNotEmpty()
+  code: string;
+}
+
 export class RefreshTokenDto {
   @ApiProperty()
   @IsNotEmpty()
