@@ -2,7 +2,10 @@ import {
   Controller,
   Post,
   Get,
+  Put,
+  Delete,
   Body,
+  Param,
   UseGuards,
   UseInterceptors,
   UploadedFile,
@@ -11,8 +14,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { UploadService } from './upload.service';
 import { SettingsService } from './settings.service';
-import { PresignedUrlDto } from './dto/system.dto';
+import { PresignedUrlDto, UpsertSettingDto } from './dto/system.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('System')
@@ -66,5 +71,34 @@ export class SystemController {
   @ApiOperation({ summary: 'Get public settings' })
   async getPublicSettings() {
     return this.settingsService.getPublicSettings();
+  }
+
+  // ========== ADMIN ONLY ENDPOINTS ==========
+
+  @Get('admin/settings/:key')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin: Get setting by key' })
+  async getSetting(@Param('key') key: string) {
+    return this.settingsService.getSetting(key);
+  }
+
+  @Put('admin/settings')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin: Create or update setting' })
+  async upsertSetting(@Body() dto: UpsertSettingDto) {
+    return this.settingsService.upsertSetting(dto.key, dto.value, dto.description);
+  }
+
+  @Delete('admin/settings/:key')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('super_admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin: Delete setting' })
+  async deleteSetting(@Param('key') key: string) {
+    return this.settingsService.deleteSetting(key);
   }
 }
