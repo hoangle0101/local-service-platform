@@ -1,11 +1,12 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/entities/entities.dart';
 import '../../../data/datasources/marketplace_datasource.dart';
 import 'services_event_state.dart';
 
 class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
-  final MarketplaceDataSource dataSource;
+  final MarketplaceDataSource _marketplaceDataSource = MarketplaceDataSource();
 
-  ServicesBloc({required this.dataSource}) : super(ServicesInitial()) {
+  ServicesBloc() : super(ServicesInitial()) {
     on<LoadServices>(_onLoadServices);
   }
 
@@ -15,7 +16,8 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
   ) async {
     emit(ServicesLoading());
     try {
-      final services = await dataSource.searchServices(limit: event.limit);
+      final services =
+          await _marketplaceDataSource.searchServices(limit: event.limit);
       emit(ServicesLoaded(services));
     } catch (e) {
       emit(ServicesError(e.toString()));

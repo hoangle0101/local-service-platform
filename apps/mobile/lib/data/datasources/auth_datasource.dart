@@ -23,13 +23,51 @@ class AuthDataSource {
     required String fullName,
   }) async {
     try {
+      print('📤 Sending registration request:');
+      print('   Phone: $phone');
+      print('   Password: ${password.replaceAll(RegExp(r'.'), '*')}');
+      print('   Full Name: $fullName');
+
       final response = await _dio.post('/auth/register', data: {
         'phone': phone,
         'password': password,
         'fullName': fullName,
       });
+
+      print('✅ Registration successful');
       return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      print('❌ Registration failed');
+      print('   Status Code: ${e.response?.statusCode}');
+      print('   Response Data: ${e.response?.data}');
+
+      // Extract detailed error message from backend
+      if (e.response?.data != null) {
+        final errorData = e.response!.data;
+
+        // Handle validation errors
+        if (errorData is Map<String, dynamic>) {
+          if (errorData.containsKey('message')) {
+            final message = errorData['message'];
+
+            // If message is a list (validation errors)
+            if (message is List) {
+              final errors = message.join('\n• ');
+              throw Exception('Validation errors:\n• $errors');
+            }
+
+            // If message is a string
+            if (message is String) {
+              throw Exception(message);
+            }
+          }
+        }
+      }
+
+      // Fallback error message
+      throw Exception('Failed to register. Please check your input.');
     } catch (e) {
+      print('❌ Unexpected error: $e');
       throw Exception('Failed to register: $e');
     }
   }
@@ -166,6 +204,32 @@ class AuthDataSource {
       return response.data as Map<String, dynamic>;
     } catch (e) {
       throw Exception('Failed to reset password: $e');
+    }
+  }
+
+  // Get user profile
+  Future<UserEntity> getUserProfile(String accessToken) async {
+    try {
+      final response = await _dio.get(
+        '/users/me',
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+          },
+        ),
+      );
+
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        // Handle wrapped response
+        if (data.containsKey('data')) {
+          return UserEntity.fromJson(data['data'] as Map<String, dynamic>);
+        }
+        return UserEntity.fromJson(data);
+      }
+      throw Exception('Unexpected response format');
+    } catch (e) {
+      throw Exception('Failed to get user profile: $e');
     }
   }
 

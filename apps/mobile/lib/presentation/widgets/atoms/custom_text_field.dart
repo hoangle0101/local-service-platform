@@ -67,7 +67,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
           inputFormatters: _getInputFormatters(),
           decoration: InputDecoration(
             hintText: widget.hint,
-            hintStyle: TextStyle(color: AppColors.textTertiary),
+            hintStyle: const TextStyle(color: AppColors.textTertiary),
             prefixIcon: widget.prefixIcon,
             suffixIcon: widget.type == TextFieldType.password
                 ? IconButton(

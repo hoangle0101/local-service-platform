@@ -46,10 +46,22 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
   void _handleNext() {
     if (_currentStep == 0) {
       if (_formKey.currentState!.validate()) {
+        // Format phone number with +84 if not present
+        String phone = _phoneController.text.trim();
+        if (!phone.startsWith('+')) {
+          if (phone.startsWith('0')) {
+            phone = '+84${phone.substring(1)}';
+          } else if (phone.startsWith('84')) {
+            phone = '+$phone';
+          } else {
+            phone = '+84$phone';
+          }
+        }
+
         // Register user account
         context.read<AuthBloc>().add(
               RegisterRequested(
-                phone: _phoneController.text,
+                phone: phone,
                 password: _passwordController.text,
                 fullName: _fullNameController.text,
               ),

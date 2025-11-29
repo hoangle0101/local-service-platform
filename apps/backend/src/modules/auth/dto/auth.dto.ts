@@ -1,4 +1,12 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength, IsEnum, IsPhoneNumber } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength,
+  IsEnum,
+  IsPhoneNumber,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum OtpPurpose {
@@ -10,7 +18,7 @@ export enum OtpPurpose {
 export class RegisterDto {
   @ApiProperty({ example: '+84987654321' })
   @IsNotEmpty()
-  @IsPhoneNumber()
+  @IsPhoneNumber('VN')
   phone: string;
 
   @ApiProperty({ example: 'password123' })
@@ -36,7 +44,7 @@ export class LoginDto {
 export class LoginWithOtpDto {
   @ApiProperty({ example: '+84987654321' })
   @IsNotEmpty()
-  @IsPhoneNumber()
+  @IsPhoneNumber('VN')
   phone: string;
 
   @ApiProperty({ example: '123456' })
@@ -53,7 +61,7 @@ export class RefreshTokenDto {
 export class SendOtpDto {
   @ApiProperty({ example: '+84987654321' })
   @IsNotEmpty()
-  @IsPhoneNumber()
+  @IsPhoneNumber('VN')
   phone: string;
 
   @ApiProperty({ enum: OtpPurpose })
@@ -64,7 +72,7 @@ export class SendOtpDto {
 export class VerifyOtpDto {
   @ApiProperty({ example: '+84987654321' })
   @IsNotEmpty()
-  @IsPhoneNumber()
+  @IsPhoneNumber('VN')
   phone: string;
 
   @ApiProperty({ example: '123456' })
@@ -79,14 +87,14 @@ export class VerifyOtpDto {
 export class ForgotPasswordDto {
   @ApiProperty({ example: '+84987654321' })
   @IsNotEmpty()
-  @IsPhoneNumber()
+  @IsPhoneNumber('VN')
   phone: string;
 }
 
 export class ResetPasswordDto {
   @ApiProperty({ example: '+84987654321' })
   @IsNotEmpty()
-  @IsPhoneNumber()
+  @IsPhoneNumber('VN')
   phone: string;
 
   @ApiProperty({ example: '123456' })

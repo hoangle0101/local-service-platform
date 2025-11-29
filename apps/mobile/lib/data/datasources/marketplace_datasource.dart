@@ -144,25 +144,17 @@ class MarketplaceDataSource {
       isActive: json['isActive'] as bool? ?? true,
       service: Service(
         id: _parseInt(serviceData['id']),
-        categoryId: serviceData['categoryId'] != null
-            ? _parseInt(serviceData['categoryId'])
-            : null,
+        categoryId: _parseInt(serviceData['categoryId'], defaultValue: 0),
         name: serviceData['name'] as String,
         description: serviceData['description'] as String?,
-        basePrice: _parseDouble(serviceData['basePrice']),
-        durationMinutes: serviceData['durationMinutes'] != null
-            ? _parseInt(serviceData['durationMinutes'])
-            : null,
+        iconUrl: serviceData['iconUrl'] as String?,
       ),
-      provider: Provider(
+      provider: ProviderInfo(
         userId: providerData['userId'].toString(),
         displayName: providerData['displayName'] as String,
-        bio: providerData['bio'] as String?,
+        isVerified: providerData['isVerified'] as bool? ?? false,
         ratingAvg: _parseDouble(providerData['ratingAvg']),
         ratingCount: _parseInt(providerData['ratingCount']),
-        isAvailable: providerData['isAvailable'] as bool? ?? false,
-        verificationStatus:
-            providerData['verificationStatus'] as String? ?? 'unverified',
       ),
     );
   }

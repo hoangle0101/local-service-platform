@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile/presentation/bloc/auth/auth_bloc.dart';
+import 'package:mobile/presentation/bloc/categories/categories_bloc.dart';
+import 'package:mobile/presentation/bloc/services/services_bloc.dart';
+import 'package:mobile/presentation/bloc/bookings/bookings_bloc.dart';
 import 'presentation/navigation/app_router.dart';
 import 'presentation/theme/app_theme.dart';
 
@@ -11,7 +14,15 @@ void main() {
         BlocProvider<AuthBloc>(
           create: (_) => AuthBloc(),
         ),
-        // Thêm các bloc khác nếu cần
+        BlocProvider<CategoriesBloc>(
+          create: (_) => CategoriesBloc(),
+        ),
+        BlocProvider<ServicesBloc>(
+          create: (_) => ServicesBloc(),
+        ),
+        BlocProvider<BookingsBloc>(
+          create: (_) => BookingsBloc(),
+        ),
       ],
       child: const MyApp(),
     ),

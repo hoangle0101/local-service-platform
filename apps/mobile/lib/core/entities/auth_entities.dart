@@ -1,4 +1,3 @@
-// Auth-related entities
 class AuthTokens {
   final String accessToken;
   final String refreshToken;
@@ -31,6 +30,7 @@ class UserEntity {
   final bool isVerified;
   final DateTime? lastLoginAt;
   final UserProfileEntity? profile;
+  final ProviderProfileEntity? providerProfile;
 
   UserEntity({
     required this.id,
@@ -40,7 +40,18 @@ class UserEntity {
     required this.isVerified,
     this.lastLoginAt,
     this.profile,
+    this.providerProfile,
   });
+
+  /// Check if user is a provider
+  bool get isProvider => providerProfile != null;
+
+  /// Get user's full name
+  String get fullName =>
+      profile?.fullName ?? providerProfile?.displayName ?? 'User';
+
+  /// Get user's role
+  String get role => isProvider ? 'provider' : 'user';
 
   factory UserEntity.fromJson(Map<String, dynamic> json) {
     return UserEntity(
@@ -54,6 +65,10 @@ class UserEntity {
           : null,
       profile: json['profile'] != null
           ? UserProfileEntity.fromJson(json['profile'] as Map<String, dynamic>)
+          : null,
+      providerProfile: json['providerProfile'] != null
+          ? ProviderProfileEntity.fromJson(
+              json['providerProfile'] as Map<String, dynamic>)
           : null,
     );
   }
@@ -95,22 +110,18 @@ class ProviderProfileEntity {
   final String displayName;
   final String? bio;
   final Map<String, dynamic>? skills;
-  final double ratingAvg;
-  final int ratingCount;
-  final bool isAvailable;
+  final int? serviceRadiusM;
   final String verificationStatus;
-  final int serviceRadiusM;
+  final bool isAvailable;
 
   ProviderProfileEntity({
     required this.userId,
     required this.displayName,
     this.bio,
     this.skills,
-    required this.ratingAvg,
-    required this.ratingCount,
-    required this.isAvailable,
+    this.serviceRadiusM,
     required this.verificationStatus,
-    required this.serviceRadiusM,
+    required this.isAvailable,
   });
 
   factory ProviderProfileEntity.fromJson(Map<String, dynamic> json) {
@@ -119,27 +130,9 @@ class ProviderProfileEntity {
       displayName: json['displayName'] as String,
       bio: json['bio'] as String?,
       skills: json['skills'] as Map<String, dynamic>?,
-      ratingAvg: _parseDouble(json['ratingAvg']),
-      ratingCount: _parseInt(json['ratingCount']),
-      isAvailable: json['isAvailable'] as bool? ?? false,
+      serviceRadiusM: json['serviceRadiusM'] as int?,
       verificationStatus: json['verificationStatus'] as String? ?? 'unverified',
-      serviceRadiusM: _parseInt(json['serviceRadiusM'], defaultValue: 5000),
+      isAvailable: json['isAvailable'] as bool? ?? false,
     );
-  }
-
-  static double _parseDouble(dynamic value, {double defaultValue = 0.0}) {
-    if (value == null) return defaultValue;
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? defaultValue;
-    return defaultValue;
-  }
-
-  static int _parseInt(dynamic value, {int defaultValue = 0}) {
-    if (value == null) return defaultValue;
-    if (value is int) return value;
-    if (value is double) return value.toInt();
-    if (value is String) return int.tryParse(value) ?? defaultValue;
-    return defaultValue;
   }
 }

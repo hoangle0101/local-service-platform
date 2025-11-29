@@ -28,18 +28,31 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _handleLogin() {
     if (_formKey.currentState!.validate()) {
+      // Format phone number with +84 if not present
+      String phone = _phoneController.text.trim();
+      if (!phone.startsWith('+')) {
+        if (phone.startsWith('0')) {
+          phone = '+84${phone.substring(1)}';
+        } else if (phone.startsWith('84')) {
+          phone = '+$phone';
+        } else {
+          phone = '+84$phone';
+        }
+      }
+
       if (_useOtp) {
-        // Send OTP first
+        // Send OTP
         context.read<AuthBloc>().add(
               OtpSendRequested(
-                phone: _phoneController.text,
+                phone: phone,
                 purpose: 'login',
               ),
             );
       } else {
+        // Login with password
         context.read<AuthBloc>().add(
               LoginRequested(
-                phone: _phoneController.text,
+                phone: phone,
                 password: _passwordController.text,
               ),
             );
@@ -59,7 +72,17 @@ class _LoginScreenState extends State<LoginScreen> {
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is Authenticated) {
-            context.go('/');
+            // Navigate based on user role
+            if (state.user != null) {
+              if (state.user!.isProvider) {
+                context.go('/provider/home');
+              } else {
+                context.go('/user/home');
+              }
+            } else {
+              // Fallback to guest home if no user data
+              context.go('/');
+            }
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Login successful!')),
             );
@@ -122,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     // Phone Number
                     CustomTextField(
                       label: 'Phone Number',
-                      hint: '+84987654321',
+                      hint: '0987654321 or +84987654321',
                       type: TextFieldType.phone,
                       controller: _phoneController,
                       prefixIcon: const Icon(Icons.phone_outlined),
