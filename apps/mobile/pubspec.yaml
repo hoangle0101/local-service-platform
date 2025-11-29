@@ -1,0 +1,49 @@
+name: mobile
+description: Local Service Platform - Modern service marketplace app
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management - Bloc
+  flutter_bloc: ^8.1.6
+  bloc: ^8.1.4
+  equatable: ^2.0.5
+
+  # HTTP & API
+  dio: ^5.4.3
+
+  # UI & Design
+  google_fonts: ^6.2.1
+  flutter_svg: ^2.0.10
+  cached_network_image: ^3.3.1
+
+  # Navigation
+  go_router: ^14.2.7
+
+  # Utils
+  intl: ^0.19.0
+
+  # Secure Storage
+  flutter_secure_storage: ^9.0.0
+
+  # Icons
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Assets
+  assets:
+    - assets/images/
+    - assets/icons/
