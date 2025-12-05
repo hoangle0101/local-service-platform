@@ -47,11 +47,20 @@ class ProviderDataSource {
   Future<void> createProviderProfile({
     required String displayName,
     String? bio,
-    Map<String, dynamic>? skills,
+    List<String>? skills,
     int? serviceRadiusM,
   }) async {
     try {
       final token = await SecureStorage.getAccessToken();
+      print(
+          'Creating provider profile with token: ${token?.substring(0, 10)}...');
+      print('Request data: ${{
+        'displayName': displayName,
+        if (bio != null) 'bio': bio,
+        if (skills != null) 'skills': skills,
+        if (serviceRadiusM != null) 'serviceRadiusM': serviceRadiusM,
+      }}');
+
       await _dio.post(
         '/provider/onboarding',
         data: {

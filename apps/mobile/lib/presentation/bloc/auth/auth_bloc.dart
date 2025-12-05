@@ -194,6 +194,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           // But for provider registration, this is critical.
           // However, we still emit OtpVerified so user sees success.
         }
+      } else {
+        print(
+            'Skipping auto-login: purpose=$purpose, tempPhone=$_tempPhone, hasPassword=${_tempPassword != null}');
       }
 
       emit(OtpVerified(
