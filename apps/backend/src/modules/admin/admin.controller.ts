@@ -17,6 +17,8 @@ import {
     AdminProvidersQueryDto,
     BanUserDto,
     VerifyProviderDto,
+    AdminBookingsQueryDto,
+    AdminPaymentsQueryDto,
 } from './dto/admin.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -171,5 +173,57 @@ export class AdminController {
         @Body() dto: VerifyProviderDto
     ) {
         return this.adminService.verifyProvider(BigInt(userId), BigInt(user.userId), dto);
+    }
+
+    /**
+     * Get list of all bookings
+     */
+    @Get('bookings')
+    @Roles('admin', 'super_admin')
+    @ApiOperation({ summary: 'Get all bookings (admin view)' })
+    @ApiResponse({ status: 200, description: 'Bookings list retrieved successfully' })
+    async getBookings(@Query() query: AdminBookingsQueryDto) {
+        return this.adminService.getBookings(query);
+    }
+
+    /**
+     * Get single booking detail
+     */
+    @Get('bookings/:id')
+    @Roles('admin', 'super_admin')
+    @ApiOperation({ summary: 'Get booking detail (admin view)' })
+    @ApiResponse({ status: 200, description: 'Booking detail retrieved successfully' })
+    @ApiResponse({ status: 404, description: 'Booking not found' })
+    async getBookingDetail(@Param('id') bookingId: string) {
+        return this.adminService.getBookingDetail(BigInt(bookingId));
+    }
+
+    /**
+     * Get list of all payments
+     */
+    @Get('payments')
+    @Roles('admin', 'super_admin')
+    @ApiOperation({ summary: 'Get all payments (admin view)' })
+    @ApiResponse({ status: 200, description: 'Payments list retrieved successfully' })
+    async getPayments(@Query() query: AdminPaymentsQueryDto) {
+        return this.adminService.getPayments(query);
+    }
+
+    /**
+     * Get user wallet details
+     */
+    @Get('wallets/:userId')
+    @Roles('admin', 'super_admin')
+    @ApiOperation({ summary: 'Get user wallet details' })
+    @ApiResponse({ status: 200, description: 'Wallet details retrieved successfully' })
+    @ApiResponse({ status: 404, description: 'Wallet not found' })
+    async getWallet(
+        @Param('userId') userId: string,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string
+    ) {
+        const pageNum = page ? parseInt(page, 10) : 1;
+        const limitNum = limit ? parseInt(limit, 10) : 20;
+        return this.adminService.getWallet(BigInt(userId), pageNum, limitNum);
     }
 }

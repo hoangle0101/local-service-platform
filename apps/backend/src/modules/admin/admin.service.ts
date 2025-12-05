@@ -15,6 +15,8 @@ import {
     AdminProvidersQueryDto,
     BanUserDto,
     VerifyProviderDto,
+    AdminBookingsQueryDto,
+    AdminPaymentsQueryDto,
 } from './dto/admin.dto';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -917,5 +919,437 @@ export class AdminService {
                 adminNotes: dto.adminNotes
             };
         });
+    }
+
+    /**
+     * Get list of bookings from admin perspective
+     * Admin can see all bookings with filtering, searching, and pagination
+     */
+    async getBookings(query: AdminBookingsQueryDto) {
+        const page = query.page || 1;
+        const limit = Math.min(query.limit || 20, 100);
+        const skip = (page - 1) * limit;
+
+        // Build where clause with all filters
+        const where: any = {};
+
+        // Filter by status
+        if (query.status) {
+            where.status = query.status;
+        }
+
+        // Filter by date range
+        if (query.startDate || query.endDate) {
+            where.scheduledAt = {};
+            if (query.startDate) {
+                where.scheduledAt.gte = new Date(query.startDate);
+            }
+            if (query.endDate) {
+                const endDate = new Date(query.endDate);
+                endDate.setHours(23, 59, 59, 999);
+                where.scheduledAt.lte = endDate;
+            }
+        }
+
+        // Search by customer (phone or email)
+        if (query.customerSearch) {
+            where.customer = {
+                OR: [
+                    { phone: { contains: query.customerSearch, mode: 'insensitive' } },
+                    { email: { contains: query.customerSearch, mode: 'insensitive' } }
+                ]
+            };
+        }
+
+        // Search by provider (phone or email)
+        if (query.providerSearch) {
+            where.providerUser = {
+                OR: [
+                    { phone: { contains: query.providerSearch, mode: 'insensitive' } },
+                    { email: { contains: query.providerSearch, mode: 'insensitive' } }
+                ]
+            };
+        }
+
+        // Determine sort order
+        const sortOrder = query.sortOrder === 'asc' ? 'asc' : 'desc';
+        const sortBy = query.sortBy || 'createdAt';
+
+        const orderBy: any = {};
+        orderBy[sortBy] = sortOrder;
+
+        // Execute parallel queries
+        const [bookings, total] = await Promise.all([
+            this.prisma.booking.findMany({
+                where,
+                skip,
+                take: limit,
+                include: {
+                    customer: {
+                        select: {
+                            id: true,
+                            phone: true,
+                            email: true,
+                            profile: { select: { fullName: true } }
+                        }
+                    },
+                    providerUser: {
+                        select: {
+                            id: true,
+                            phone: true,
+                            email: true,
+                            profile: { select: { fullName: true } }
+                        }
+                    },
+                    service: { select: { id: true, name: true } },
+                    payments: {
+                        select: { id: true, status: true, amount: true }
+                    },
+                    _count: {
+                        select: { payments: true }
+                    }
+                },
+                orderBy
+            }),
+            this.prisma.booking.count({ where })
+        ]);
+
+        return {
+            data: bookings.map(booking => ({
+                id: booking.id.toString(),
+                code: booking.code,
+                customerId: booking.customerId.toString(),
+                customerName: booking.customer.profile?.fullName || 'Unknown',
+                customerPhone: booking.customer.phone,
+                customerEmail: booking.customer.email,
+                providerId: booking.providerId?.toString(),
+                providerName: booking.providerUser?.profile?.fullName || 'Unassigned',
+                providerPhone: booking.providerUser?.phone,
+                providerEmail: booking.providerUser?.email,
+                serviceId: booking.serviceId,
+                serviceName: booking.service.name,
+                status: booking.status,
+                scheduledAt: booking.scheduledAt,
+                estimatedPrice: booking.estimatedPrice?.toNumber(),
+                actualPrice: booking.actualPrice?.toNumber(),
+                platformFee: booking.platformFee?.toNumber(),
+                providerEarning: booking.providerEarning?.toNumber(),
+                paymentStatus: booking.payments.length > 0 ? booking.payments[0].status : 'unpaid',
+                totalPayments: booking._count.payments,
+                createdAt: booking.createdAt,
+                completedAt: booking.completedAt,
+                cancelledAt: booking.cancelledAt
+            })),
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: page < Math.ceil(total / limit)
+            }
+        };
+    }
+
+    /**
+     * Get single booking detail from admin perspective
+     * Admin can see all booking details including payments, timeline, etc.
+     */
+    async getBookingDetail(bookingId: bigint) {
+        const booking = await this.prisma.booking.findUnique({
+            where: { id: bookingId },
+            include: {
+                customer: {
+                    select: {
+                        id: true,
+                        phone: true,
+                        email: true,
+                        profile: { select: { fullName: true } },
+                        wallet: { select: { balance: true } }
+                    }
+                },
+                providerUser: {
+                    select: {
+                        id: true,
+                        phone: true,
+                        email: true,
+                        profile: { select: { fullName: true } },
+                        wallet: { select: { balance: true } }
+                    }
+                },
+                service: { select: { id: true, name: true, basePrice: true } },
+                payments: {
+                    select: {
+                        id: true,
+                        amount: true,
+                        currency: true,
+                        method: true,
+                        gateway: true,
+                        status: true,
+                        createdAt: true
+                    }
+                },
+                dispute: {
+                    select: {
+                        id: true,
+                        status: true,
+                        reason: true
+                    }
+                }
+            }
+        });
+
+        if (!booking) {
+            throw new NotFoundException('Booking not found');
+        }
+
+        return {
+            id: booking.id.toString(),
+            code: booking.code,
+            customer: {
+                id: booking.customer.id.toString(),
+                fullName: booking.customer.profile?.fullName,
+                phone: booking.customer.phone,
+                email: booking.customer.email,
+                walletBalance: booking.customer.wallet?.balance.toNumber()
+            },
+            provider: booking.providerUser ? {
+                id: booking.providerUser.id.toString(),
+                fullName: booking.providerUser.profile?.fullName,
+                phone: booking.providerUser.phone,
+                email: booking.providerUser.email,
+                walletBalance: booking.providerUser.wallet?.balance.toNumber()
+            } : null,
+            service: {
+                id: booking.service.id,
+                name: booking.service.name,
+                basePrice: booking.service.basePrice.toNumber()
+            },
+            status: booking.status,
+            scheduledAt: booking.scheduledAt,
+            estimatedDurationMinutes: booking.estimatedDurationMinutes,
+            estimatedPrice: booking.estimatedPrice?.toNumber(),
+            actualPrice: booking.actualPrice?.toNumber(),
+            platformFee: booking.platformFee?.toNumber(),
+            providerEarning: booking.providerEarning?.toNumber(),
+            addressText: booking.addressText,
+            notes: booking.notes,
+            payments: booking.payments.map(p => ({
+                id: p.id.toString(),
+                amount: p.amount.toNumber(),
+                currency: p.currency,
+                method: p.method,
+                gateway: p.gateway,
+                status: p.status,
+                createdAt: p.createdAt
+            })),
+            dispute: booking.dispute ? {
+                id: booking.dispute.id.toString(),
+                status: booking.dispute.status,
+                reason: booking.dispute.reason
+            } : null,
+            createdAt: booking.createdAt,
+            completedAt: booking.completedAt,
+            cancelledAt: booking.cancelledAt
+        };
+    }
+
+    /**
+     * Get list of payments from admin perspective
+     * Admin can see all payments with filtering and statistics
+     */
+    async getPayments(query: AdminPaymentsQueryDto) {
+        const page = query.page || 1;
+        const limit = Math.min(query.limit || 20, 100);
+        const skip = (page - 1) * limit;
+
+        // Build where clause
+        const where: any = {};
+
+        // Filter by status
+        if (query.status) {
+            where.status = query.status;
+        }
+
+        // Filter by gateway
+        if (query.gateway) {
+            where.gateway = query.gateway;
+        }
+
+        // Filter by date range
+        if (query.startDate || query.endDate) {
+            where.createdAt = {};
+            if (query.startDate) {
+                where.createdAt.gte = new Date(query.startDate);
+            }
+            if (query.endDate) {
+                const endDate = new Date(query.endDate);
+                endDate.setHours(23, 59, 59, 999);
+                where.createdAt.lte = endDate;
+            }
+        }
+
+        // Filter by amount range
+        if (query.minAmount !== undefined || query.maxAmount !== undefined) {
+            where.amount = {};
+            if (query.minAmount !== undefined) {
+                where.amount.gte = new Decimal(query.minAmount);
+            }
+            if (query.maxAmount !== undefined) {
+                where.amount.lte = new Decimal(query.maxAmount);
+            }
+        }
+
+        // Determine sort order
+        const sortOrder = query.sortOrder === 'asc' ? 'asc' : 'desc';
+        const sortBy = query.sortBy || 'createdAt';
+
+        const orderBy: any = {};
+        orderBy[sortBy] = sortOrder;
+
+        // Execute parallel queries
+        const [payments, total, stats] = await Promise.all([
+            this.prisma.payment.findMany({
+                where,
+                skip,
+                take: limit,
+                include: {
+                    booking: {
+                        select: {
+                            id: true,
+                            code: true,
+                            customerId: true,
+                            customer: { select: { phone: true, email: true } }
+                        }
+                    }
+                },
+                orderBy
+            }),
+            this.prisma.payment.count({ where }),
+            this.prisma.payment.aggregate({
+                where,
+                _sum: { amount: true },
+                _count: true
+            })
+        ]);
+
+        return {
+            data: payments.map(payment => ({
+                id: payment.id.toString(),
+                bookingId: payment.booking?.id.toString(),
+                bookingCode: payment.booking?.code,
+                customerId: payment.booking?.customerId.toString(),
+                customerPhone: payment.booking?.customer?.phone,
+                customerEmail: payment.booking?.customer?.email,
+                amount: payment.amount.toNumber(),
+                currency: payment.currency,
+                method: payment.method,
+                gateway: payment.gateway,
+                gatewayTxId: payment.gatewayTxId,
+                status: payment.status,
+                environment: payment.environment,
+                reconciled: payment.reconciled,
+                createdAt: payment.createdAt,
+                updatedAt: payment.updatedAt
+            })),
+            statistics: {
+                totalCount: stats._count,
+                totalAmount: stats._sum.amount?.toNumber() || 0,
+                successCount: payments.filter(p => p.status === 'succeeded').length,
+                failedCount: payments.filter(p => p.status === 'failed').length,
+                initiatedCount: payments.filter(p => p.status === 'initiated').length
+            },
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: page < Math.ceil(total / limit)
+            }
+        };
+    }
+
+    /**
+     * Get user's wallet details from admin perspective
+     * Admin can see wallet balance and recent transactions
+     */
+    async getWallet(userId: bigint, page: number = 1, limit: number = 20) {
+        const wallet = await this.prisma.wallet.findUnique({
+            where: { userId },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        phone: true,
+                        email: true,
+                        profile: { select: { fullName: true } },
+                        userRoles: {
+                            select: { role: { select: { name: true } } }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!wallet) {
+            throw new NotFoundException('Wallet not found');
+        }
+
+        // Get transaction history with pagination
+        const skip = (page - 1) * limit;
+        const cleanLimit = Math.min(limit, 100);
+
+        const [transactions, transactionCount] = await Promise.all([
+            this.prisma.walletTransaction.findMany({
+                where: { walletUserId: userId },
+                skip,
+                take: cleanLimit,
+                include: {
+                    payment: {
+                        select: {
+                            id: true,
+                            booking: { select: { id: true, code: true } }
+                        }
+                    }
+                },
+                orderBy: { createdAt: 'desc' }
+            }),
+            this.prisma.walletTransaction.count({
+                where: { walletUserId: userId }
+            })
+        ]);
+
+        return {
+            wallet: {
+                userId: wallet.userId.toString(),
+                fullName: wallet.user.profile?.fullName,
+                phone: wallet.user.phone,
+                email: wallet.user.email,
+                roles: wallet.user.userRoles.map(ur => ur.role.name),
+                balance: wallet.balance.toNumber(),
+                currency: wallet.currency,
+                isLocked: wallet.lockedUntil ? wallet.lockedUntil > new Date() : false,
+                createdAt: wallet.createdAt,
+                updatedAt: wallet.updatedAt
+            },
+            transactions: transactions.map(tx => ({
+                id: tx.id.toString(),
+                type: tx.type,
+                amount: tx.amount.toNumber(),
+                balanceAfter: tx.balanceAfter.toNumber(),
+                status: tx.status,
+                bookingId: tx.payment?.booking?.id.toString(),
+                bookingCode: tx.payment?.booking?.code,
+                paymentId: tx.payment?.id.toString(),
+                createdAt: tx.createdAt,
+                metadata: tx.metadata
+            })),
+            pagination: {
+                total: transactionCount,
+                page,
+                limit: cleanLimit,
+                totalPages: Math.ceil(transactionCount / cleanLimit),
+                hasNextPage: page < Math.ceil(transactionCount / cleanLimit)
+            }
+        };
     }
 }

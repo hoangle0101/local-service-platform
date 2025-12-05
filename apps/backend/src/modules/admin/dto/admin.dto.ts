@@ -305,3 +305,122 @@ export class VerifyProviderDto {
     @IsString()
     rejectionReason?: string;
 }
+
+/**
+ * DTO for listing bookings from admin perspective
+ */
+export class AdminBookingsQueryDto {
+    @ApiPropertyOptional({ example: 1, description: 'Page number' })
+    @IsOptional()
+    @Type(() => Number)
+    @Min(1)
+    page?: number = 1;
+
+    @ApiPropertyOptional({ example: 20, description: 'Items per page' })
+    @IsOptional()
+    @Type(() => Number)
+    @Min(1)
+    @Max(100)
+    limit?: number = 20;
+
+    @ApiPropertyOptional({
+        example: 'completed',
+        description: 'Filter by status',
+        enum: ['pending', 'accepted', 'in_progress', 'completed', 'cancelled', 'disputed']
+    })
+    @IsOptional()
+    @IsEnum(['pending', 'accepted', 'in_progress', 'completed', 'cancelled', 'disputed'])
+    status?: string;
+
+    @ApiPropertyOptional({ example: '2025-12-01', description: 'Start date' })
+    @IsOptional()
+    @IsString()
+    startDate?: string;
+
+    @ApiPropertyOptional({ example: '2025-12-06', description: 'End date' })
+    @IsOptional()
+    @IsString()
+    endDate?: string;
+
+    @ApiPropertyOptional({ example: 'customer', description: 'Filter by customer phone/email' })
+    @IsOptional()
+    @IsString()
+    customerSearch?: string;
+
+    @ApiPropertyOptional({ example: 'provider', description: 'Filter by provider phone/email' })
+    @IsOptional()
+    @IsString()
+    providerSearch?: string;
+
+    @ApiPropertyOptional({ example: 'createdAt', description: 'Sort by field', enum: ['createdAt', 'scheduledAt', 'actualPrice', 'status'] })
+    @IsOptional()
+    @IsEnum(['createdAt', 'scheduledAt', 'actualPrice', 'status'])
+    sortBy?: string = 'createdAt';
+
+    @ApiPropertyOptional({ example: 'desc', description: 'Sort order', enum: ['asc', 'desc'] })
+    @IsOptional()
+    @IsEnum(['asc', 'desc'])
+    sortOrder?: 'asc' | 'desc' = 'desc';
+}
+
+/**
+ * DTO for listing payments from admin perspective
+ */
+export class AdminPaymentsQueryDto {
+    @ApiPropertyOptional({ example: 1, description: 'Page number' })
+    @IsOptional()
+    @Type(() => Number)
+    @Min(1)
+    page?: number = 1;
+
+    @ApiPropertyOptional({ example: 20, description: 'Items per page' })
+    @IsOptional()
+    @Type(() => Number)
+    @Min(1)
+    @Max(100)
+    limit?: number = 20;
+
+    @ApiPropertyOptional({
+        example: 'succeeded',
+        description: 'Filter by status',
+        enum: ['initiated', 'succeeded', 'failed']
+    })
+    @IsOptional()
+    @IsEnum(['initiated', 'succeeded', 'failed'])
+    status?: string;
+
+    @ApiPropertyOptional({ example: 'momo', description: 'Filter by gateway/method' })
+    @IsOptional()
+    @IsString()
+    gateway?: string;
+
+    @ApiPropertyOptional({ example: '2025-12-01', description: 'Start date' })
+    @IsOptional()
+    @IsString()
+    startDate?: string;
+
+    @ApiPropertyOptional({ example: '2025-12-06', description: 'End date' })
+    @IsOptional()
+    @IsString()
+    endDate?: string;
+
+    @ApiPropertyOptional({ example: 100000, description: 'Minimum amount' })
+    @IsOptional()
+    @Type(() => Number)
+    minAmount?: number;
+
+    @ApiPropertyOptional({ example: 10000000, description: 'Maximum amount' })
+    @IsOptional()
+    @Type(() => Number)
+    maxAmount?: number;
+
+    @ApiPropertyOptional({ example: 'createdAt', description: 'Sort by field', enum: ['createdAt', 'amount', 'status'] })
+    @IsOptional()
+    @IsEnum(['createdAt', 'amount', 'status'])
+    sortBy?: string = 'createdAt';
+
+    @ApiPropertyOptional({ example: 'desc', description: 'Sort order', enum: ['asc', 'desc'] })
+    @IsOptional()
+    @IsEnum(['asc', 'desc'])
+    sortOrder?: 'asc' | 'desc' = 'desc';
+}
