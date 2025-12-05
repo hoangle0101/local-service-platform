@@ -4,7 +4,7 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateDisputeDto } from './dto/dispute.dto';
+import { CreateDisputeDto, GetDisputesDto, GetDisputeDetailDto, UpdateDisputeAppealDto } from './dto/dispute.dto';
 
 @Injectable()
 export class DisputesService {
@@ -64,6 +64,187 @@ export class DisputesService {
             });
 
             return dispute;
+        });
+    }
+
+    /**
+     * Get list of disputes for current user
+     * User can see disputes they raised or disputes for their bookings (if provider)
+     */
+    async getDisputesList(userId: bigint, query: GetDisputesDto) {
+        const page = query.page || 1;
+        const limit = query.limit || 10;
+        const skip = (page - 1) * limit;
+        const sortBy = query.sortBy === 'asc' ? 'asc' : 'desc';
+
+        // Build filter
+        const where: any = {
+            OR: [
+                { raisedBy: userId }, // Disputes raised by user
+                {
+                    booking: {
+                        OR: [
+                            { customerId: userId }, // Disputes on bookings where user is customer
+                            { providerId: userId }, // Disputes on bookings where user is provider
+                        ]
+                    }
+                }
+            ]
+        };
+
+        // Add status filter if provided
+        if (query.status) {
+            where.status = query.status;
+        }
+
+        // Fetch disputes with pagination
+        const [disputes, total] = await Promise.all([
+            this.prisma.dispute.findMany({
+                where,
+                include: {
+                    booking: {
+                        select: {
+                            id: true,
+                            customerId: true,
+                            providerId: true,
+                            serviceId: true,
+                            status: true,
+                            service: {
+                                select: {
+                                    name: true,
+                                }
+                            }
+                        }
+                    }
+                },
+                skip,
+                take: limit,
+                orderBy: { createdAt: sortBy }
+            }),
+            this.prisma.dispute.count({ where })
+        ]);
+
+        return {
+            data: disputes,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: page < Math.ceil(total / limit)
+            }
+        };
+    }
+
+    /**
+     * Get detail of a single dispute
+     * User can see dispute if they raised it or relate to its booking
+     */
+    async getDisputeDetail(userId: bigint, disputeId: bigint, query: GetDisputeDetailDto) {
+        // Build permission check
+        const where: any = {
+            id: disputeId,
+            OR: [
+                { raisedBy: userId },
+                {
+                    booking: {
+                        OR: [
+                            { customerId: userId },
+                            { providerId: userId },
+                        ]
+                    }
+                }
+            ]
+        };
+
+        // Build include for relations
+        const include: any = {};
+        if (query.includeRelations !== false) {
+            include.booking = {
+                select: {
+                    id: true,
+                    customerId: true,
+                    providerId: true,
+                    serviceId: true,
+                    status: true,
+                    service: {
+                        select: {
+                            name: true,
+                            description: true,
+                            price: true,
+                        }
+                    }
+                }
+            };
+        }
+
+        const dispute = await this.prisma.dispute.findFirst({
+            where,
+            include: include.booking ? include : undefined,
+        });
+
+        if (!dispute) {
+            throw new NotFoundException('Dispute not found');
+        }
+
+        return dispute;
+    }
+
+    /**
+     * Appeal a dispute decision
+     * Only the user who raised the dispute can appeal
+     * Dispute must be in 'resolved' status to appeal
+     */
+    async appealDispute(userId: bigint, disputeId: bigint, dto: UpdateDisputeAppealDto) {
+        const dispute = await this.prisma.dispute.findUnique({
+            where: { id: disputeId },
+        });
+
+        if (!dispute) {
+            throw new NotFoundException('Dispute not found');
+        }
+
+        // Only the user who raised the dispute can appeal
+        if (dispute.raisedBy !== userId) {
+            throw new NotFoundException('Dispute not found');
+        }
+
+        // Can only appeal resolved disputes
+        if (dispute.status !== 'resolved') {
+            throw new BadRequestException('Can only appeal resolved disputes');
+        }
+
+        // Update dispute status to under_review and record appeal
+        return this.prisma.$transaction(async (tx) => {
+            const updatedDispute = await tx.dispute.update({
+                where: { id: disputeId },
+                data: {
+                    status: 'under_review',
+                    // Note: If schema has appeal/evidence fields, add them here
+                    // For now, updating status is the main action
+                    // You may want to add: appealReason, newEvidence, etc. if schema supports
+                },
+                include: {
+                    booking: {
+                        select: {
+                            id: true,
+                            customerId: true,
+                            providerId: true,
+                            status: true,
+                            service: {
+                                select: {
+                                    name: true,
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Optional: Create audit log for appeal
+            // This could be added to a separate auditLog table if needed
+
+            return updatedDispute;
         });
     }
 }
