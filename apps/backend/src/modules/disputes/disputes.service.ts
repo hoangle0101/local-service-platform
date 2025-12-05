@@ -4,7 +4,7 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateDisputeDto } from './dto/dispute.dto';
+import { CreateDisputeDto, GetDisputesDto } from './dto/dispute.dto';
 
 @Injectable()
 export class DisputesService {
@@ -65,5 +65,74 @@ export class DisputesService {
 
             return dispute;
         });
+    }
+
+    /**
+     * Get list of disputes for current user
+     * User can see disputes they raised or disputes for their bookings (if provider)
+     */
+    async getDisputesList(userId: bigint, query: GetDisputesDto) {
+        const page = query.page || 1;
+        const limit = query.limit || 10;
+        const skip = (page - 1) * limit;
+        const sortBy = query.sortBy === 'asc' ? 'asc' : 'desc';
+
+        // Build filter
+        const where: any = {
+            OR: [
+                { raisedBy: userId }, // Disputes raised by user
+                {
+                    booking: {
+                        OR: [
+                            { customerId: userId }, // Disputes on bookings where user is customer
+                            { providerId: userId }, // Disputes on bookings where user is provider
+                        ]
+                    }
+                }
+            ]
+        };
+
+        // Add status filter if provided
+        if (query.status) {
+            where.status = query.status;
+        }
+
+        // Fetch disputes with pagination
+        const [disputes, total] = await Promise.all([
+            this.prisma.dispute.findMany({
+                where,
+                include: {
+                    booking: {
+                        select: {
+                            id: true,
+                            customerId: true,
+                            providerId: true,
+                            serviceId: true,
+                            status: true,
+                            service: {
+                                select: {
+                                    name: true,
+                                }
+                            }
+                        }
+                    }
+                },
+                skip,
+                take: limit,
+                orderBy: { createdAt: sortBy }
+            }),
+            this.prisma.dispute.count({ where })
+        ]);
+
+        return {
+            data: disputes,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: page < Math.ceil(total / limit)
+            }
+        };
     }
 }
