@@ -64,15 +64,10 @@ export class AdminDisputesQueryDto {
     @IsEnum(['open', 'under_review', 'resolved', 'closed'])
     status?: string;
 
-    @ApiPropertyOptional({ example: 'createdAt', description: 'Sort by field', enum: ['createdAt', 'status'] })
-    @IsOptional()
-    @IsEnum(['createdAt', 'status'])
-    sortBy?: string = 'createdAt';
-
-    @ApiPropertyOptional({ example: 'desc', description: 'Sort order', enum: ['asc', 'desc'] })
+    @ApiPropertyOptional({ example: 'asc', description: 'Sort order', enum: ['asc', 'desc'] })
     @IsOptional()
     @IsEnum(['asc', 'desc'])
-    sortOrder?: 'asc' | 'desc' = 'desc';
+    sortBy?: 'asc' | 'desc' = 'desc';
 
     @ApiPropertyOptional({ example: 'pending', description: 'Filter by resolution status', enum: ['pending', 'resolved', 'appealed'] })
     @IsOptional()
@@ -106,15 +101,10 @@ export class AdminWithdrawalsQueryDto {
     @IsEnum(['pending', 'approved', 'rejected', 'processing', 'completed', 'failed'])
     status?: string;
 
-    @ApiPropertyOptional({ example: 'createdAt', description: 'Sort by field', enum: ['createdAt', 'status'] })
-    @IsOptional()
-    @IsEnum(['createdAt', 'status'])
-    sortBy?: string = 'createdAt';
-
-    @ApiPropertyOptional({ example: 'desc', description: 'Sort order', enum: ['asc', 'desc'] })
+    @ApiPropertyOptional({ example: 'asc', description: 'Sort order', enum: ['asc', 'desc'] })
     @IsOptional()
     @IsEnum(['asc', 'desc'])
-    sortOrder?: 'asc' | 'desc' = 'desc';
+    sortBy?: 'asc' | 'desc' = 'desc';
 
     @ApiPropertyOptional({ example: '2025-12-01', description: 'Start date' })
     @IsOptional()

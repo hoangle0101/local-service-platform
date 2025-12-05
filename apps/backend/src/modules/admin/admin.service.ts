@@ -231,8 +231,7 @@ export class AdminService {
         const page = query.page || 1;
         const limit = Math.min(query.limit || 20, 100);
         const skip = (page - 1) * limit;
-        const sortOrder = query.sortOrder === 'asc' ? 'asc' : 'desc';
-        const sortField = query.sortBy || 'createdAt';
+        const sortBy = query.sortBy === 'asc' ? 'asc' : 'desc';
 
         // Build where clause with filters
         const where: any = {};
@@ -271,9 +270,7 @@ export class AdminService {
                 },
                 skip,
                 take: limit,
-                orderBy: {
-                    [sortField]: sortOrder
-                }
+                orderBy: { createdAt: sortBy }
             }),
             this.prisma.dispute.count({ where })
         ]);
@@ -318,8 +315,7 @@ export class AdminService {
         const page = query.page || 1;
         const limit = Math.min(query.limit || 20, 100);
         const skip = (page - 1) * limit;
-        const sortOrder = query.sortOrder === 'asc' ? 'asc' : 'desc';
-        const sortField = query.sortBy || 'createdAt';
+        const sortBy = query.sortBy === 'asc' ? 'asc' : 'desc';
 
         // Build where clause
         const where: any = {
@@ -346,9 +342,7 @@ export class AdminService {
                 where,
                 skip,
                 take: limit,
-                orderBy: {
-                    [sortField]: sortOrder
-                }
+                orderBy: { createdAt: sortBy }
             }),
             this.prisma.walletTransaction.count({ where })
         ]);
