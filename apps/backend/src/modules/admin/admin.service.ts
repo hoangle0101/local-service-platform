@@ -11,6 +11,10 @@ import {
     AdminWithdrawalsQueryDto,
     ApproveWithdrawalDto,
     RejectWithdrawalDto,
+    AdminUsersQueryDto,
+    AdminProvidersQueryDto,
+    BanUserDto,
+    VerifyProviderDto,
 } from './dto/admin.dto';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -524,6 +528,393 @@ export class AdminService {
                 message: 'Withdrawal rejected successfully',
                 withdrawal: updatedWithdrawal,
                 refunded: dto.refundToWallet
+            };
+        });
+    }
+
+    /**
+     * Get list of users from admin perspective
+     * Admin can see all users with filtering, searching, and pagination
+     */
+    async getUsers(query: AdminUsersQueryDto) {
+        const page = query.page || 1;
+        const limit = Math.min(query.limit || 20, 100);
+        const skip = (page - 1) * limit;
+
+        // Build where clause with all filters
+        const where: any = {};
+
+        // Filter by status
+        if (query.status) {
+            where.status = query.status;
+        }
+
+        // Filter by role
+        if (query.role) {
+            where.userRoles = {
+                some: {
+                    role: { name: query.role }
+                }
+            };
+        }
+
+        // Search by email
+        if (query.email) {
+            where.email = { contains: query.email, mode: 'insensitive' };
+        }
+
+        // Search by phone
+        if (query.phone) {
+            where.phone = { contains: query.phone, mode: 'insensitive' };
+        }
+
+        // Search by full name
+        if (query.search) {
+            where.profile = {
+                fullName: { contains: query.search, mode: 'insensitive' }
+            };
+        }
+
+        // Determine sort order
+        const sortOrder = query.sortOrder === 'asc' ? 'asc' : 'desc';
+        const sortBy = query.sortBy || 'createdAt';
+
+        const orderBy: any = {};
+        orderBy[sortBy] = sortOrder;
+
+        // Execute parallel queries
+        const [users, total] = await Promise.all([
+            this.prisma.user.findMany({
+                where,
+                skip,
+                take: limit,
+                select: {
+                    id: true,
+                    phone: true,
+                    email: true,
+                    status: true,
+                    isVerified: true,
+                    lastLoginAt: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    profile: {
+                        select: {
+                            fullName: true,
+                            avatarUrl: true,
+                        }
+                    },
+                    userRoles: {
+                        select: {
+                            role: { select: { name: true } }
+                        }
+                    },
+                    _count: {
+                        select: { bookingsCustomer: true, bookingsProvider: true }
+                    }
+                },
+                orderBy
+            }),
+            this.prisma.user.count({ where })
+        ]);
+
+        return {
+            data: users.map(user => ({
+                id: user.id.toString(),
+                phone: user.phone,
+                email: user.email,
+                fullName: user.profile?.fullName || 'Unknown',
+                avatarUrl: user.profile?.avatarUrl,
+                status: user.status,
+                isVerified: user.isVerified,
+                roles: user.userRoles.map(ur => ur.role.name),
+                bookingsAsCustomer: user._count.bookingsCustomer,
+                bookingsAsProvider: user._count.bookingsProvider,
+                lastLoginAt: user.lastLoginAt,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt
+            })),
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: page < Math.ceil(total / limit)
+            }
+        };
+    }
+
+    /**
+     * Get list of providers from admin perspective
+     * Admin can see all providers with stats and filtering
+     */
+    async getProviders(query: AdminProvidersQueryDto) {
+        const page = query.page || 1;
+        const limit = Math.min(query.limit || 20, 100);
+        const skip = (page - 1) * limit;
+
+        // Build where clause
+        const where: any = {};
+
+        // Filter by verification status
+        if (query.verificationStatus) {
+            where.verificationStatus = query.verificationStatus;
+        }
+
+        // Filter by minimum rating
+        if (query.minRating !== undefined) {
+            where.ratingAvg = { gte: new Decimal(query.minRating) };
+        }
+
+        // Filter by availability
+        if (query.isAvailable !== undefined) {
+            where.isAvailable = query.isAvailable;
+        }
+
+        // Search by display name or user phone
+        if (query.search) {
+            where.OR = [
+                { displayName: { contains: query.search, mode: 'insensitive' } },
+                { user: { phone: { contains: query.search, mode: 'insensitive' } } }
+            ];
+        }
+
+        // Determine sort order
+        const sortOrder = query.sortOrder === 'asc' ? 'asc' : 'desc';
+        const sortBy = query.sortBy || 'ratingAvg';
+
+        const orderBy: any = {};
+        orderBy[sortBy] = sortOrder;
+
+        // Execute parallel queries
+        const [providers, total] = await Promise.all([
+            this.prisma.providerProfile.findMany({
+                where,
+                skip,
+                take: limit,
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            phone: true,
+                            email: true,
+                            profile: {
+                                select: {
+                                    fullName: true,
+                                    avatarUrl: true
+                                }
+                            }
+                        }
+                    },
+                    providerServices: true
+                },
+                orderBy
+            }),
+            this.prisma.providerProfile.count({ where })
+        ]);
+
+        // Fetch booking statistics for providers
+        const providerIds = providers.map(p => p.userId);
+        const bookingStats = await this.prisma.booking.groupBy({
+            by: ['providerId'],
+            where: { providerId: { in: providerIds } },
+            _count: true,
+            _sum: { providerEarning: true }
+        });
+
+        const statsMap = new Map(
+            bookingStats.map(stat => [stat.providerId?.toString(), {
+                totalBookings: stat._count,
+                totalEarnings: stat._sum.providerEarning
+            }])
+        );
+
+        return {
+            data: providers.map(provider => {
+                const stats = statsMap.get(provider.userId.toString()) || { totalBookings: 0, totalEarnings: 0 };
+                const earnings = stats.totalEarnings instanceof Decimal
+                    ? stats.totalEarnings.toNumber()
+                    : (typeof stats.totalEarnings === 'number' ? stats.totalEarnings : 0);
+
+                return {
+                    userId: provider.userId.toString(),
+                    displayName: provider.displayName,
+                    bio: provider.bio,
+                    phone: provider.user.phone,
+                    email: provider.user.email,
+                    fullName: provider.user.profile?.fullName,
+                    avatarUrl: provider.user.profile?.avatarUrl,
+                    rating: {
+                        average: provider.ratingAvg.toNumber(),
+                        count: provider.ratingCount
+                    },
+                    isAvailable: provider.isAvailable,
+                    verificationStatus: provider.verificationStatus,
+                    totalServices: provider.providerServices.length,
+                    totalBookings: stats.totalBookings,
+                    totalEarnings: earnings,
+                    createdAt: provider.createdAt
+                };
+            }),
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: page < Math.ceil(total / limit)
+            }
+        };
+    }
+
+    /**
+     * Ban or unban a user
+     * Validates user exists and updates status
+     */
+    async banUser(userId: bigint, adminId: bigint, dto: BanUserDto) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId }
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        // Check if trying to ban an already banned user
+        if (dto.action === 'ban' && user.status === 'banned') {
+            throw new BadRequestException('User is already banned');
+        }
+
+        // Check if trying to unban an active user
+        if (dto.action === 'unban' && user.status === 'active') {
+            throw new BadRequestException('User is already active');
+        }
+
+        return this.prisma.$transaction(async (tx) => {
+            // Update user status
+            const newStatus = dto.action === 'ban' ? 'banned' : 'active';
+            const updatedUser = await tx.user.update({
+                where: { id: userId },
+                data: { status: newStatus }
+            });
+
+            // Create audit log
+            await tx.auditLog.create({
+                data: {
+                    actorUserId: adminId,
+                    action: `user_${dto.action}`,
+                    objectType: 'user',
+                    objectId: userId,
+                    detail: {
+                        userId: userId.toString(),
+                        action: dto.action,
+                        reason: dto.reason,
+                        adminNotes: dto.adminNotes,
+                        durationDays: dto.durationDays
+                    }
+                }
+            });
+
+            // Create notification for user
+            const action = dto.action === 'ban' ? 'banned' : 'unbanned';
+            const message = dto.action === 'ban'
+                ? `Your account has been banned. Reason: ${dto.reason}`
+                : 'Your account has been unbanned and is now active';
+
+            await tx.notification.create({
+                data: {
+                    userId: userId,
+                    title: `Account ${action}`,
+                    body: message,
+                    type: 'system',
+                    payload: {
+                        action: dto.action,
+                        reason: dto.reason
+                    },
+                    isRead: false
+                }
+            });
+
+            return {
+                message: `User ${action} successfully`,
+                userId: userId.toString(),
+                status: newStatus,
+                reason: dto.reason
+            };
+        });
+    }
+
+    /**
+     * Verify or reject a provider
+     * Updates provider verification status
+     */
+    async verifyProvider(userId: bigint, adminId: bigint, dto: VerifyProviderDto) {
+        const provider = await this.prisma.providerProfile.findUnique({
+            where: { userId },
+            include: { user: true }
+        });
+
+        if (!provider) {
+            throw new NotFoundException('Provider profile not found');
+        }
+
+        // Validate rejection reason is provided if rejecting
+        if (dto.action === 'rejected' && !dto.rejectionReason) {
+            throw new BadRequestException('Rejection reason is required when rejecting provider');
+        }
+
+        return this.prisma.$transaction(async (tx) => {
+            // Update provider verification status
+            const updatedProvider = await tx.providerProfile.update({
+                where: { userId },
+                data: {
+                    verificationStatus: dto.action
+                }
+            });
+
+            // Create audit log
+            await tx.auditLog.create({
+                data: {
+                    actorUserId: adminId,
+                    action: `provider_${dto.action}`,
+                    objectType: 'provider_profile',
+                    objectId: userId,
+                    detail: {
+                        userId: userId.toString(),
+                        action: dto.action,
+                        adminNotes: dto.adminNotes,
+                        rejectionReason: dto.rejectionReason
+                    }
+                }
+            });
+
+            // Create notification for provider
+            const title = dto.action === 'verified'
+                ? 'Provider Account Verified'
+                : 'Provider Application Rejected';
+
+            const body = dto.action === 'verified'
+                ? `Congratulations! Your provider account has been verified. You can now accept bookings.`
+                : `Your provider application has been rejected. Reason: ${dto.rejectionReason}`;
+
+            await tx.notification.create({
+                data: {
+                    userId: userId,
+                    title,
+                    body,
+                    type: 'system',
+                    payload: {
+                        action: dto.action,
+                        adminNotes: dto.adminNotes,
+                        rejectionReason: dto.rejectionReason
+                    },
+                    isRead: false
+                }
+            });
+
+            return {
+                message: `Provider ${dto.action} successfully`,
+                userId: userId.toString(),
+                verificationStatus: dto.action,
+                adminNotes: dto.adminNotes
             };
         });
     }

@@ -13,6 +13,10 @@ import {
     AdminWithdrawalsQueryDto,
     ApproveWithdrawalDto,
     RejectWithdrawalDto,
+    AdminUsersQueryDto,
+    AdminProvidersQueryDto,
+    BanUserDto,
+    VerifyProviderDto,
 } from './dto/admin.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -111,5 +115,61 @@ export class AdminController {
             BigInt(user.userId),
             dto,
         );
+    }
+
+    /**
+     * Get list of all users
+     */
+    @Get('users')
+    @Roles('admin', 'super_admin')
+    @ApiOperation({ summary: 'Get all users (admin view)' })
+    @ApiResponse({ status: 200, description: 'Users list retrieved successfully' })
+    async getUsers(@Query() query: AdminUsersQueryDto) {
+        return this.adminService.getUsers(query);
+    }
+
+    /**
+     * Get list of all providers
+     */
+    @Get('providers')
+    @Roles('admin', 'super_admin')
+    @ApiOperation({ summary: 'Get all providers (admin view)' })
+    @ApiResponse({ status: 200, description: 'Providers list retrieved successfully' })
+    async getProviders(@Query() query: AdminProvidersQueryDto) {
+        return this.adminService.getProviders(query);
+    }
+
+    /**
+     * Ban or unban a user
+     */
+    @Patch('users/:id/ban')
+    @Roles('admin', 'super_admin')
+    @ApiOperation({ summary: 'Ban or unban user' })
+    @ApiResponse({ status: 200, description: 'User banned/unbanned successfully' })
+    @ApiResponse({ status: 400, description: 'Invalid action or user status' })
+    @ApiResponse({ status: 404, description: 'User not found' })
+    async banUser(
+        @CurrentUser() user: JwtPayload,
+        @Param('id') userId: string,
+        @Body() dto: BanUserDto
+    ) {
+        return this.adminService.banUser(BigInt(userId), BigInt(user.userId), dto);
+    }
+
+    /**
+     * Verify or reject provider
+     */
+    @Patch('providers/:id/verify')
+    @Roles('admin', 'super_admin')
+    @ApiOperation({ summary: 'Verify or reject provider' })
+    @ApiResponse({ status: 200, description: 'Provider status updated successfully' })
+    @ApiResponse({ status: 400, description: 'Invalid action or missing fields' })
+    @ApiResponse({ status: 404, description: 'Provider not found' })
+    async verifyProvider(
+        @CurrentUser() user: JwtPayload,
+        @Param('id') userId: string,
+        @Body() dto: VerifyProviderDto
+    ) {
+        return this.adminService.verifyProvider(BigInt(userId), BigInt(user.userId), dto);
     }
 }
