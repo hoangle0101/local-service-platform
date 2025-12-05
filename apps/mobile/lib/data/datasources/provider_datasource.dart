@@ -49,6 +49,9 @@ class ProviderDataSource {
     String? bio,
     List<String>? skills,
     int? serviceRadiusM,
+    double? latitude,
+    double? longitude,
+    String? address,
   }) async {
     try {
       final token = await SecureStorage.getAccessToken();
@@ -59,6 +62,9 @@ class ProviderDataSource {
         if (bio != null) 'bio': bio,
         if (skills != null) 'skills': skills,
         if (serviceRadiusM != null) 'serviceRadiusM': serviceRadiusM,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (address != null) 'address': address,
       }}');
 
       await _dio.post(
@@ -68,6 +74,9 @@ class ProviderDataSource {
           if (bio != null) 'bio': bio,
           if (skills != null) 'skills': skills,
           if (serviceRadiusM != null) 'serviceRadiusM': serviceRadiusM,
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+          if (address != null) 'address': address,
         },
         options: Options(
           headers: {'Authorization': 'Bearer $token'},

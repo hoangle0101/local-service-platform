@@ -32,6 +32,10 @@ dependencies:
   # Secure Storage
   flutter_secure_storage: ^9.0.0
 
+  # Location
+  geolocator: ^12.0.0
+  geocoding: ^3.0.0
+
   # Icons
   cupertino_icons: ^1.0.8
 

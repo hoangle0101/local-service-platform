@@ -9,7 +9,12 @@ import {
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
 import { BookingsService } from './bookings.service';
 import {
   EstimateDto,
@@ -39,7 +44,18 @@ export class BookingsController {
   @Post()
   @ApiOperation({ summary: 'Create new booking' })
   async createBooking(@CurrentUser() user: any, @Body() dto: CreateBookingDto) {
-    return this.bookingsService.createBooking(BigInt(user.userId), dto);
+    const result = await this.bookingsService.createBooking(
+      BigInt(user.userId),
+      dto,
+    );
+
+    // Notify nearby providers
+    if (result.nearbyProviderIds && result.nearbyProviderIds.length > 0) {
+      // In a real app, inject SocketGateway and call notifyProviders
+      // this.socketGateway.notifyProviders(result.nearbyProviderIds, 'new_booking_request', result);
+    }
+
+    return result;
   }
 
   @Get()
@@ -58,6 +74,19 @@ export class BookingsController {
     return this.bookingsService.getBookingById(BigInt(user.userId), BigInt(id));
   }
 
+  @Get(':id/offers')
+  @ApiOperation({ summary: 'Get offers for a booking' })
+  @ApiParam({ name: 'id', example: 1 })
+  async getBookingOffers(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.bookingsService.getBookingOffers(
+      BigInt(user.userId),
+      BigInt(id),
+    );
+  }
+
   @Patch(':id/cancel')
   @ApiOperation({ summary: 'Cancel booking (Customer)' })
   @ApiParam({ name: 'id', example: 1 })
@@ -66,7 +95,11 @@ export class BookingsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CancelBookingDto,
   ) {
-    return this.bookingsService.cancelBooking(BigInt(user.userId), BigInt(id), dto);
+    return this.bookingsService.cancelBooking(
+      BigInt(user.userId),
+      BigInt(id),
+      dto,
+    );
   }
 
   @Post(':id/review')
@@ -77,7 +110,27 @@ export class BookingsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ReviewBookingDto,
   ) {
-    return this.bookingsService.reviewBooking(BigInt(user.userId), BigInt(id), dto);
+    return this.bookingsService.reviewBooking(
+      BigInt(user.userId),
+      BigInt(id),
+      dto,
+    );
+  }
+
+  @Post(':id/select-provider/:providerId')
+  @ApiOperation({ summary: 'Select provider for booking (Customer)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiParam({ name: 'providerId', example: 1 })
+  async selectProvider(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('providerId', ParseIntPipe) providerId: number,
+  ) {
+    return this.bookingsService.selectProvider(
+      BigInt(user.userId),
+      BigInt(id),
+      BigInt(providerId),
+    );
   }
 }
 
@@ -89,8 +142,27 @@ export class BookingsController {
 export class ProviderBookingsController {
   constructor(private bookingsService: BookingsService) {}
 
+  @Get('requests')
+  @ApiOperation({ summary: 'Get pending booking requests near provider' })
+  async getProviderRequests(@CurrentUser() user: any) {
+    return this.bookingsService.getProviderRequests(BigInt(user.userId));
+  }
+
+  @Post(':id/offer')
+  @ApiOperation({ summary: 'Send booking offer (Provider)' })
+  @ApiParam({ name: 'id', example: 1 })
+  async acceptBookingRequest(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.bookingsService.acceptBookingRequest(
+      BigInt(user.userId),
+      BigInt(id),
+    );
+  }
+
   @Patch(':id/accept')
-  @ApiOperation({ summary: 'Accept booking (Provider)' })
+  @ApiOperation({ summary: 'Accept booking (Provider) - Legacy' })
   @ApiParam({ name: 'id', example: 1 })
   async acceptBooking(
     @CurrentUser() user: any,
@@ -116,6 +188,9 @@ export class ProviderBookingsController {
     @CurrentUser() user: any,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    return this.bookingsService.completeBooking(BigInt(user.userId), BigInt(id));
+    return this.bookingsService.completeBooking(
+      BigInt(user.userId),
+      BigInt(id),
+    );
   }
 }

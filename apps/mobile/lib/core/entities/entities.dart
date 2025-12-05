@@ -54,6 +54,7 @@ class Service extends Equatable {
   final String? description;
   final int categoryId;
   final String? iconUrl;
+  final int? durationMinutes;
 
   const Service({
     required this.id,
@@ -61,6 +62,7 @@ class Service extends Equatable {
     this.description,
     required this.categoryId,
     this.iconUrl,
+    this.durationMinutes,
   });
 
   factory Service.fromJson(Map<String, dynamic> json) {
@@ -70,6 +72,8 @@ class Service extends Equatable {
       description: json['description'] as String?,
       categoryId: json['category_id'] as int? ?? json['categoryId'] as int,
       iconUrl: json['icon_url'] as String? ?? json['iconUrl'] as String?,
+      durationMinutes:
+          json['duration_minutes'] as int? ?? json['durationMinutes'] as int?,
     );
   }
 
@@ -80,11 +84,13 @@ class Service extends Equatable {
       'description': description,
       'category_id': categoryId,
       'icon_url': iconUrl,
+      'duration_minutes': durationMinutes,
     };
   }
 
   @override
-  List<Object?> get props => [id, name, description, categoryId, iconUrl];
+  List<Object?> get props =>
+      [id, name, description, categoryId, iconUrl, durationMinutes];
 }
 
 class ProviderService extends Equatable {

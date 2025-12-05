@@ -1,124 +1,250 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/entities/entities.dart';
+import '../../../core/theme/app_colors.dart';
+import '../bloc/services/services_bloc.dart';
+import '../bloc/services/services_event_state.dart';
+import '../widgets/service_card.dart';
 
-class CategoryServicesScreen extends StatelessWidget {
+class CategoryServicesScreen extends StatefulWidget {
   final int categoryId;
+  final Category? category;
 
   const CategoryServicesScreen({
     super.key,
     required this.categoryId,
+    this.category,
   });
 
   @override
+  State<CategoryServicesScreen> createState() => _CategoryServicesScreenState();
+}
+
+class _CategoryServicesScreenState extends State<CategoryServicesScreen> {
+  late ServicesBloc _servicesBloc;
+
+  @override
+  void initState() {
+    super.initState();
+    _servicesBloc = ServicesBloc();
+    _servicesBloc.add(
+      LoadServicesByCategory(categoryId: widget.categoryId, limit: 20),
+    );
+  }
+
+  @override
+  void dispose() {
+    _servicesBloc.close();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Category Services'),
-      ),
-      body: Column(
-        children: [
-          // Category Header
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(
-              gradient: AppColors.primaryGradient,
-            ),
-            child: Column(
-              children: [
-                const Icon(Icons.category, size: 48, color: AppColors.white),
-                const SizedBox(height: 8),
-                Text(
-                  'Category Name',
-                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                        color: AppColors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Category ID: $categoryId',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.white,
-                      ),
-                ),
-              ],
-            ),
-          ),
-
-          // Filters
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      // TODO: Show filter dialog
-                    },
-                    icon: const Icon(Icons.filter_list),
-                    label: const Text('Filter'),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      // TODO: Show sort dialog
-                    },
-                    icon: const Icon(Icons.sort),
-                    label: const Text('Sort'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Services List
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: 5,
-              itemBuilder: (context, index) {
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  child: ListTile(
-                    leading: const CircleAvatar(
-                      child: Icon(Icons.cleaning_services),
-                    ),
-                    title: Text('Service ${index + 1}'),
-                    subtitle: const Text('Professional service provider'),
-                    trailing: const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '150,000 VND',
-                          style: TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.star, size: 14, color: Colors.amber),
-                            SizedBox(width: 2),
-                            Text('4.8'),
-                          ],
-                        ),
-                      ],
-                    ),
-                    onTap: () {
-                      // TODO: Navigate to service details
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
+    return BlocProvider.value(
+      value: _servicesBloc,
+      child: Scaffold(
+        backgroundColor: AppColors.backgroundPrimary,
+        body: CustomScrollView(
+          slivers: [
+            _buildSliverAppBar(context),
+            _buildServicesList(context),
+          ],
+        ),
       ),
     );
+  }
+
+  Widget _buildSliverAppBar(BuildContext context) {
+    return SliverAppBar(
+      expandedHeight: 200.0,
+      floating: false,
+      pinned: true,
+      backgroundColor: AppColors.primary,
+      flexibleSpace: FlexibleSpaceBar(
+        title: Text(
+          widget.category?.name ?? 'Category Services',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            shadows: [
+              Shadow(
+                offset: Offset(0, 1),
+                blurRadius: 3.0,
+                color: Colors.black45,
+              ),
+            ],
+          ),
+        ),
+        background: Container(
+          decoration: const BoxDecoration(
+            gradient: AppColors.primaryGradient,
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Decorative circles
+              Positioned(
+                top: -50,
+                right: -50,
+                child: Container(
+                  width: 200,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: -30,
+                left: -30,
+                child: Container(
+                  width: 150,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                ),
+              ),
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 20),
+                    Icon(
+                      _getCategoryIcon(widget.category?.code ?? ''),
+                      size: 64,
+                      color: Colors.white.withOpacity(0.9),
+                    ),
+                    const SizedBox(height: 8),
+                    if (widget.category?.description != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(
+                          widget.category!.description!,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+        onPressed: () => context.pop(),
+      ),
+    );
+  }
+
+  Widget _buildServicesList(BuildContext context) {
+    return BlocBuilder<ServicesBloc, ServicesState>(
+      builder: (context, state) {
+        if (state is ServicesLoading) {
+          return const SliverFillRemaining(
+            child: Center(child: CircularProgressIndicator()),
+          );
+        } else if (state is ServicesError) {
+          return SliverFillRemaining(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline,
+                      size: 48, color: AppColors.error),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error: ${state.message}',
+                    style: const TextStyle(color: AppColors.textSecondary),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      _servicesBloc.add(
+                        LoadServicesByCategory(
+                            categoryId: widget.categoryId, limit: 20),
+                      );
+                    },
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        } else if (state is ServicesLoaded) {
+          if (state.services.isEmpty) {
+            return SliverFillRemaining(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.search_off,
+                      size: 64,
+                      color: AppColors.textSecondary.withOpacity(0.5),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'No services found in this category',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          return SliverPadding(
+            padding: const EdgeInsets.all(16),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final service = state.services[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: ServiceCardWidget(service: service),
+                  );
+                },
+                childCount: state.services.length,
+              ),
+            ),
+          );
+        }
+        return const SliverToBoxAdapter(child: SizedBox());
+      },
+    );
+  }
+
+  IconData _getCategoryIcon(String code) {
+    switch (code.toLowerCase()) {
+      case 'cleaning':
+        return Icons.cleaning_services;
+      case 'plumbing':
+        return Icons.plumbing;
+      case 'electrical':
+        return Icons.electrical_services;
+      case 'carpentry':
+        return Icons.carpenter;
+      case 'painting':
+        return Icons.format_paint;
+      case 'gardening':
+        return Icons.yard;
+      default:
+        return Icons.home_repair_service;
+    }
   }
 }

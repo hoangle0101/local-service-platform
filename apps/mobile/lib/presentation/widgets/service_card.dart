@@ -18,7 +18,12 @@ class ServiceCardWidget extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
         onTap: () {
-          context.push('/service/${service.serviceId}');
+          print('ServiceCardWidget: Tapped service ${service.serviceId}');
+          print('ServiceCardWidget: Service object: $service');
+          context.push(
+            '/service/${service.serviceId}',
+            extra: service,
+          );
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(

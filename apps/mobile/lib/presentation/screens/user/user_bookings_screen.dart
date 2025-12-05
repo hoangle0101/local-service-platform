@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:mobile/presentation/bloc/bookings/bookings_event_state.dart';
+import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
+import '../../bloc/bookings/bookings_event_state.dart';
 
 class UserBookingsScreen extends StatefulWidget {
   const UserBookingsScreen({super.key});
@@ -19,13 +20,20 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    context.read<BookingsBloc>().add(LoadBookings());
+    // Load bookings when screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BookingsBloc>().add(const LoadBookings());
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _refreshBookings() {
+    context.read<BookingsBloc>().add(const LoadBookings());
   }
 
   @override
@@ -37,56 +45,109 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
         backgroundColor: AppColors.white,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshBookings,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primaryDark,
           unselectedLabelColor: AppColors.textSecondary,
           indicatorColor: AppColors.primaryDark,
+          isScrollable: true,
           tabs: const [
             Tab(text: 'Pending'),
-            Tab(text: 'Confirmed'),
+            Tab(text: 'Accepted'),
             Tab(text: 'Completed'),
             Tab(text: 'Cancelled'),
           ],
         ),
       ),
-      body: BlocBuilder<BookingsBloc, BookingsState>(
-        builder: (context, state) {
-          if (state is BookingsLoading) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (state is BookingsLoaded) {
-            return TabBarView(
-              controller: _tabController,
-              children: [
-                _buildBookingsList(state.bookings
-                    .where((b) => b.status == 'pending')
-                    .toList()),
-                _buildBookingsList(state.bookings
-                    .where((b) => b.status == 'confirmed')
-                    .toList()),
-                _buildBookingsList(state.bookings
-                    .where((b) => b.status == 'completed')
-                    .toList()),
-                _buildBookingsList(state.bookings
-                    .where((b) => b.status == 'cancelled')
-                    .toList()),
-              ],
+      body: BlocConsumer<BookingsBloc, BookingsState>(
+        listener: (context, state) {
+          if (state is BookingActionSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.green,
+              ),
             );
           } else if (state is BookingsError) {
-            return Center(
-              child: Text(
-                'Error: ${state.message}',
-                style: const TextStyle(color: AppColors.error),
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.red,
               ),
             );
           }
-          return const SizedBox();
+        },
+        builder: (context, state) {
+          print('[UserBookingsScreen] Current state: ${state.runtimeType}');
+          if (state is BookingsLoading) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (state is BookingsLoaded) {
+            final bookings = state.bookings;
+            print(
+                '[UserBookingsScreen] BookingsLoaded with ${bookings.length} bookings');
+            for (var b in bookings) {
+              print(
+                  '[UserBookingsScreen] Booking: ${b.code} - status: ${b.status}');
+            }
+            return TabBarView(
+              controller: _tabController,
+              children: [
+                _buildBookingsList(
+                  bookings.where((b) => b.status == 'pending').toList(),
+                ),
+                _buildBookingsList(
+                  bookings
+                      .where((b) =>
+                          b.status == 'accepted' ||
+                          b.status == 'confirmed' ||
+                          b.status == 'in_progress')
+                      .toList(),
+                ),
+                _buildBookingsList(
+                  bookings.where((b) => b.status == 'completed').toList(),
+                ),
+                _buildBookingsList(
+                  bookings.where((b) => b.status == 'cancelled').toList(),
+                ),
+              ],
+            );
+          } else if (state is BookingsError) {
+            print('[UserBookingsScreen] BookingsError: ${state.message}');
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline,
+                      size: 64, color: Colors.grey.shade400),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Failed to load bookings',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: _refreshBookings,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+          // Initial state - trigger load
+          return const Center(child: CircularProgressIndicator());
         },
       ),
     );
   }
 
-  Widget _buildBookingsList(List bookings) {
+  Widget _buildBookingsList(List<Booking> bookings) {
     if (bookings.isEmpty) {
       return Center(
         child: Column(
@@ -95,7 +156,7 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
             Icon(
               Icons.calendar_today_outlined,
               size: 64,
-              color: AppColors.textSecondary.withValues(alpha: 0.5),
+              color: AppColors.textSecondary.withOpacity(0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -104,89 +165,119 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
                     color: AppColors.textSecondary,
                   ),
             ),
+            const SizedBox(height: 8),
+            Text(
+              'Your bookings will appear here',
+              style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+            ),
           ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: bookings.length,
-      itemBuilder: (context, index) {
-        final booking = bookings[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return RefreshIndicator(
+      onRefresh: () async => _refreshBookings(),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: bookings.length,
+        itemBuilder: (context, index) {
+          final booking = bookings[index];
+          return _buildBookingCard(booking);
+        },
+      ),
+    );
+  }
+
+  Widget _buildBookingCard(Booking booking) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Service Name',
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        booking.serviceName,
                         style:
                             Theme.of(context).textTheme.titleMedium!.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
                       ),
-                    ),
-                    _buildStatusChip(booking.status),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildInfoRow(Icons.person_outline, 'Provider Name'),
-                const SizedBox(height: 8),
-                _buildInfoRow(Icons.calendar_today_outlined, 'Date & Time'),
-                const SizedBox(height: 8),
-                _buildInfoRow(Icons.attach_money, 'Price'),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    if (booking.status == 'pending' ||
-                        booking.status == 'confirmed')
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            _showCancelDialog(context, booking.id);
-                          },
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.error,
-                            side: const BorderSide(color: AppColors.error),
-                          ),
-                          child: const Text('Cancel'),
-                        ),
-                      ),
-                    if (booking.status == 'completed') ...[
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            _showReviewDialog(context, booking.id);
-                          },
-                          child: const Text('Leave Review'),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Code: ${booking.code}',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
                         ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
+                _buildStatusChip(booking.status),
               ],
             ),
-          ),
-        );
-      },
+
+            const Divider(height: 24),
+
+            // Details
+            _buildInfoRow(
+              Icons.calendar_today_outlined,
+              DateFormat('EEE, dd MMM yyyy • HH:mm')
+                  .format(booking.scheduledAt),
+            ),
+            const SizedBox(height: 8),
+            _buildInfoRow(Icons.location_on_outlined, booking.addressText),
+
+            if (booking.estimatedPrice != null) ...[
+              const SizedBox(height: 8),
+              _buildInfoRow(
+                Icons.attach_money,
+                NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
+                    .format(booking.estimatedPrice),
+              ),
+            ],
+
+            if (booking.providerName != null) ...[
+              const SizedBox(height: 8),
+              _buildInfoRow(
+                  Icons.person_outline, 'Provider: ${booking.providerName}'),
+            ],
+
+            const SizedBox(height: 16),
+
+            // Actions
+            _buildActionButtons(booking),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildInfoRow(IconData icon, String text) {
     return Row(
       children: [
-        Icon(icon, size: 20, color: AppColors.textSecondary),
+        Icon(icon, size: 18, color: AppColors.textSecondary),
         const SizedBox(width: 8),
-        Text(
-          text,
-          style: Theme.of(context).textTheme.bodyMedium,
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodyMedium,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );
@@ -194,41 +285,106 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
 
   Widget _buildStatusChip(String status) {
     Color color;
+    String displayStatus;
+
     switch (status.toLowerCase()) {
       case 'pending':
         color = Colors.orange;
+        displayStatus = 'PENDING';
         break;
       case 'confirmed':
+      case 'accepted':
         color = Colors.blue;
+        displayStatus = 'ACCEPTED';
+        break;
+      case 'in_progress':
+        color = Colors.purple;
+        displayStatus = 'IN PROGRESS';
         break;
       case 'completed':
         color = Colors.green;
+        displayStatus = 'COMPLETED';
         break;
       case 'cancelled':
         color = AppColors.error;
+        displayStatus = 'CANCELLED';
         break;
       default:
         color = AppColors.textSecondary;
+        displayStatus = status.toUpperCase();
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(12),
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Text(
-        status.toUpperCase(),
+        displayStatus,
         style: TextStyle(
           color: color,
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.bold,
         ),
       ),
     );
   }
 
-  void _showCancelDialog(BuildContext context, String bookingId) {
+  Widget _buildActionButtons(Booking booking) {
+    final status = booking.status.toLowerCase();
+
+    if (status == 'pending') {
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => _showCancelDialog(booking.id),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error,
+                side: const BorderSide(color: AppColors.error),
+              ),
+              child: const Text('Cancel'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () {
+                // TODO: View offers
+              },
+              child: const Text('View Offers'),
+            ),
+          ),
+        ],
+      );
+    } else if (status == 'completed') {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () => _showReviewDialog(booking.id),
+          icon: const Icon(Icons.star),
+          label: const Text('Leave Review'),
+        ),
+      );
+    } else if (status == 'cancelled') {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: () {
+            // TODO: Rebook
+          },
+          icon: const Icon(Icons.refresh),
+          label: const Text('Book Again'),
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  void _showCancelDialog(String bookingId) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -252,63 +408,68 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
     );
   }
 
-  void _showReviewDialog(BuildContext context, String bookingId) {
+  void _showReviewDialog(String bookingId) {
     int rating = 5;
     final commentController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Leave a Review'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Rate your experience:'),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(5, (index) {
-                return IconButton(
-                  icon: Icon(
-                    index < rating ? Icons.star : Icons.star_border,
-                    color: Colors.amber,
-                  ),
-                  onPressed: () {
-                    rating = index + 1;
-                  },
-                );
-              }),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: commentController,
-              decoration: const InputDecoration(
-                labelText: 'Comment (optional)',
-                border: OutlineInputBorder(),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Leave a Review'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('How was your experience?'),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) {
+                  return IconButton(
+                    icon: Icon(
+                      index < rating ? Icons.star : Icons.star_border,
+                      color: Colors.amber,
+                      size: 32,
+                    ),
+                    onPressed: () {
+                      setDialogState(() {
+                        rating = index + 1;
+                      });
+                    },
+                  );
+                }),
               ),
-              maxLines: 3,
+              const SizedBox(height: 16),
+              TextField(
+                controller: commentController,
+                decoration: const InputDecoration(
+                  labelText: 'Comment (optional)',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                context.read<BookingsBloc>().add(
+                      ReviewBooking(
+                        bookingId,
+                        rating,
+                        commentController.text,
+                      ),
+                    );
+              },
+              child: const Text('Submit'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              context.read<BookingsBloc>().add(
-                    ReviewBooking(
-                      bookingId,
-                      rating,
-                      commentController.text,
-                    ),
-                  );
-            },
-            child: const Text('Submit'),
-          ),
-        ],
       ),
     );
   }

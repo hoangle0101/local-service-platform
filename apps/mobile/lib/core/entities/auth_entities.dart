@@ -109,7 +109,7 @@ class ProviderProfileEntity {
   final String userId;
   final String displayName;
   final String? bio;
-  final Map<String, dynamic>? skills;
+  final dynamic skills; // Can be List or Map from backend
   final int? serviceRadiusM;
   final String verificationStatus;
   final bool isAvailable;
@@ -126,10 +126,10 @@ class ProviderProfileEntity {
 
   factory ProviderProfileEntity.fromJson(Map<String, dynamic> json) {
     return ProviderProfileEntity(
-      userId: json['userId'].toString(),
-      displayName: json['displayName'] as String,
+      userId: json['userId']?.toString() ?? '',
+      displayName: json['displayName'] as String? ?? 'Provider',
       bio: json['bio'] as String?,
-      skills: json['skills'] as Map<String, dynamic>?,
+      skills: json['skills'], // Keep as dynamic, don't cast
       serviceRadiusM: json['serviceRadiusM'] as int?,
       verificationStatus: json['verificationStatus'] as String? ?? 'unverified',
       isAvailable: json['isAvailable'] as bool? ?? false,

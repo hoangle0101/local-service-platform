@@ -42,4 +42,14 @@ class AppColors {
   // Disabled Colors
   static const Color disabled = Color(0xFFD1D5DB);
   static const Color disabledText = Color(0xFF9CA3AF);
+  static const LinearGradient primaryGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      primaryLight,   // Hoặc Colors.blue
+      primary, // Hoặc Colors.purple
+    ],
+  );
+
+
 }

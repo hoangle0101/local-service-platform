@@ -18,6 +18,25 @@ class LoadServices extends ServicesEvent {
   List<Object?> get props => [limit];
 }
 
+class LoadServicesByCategory extends ServicesEvent {
+  final int categoryId;
+  final int limit;
+
+  const LoadServicesByCategory({required this.categoryId, this.limit = 20});
+
+  @override
+  List<Object?> get props => [categoryId, limit];
+}
+
+class LoadServiceDetails extends ServicesEvent {
+  final int serviceId;
+
+  const LoadServiceDetails(this.serviceId);
+
+  @override
+  List<Object?> get props => [serviceId];
+}
+
 // States
 abstract class ServicesState extends Equatable {
   const ServicesState();
@@ -37,6 +56,15 @@ class ServicesLoaded extends ServicesState {
 
   @override
   List<Object?> get props => [services];
+}
+
+class ServiceDetailsLoaded extends ServicesState {
+  final ProviderService service;
+
+  const ServiceDetailsLoaded(this.service);
+
+  @override
+  List<Object?> get props => [service];
 }
 
 class ServicesError extends ServicesState {
