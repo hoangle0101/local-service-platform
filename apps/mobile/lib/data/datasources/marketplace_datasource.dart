@@ -39,11 +39,19 @@ class MarketplaceDataSource {
     }
   }
 
-  Future<List<ProviderService>> searchServices({int limit = 10}) async {
+  Future<List<ProviderService>> searchServices({
+    int limit = 10,
+    int? categoryId,
+  }) async {
     try {
+      final queryParams = {'limit': limit};
+      if (categoryId != null) {
+        queryParams['categoryId'] = categoryId;
+      }
+
       final response = await _dio.get(
         '/marketplace/services/search',
-        queryParameters: {'limit': limit},
+        queryParameters: queryParams,
       );
 
       // Backend returns: {"statusCode":200, "message":"Success", "data": {"results": [...], "meta": {...}}}
@@ -93,6 +101,15 @@ class MarketplaceDataSource {
     }
   }
 
+  Future<ProviderService> getServiceById(int serviceId) async {
+    try {
+      final response = await _dio.get('/marketplace/services/$serviceId');
+      return _providerServiceFromJson(response.data['data']);
+    } catch (e) {
+      throw Exception('Failed to load service details: $e');
+    }
+  }
+
   // Helper function to safely parse numbers (handles String, int, double, null)
   double _parseDouble(dynamic value, {double defaultValue = 0.0}) {
     if (value == null) return defaultValue;
@@ -136,6 +153,17 @@ class MarketplaceDataSource {
       throw Exception('Missing service or provider data');
     }
 
+    // Extract categoryId: first try direct field, then try nested category object
+    int categoryId = 0;
+    if (serviceData['categoryId'] != null) {
+      categoryId = _parseInt(serviceData['categoryId']);
+    } else if (serviceData['category_id'] != null) {
+      categoryId = _parseInt(serviceData['category_id']);
+    } else if (serviceData['category'] != null &&
+        serviceData['category'] is Map) {
+      categoryId = _parseInt(serviceData['category']['id']);
+    }
+
     return ProviderService(
       providerUserId: json['providerUserId'].toString(),
       serviceId: _parseInt(json['serviceId']),
@@ -144,10 +172,11 @@ class MarketplaceDataSource {
       isActive: json['isActive'] as bool? ?? true,
       service: Service(
         id: _parseInt(serviceData['id']),
-        categoryId: _parseInt(serviceData['categoryId'], defaultValue: 0),
+        categoryId: categoryId,
         name: serviceData['name'] as String,
         description: serviceData['description'] as String?,
         iconUrl: serviceData['iconUrl'] as String?,
+        durationMinutes: _parseInt(serviceData['durationMinutes']),
       ),
       provider: ProviderInfo(
         userId: providerData['userId'].toString(),

@@ -324,6 +324,14 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
                       Icons.person,
                       () => context.push('/provider/profile'),
                     ),
+                    const SizedBox(height: 12),
+                    _buildActionCard(
+                      'Switch to Customer View',
+                      'Browse services and book for yourself',
+                      Icons.swap_horiz,
+                      () => context.go('/user/home'),
+                      isSecondary: true,
+                    ),
                   ],
                 ),
               ),
@@ -384,7 +392,8 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
   }
 
   Widget _buildActionCard(
-      String title, String subtitle, IconData icon, VoidCallback onTap) {
+      String title, String subtitle, IconData icon, VoidCallback onTap,
+      {bool isSecondary = false}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(

@@ -1,6 +1,9 @@
 import 'package:go_router/go_router.dart';
+import '../../../core/entities/entities.dart';
 import '../screens/guest_home_screen.dart';
 import '../screens/service_details_screen.dart';
+import '../screens/booking/create_booking_screen.dart';
+import '../screens/booking/complete_booking_screen.dart';
 import '../screens/category_services_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/role_selection_screen.dart';
@@ -94,14 +97,40 @@ final router = GoRouter(
       path: '/service/:id',
       builder: (context, state) {
         final id = int.parse(state.pathParameters['id']!);
-        return ServiceDetailsScreen(serviceId: id);
+        final service = state.extra as ProviderService?;
+        return ServiceDetailsScreen(
+          serviceId: id,
+          service: service,
+        );
       },
     ),
+
+    // Booking Routes
+    GoRoute(
+      path: '/booking/new',
+      builder: (context, state) => const CompleteBookingScreen(),
+    ),
+    GoRoute(
+      path: '/booking/create',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return CreateBookingScreen(
+          serviceId: extra['serviceId'] as int,
+          service: extra['service'] as ProviderService?,
+        );
+      },
+    ),
+
+    // Category Routes
     GoRoute(
       path: '/category/:id',
       builder: (context, state) {
         final id = int.parse(state.pathParameters['id']!);
-        return CategoryServicesScreen(categoryId: id);
+        final category = state.extra as Category?;
+        return CategoryServicesScreen(
+          categoryId: id,
+          category: category,
+        );
       },
     ),
   ],

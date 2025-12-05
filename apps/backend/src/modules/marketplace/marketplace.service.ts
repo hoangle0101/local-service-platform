@@ -116,7 +116,11 @@ export class MarketplaceService {
     }
 
     // Location-based search using PostGIS
-    let locationFilter: { latitude: number; longitude: number; radius: number } | null = null;
+    let locationFilter: {
+      latitude: number;
+      longitude: number;
+      radius: number;
+    } | null = null;
     if (dto.latitude && dto.longitude) {
       const radius = dto.radiusMeters || 5000;
       // We'll handle this with raw SQL for PostGIS
@@ -129,7 +133,7 @@ export class MarketplaceService {
 
     // Get provider services
     let providerServices;
-    
+
     if (locationFilter) {
       // Build WHERE clauses for filters
       const whereClauses = [
@@ -147,7 +151,9 @@ export class MarketplaceService {
       ];
 
       if (dto.categoryId) {
-        whereClauses.push(`ps.service_id IN (SELECT id FROM services WHERE category_id = $${params.length + 1})`);
+        whereClauses.push(
+          `ps.service_id IN (SELECT id FROM services WHERE category_id = $${params.length + 1})`,
+        );
         params.push(dto.categoryId);
       }
 
@@ -216,11 +222,16 @@ export class MarketplaceService {
         },
         skip,
         take: limit,
-        orderBy: dto.sortBy === 'price' 
-          ? { price: dto.sortOrder === 'asc' ? 'asc' : 'desc' }
-          : dto.sortBy === 'rating'
-          ? { provider: { ratingAvg: dto.sortOrder === 'asc' ? 'asc' : 'desc' } }
-          : { createdAt: 'desc' },
+        orderBy:
+          dto.sortBy === 'price'
+            ? { price: dto.sortOrder === 'asc' ? 'asc' : 'desc' }
+            : dto.sortBy === 'rating'
+              ? {
+                  provider: {
+                    ratingAvg: dto.sortOrder === 'asc' ? 'asc' : 'desc',
+                  },
+                }
+              : { createdAt: 'desc' },
       });
     }
 
@@ -228,37 +239,48 @@ export class MarketplaceService {
     const total = await this.prisma.providerService.count({ where });
 
     // Format response
-    const results = Array.isArray(providerServices) ? providerServices.map((ps: any) => ({
-      providerUserId: ps.provider_user_id?.toString() || ps.providerUserId?.toString(),
-      serviceId: ps.service_id || ps.serviceId,
-      price: ps.price.toString(),
-      currency: ps.currency,
-      distance: ps.distance ? Math.round(ps.distance) : null,
-      service: ps.service ? {
-        id: ps.service.id,
-        name: ps.service.name,
-        description: ps.service.description,
-        basePrice: ps.service.basePrice.toString(),
-        durationMinutes: ps.service.durationMinutes,
-        category: ps.service.category ? {
-          id: ps.service.category.id,
-          name: ps.service.category.name,
-          slug: ps.service.category.slug,
-        } : null,
-      } : null,
-      provider: ps.provider ? {
-        userId: ps.provider.userId.toString(),
-        displayName: ps.provider.displayName,
-        bio: ps.provider.bio,
-        ratingAvg: ps.provider.ratingAvg.toString(),
-        ratingCount: ps.provider.ratingCount,
-        isAvailable: ps.provider.isAvailable,
-        verificationStatus: ps.provider.verificationStatus,
-        user: ps.provider.user ? {
-          profile: ps.provider.user.profile,
-        } : null,
-      } : null,
-    })) : [];
+    const results = Array.isArray(providerServices)
+      ? providerServices.map((ps: any) => ({
+          providerUserId:
+            ps.provider_user_id?.toString() || ps.providerUserId?.toString(),
+          serviceId: ps.service_id || ps.serviceId,
+          price: ps.price.toString(),
+          currency: ps.currency,
+          distance: ps.distance ? Math.round(ps.distance) : null,
+          service: ps.service
+            ? {
+                id: ps.service.id,
+                name: ps.service.name,
+                description: ps.service.description,
+                basePrice: ps.service.basePrice.toString(),
+                durationMinutes: ps.service.durationMinutes,
+                category: ps.service.category
+                  ? {
+                      id: ps.service.category.id,
+                      name: ps.service.category.name,
+                      slug: ps.service.category.slug,
+                    }
+                  : null,
+              }
+            : null,
+          provider: ps.provider
+            ? {
+                userId: ps.provider.userId.toString(),
+                displayName: ps.provider.displayName,
+                bio: ps.provider.bio,
+                ratingAvg: ps.provider.ratingAvg.toString(),
+                ratingCount: ps.provider.ratingCount,
+                isAvailable: ps.provider.isAvailable,
+                verificationStatus: ps.provider.verificationStatus,
+                user: ps.provider.user
+                  ? {
+                      profile: ps.provider.user.profile,
+                    }
+                  : null,
+              }
+            : null,
+        }))
+      : [];
 
     return {
       results,
@@ -267,6 +289,65 @@ export class MarketplaceService {
         page,
         limit,
         totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getProviderServiceById(serviceId: number) {
+    // Find the first active provider service for this service ID
+    const providerService = await this.prisma.providerService.findFirst({
+      where: {
+        serviceId: serviceId,
+        isActive: true,
+        deletedAt: null,
+      },
+      include: {
+        service: {
+          include: {
+            category: true,
+          },
+        },
+        provider: {
+          include: {
+            user: {
+              select: {
+                profile: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!providerService) {
+      throw new NotFoundException(`Service with ID ${serviceId} not found`);
+    }
+
+    return {
+      data: {
+        providerUserId: providerService.providerUserId.toString(),
+        serviceId: providerService.serviceId,
+        price: providerService.price.toString(),
+        currency: providerService.currency,
+        isActive: providerService.isActive,
+        service: {
+          id: providerService.service.id,
+          name: providerService.service.name,
+          description: providerService.service.description,
+          basePrice: providerService.service.basePrice.toString(),
+          durationMinutes: providerService.service.durationMinutes,
+          categoryId: providerService.service.categoryId,
+          // iconUrl: providerService.service.iconUrl,
+          category: providerService.service.category,
+        },
+        provider: {
+          userId: providerService.provider.userId.toString(),
+          displayName: providerService.provider.displayName,
+          isVerified:
+            (providerService.provider.verificationStatus as any) === 'VERIFIED',
+          ratingAvg: providerService.provider.ratingAvg.toString(),
+          ratingCount: providerService.provider.ratingCount,
+        },
       },
     };
   }
@@ -333,11 +414,13 @@ export class MarketplaceService {
           description: ps.service.description,
           basePrice: ps.service.basePrice.toString(),
           durationMinutes: ps.service.durationMinutes,
-          category: ps.service.category ? {
-            id: ps.service.category.id,
-            name: ps.service.category.name,
-            slug: ps.service.category.slug,
-          } : null,
+          category: ps.service.category
+            ? {
+                id: ps.service.category.id,
+                name: ps.service.category.name,
+                slug: ps.service.category.slug,
+              }
+            : null,
         },
       })),
     };
@@ -400,13 +483,17 @@ export class MarketplaceService {
           fullName: review.reviewer.profile?.fullName,
           avatarUrl: review.reviewer.profile?.avatarUrl,
         },
-        booking: review.booking ? {
-          id: review.booking.id.toString(),
-          service: review.booking.service ? {
-            id: review.booking.service.id,
-            name: review.booking.service.name,
-          } : null,
-        } : null,
+        booking: review.booking
+          ? {
+              id: review.booking.id.toString(),
+              service: review.booking.service
+                ? {
+                    id: review.booking.service.id,
+                    name: review.booking.service.name,
+                  }
+                : null,
+            }
+          : null,
       })),
       meta: {
         total,

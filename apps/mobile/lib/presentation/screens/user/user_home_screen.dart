@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../bloc/auth/auth_bloc.dart';
 import '../../bloc/categories/categories_bloc.dart';
 import '../../bloc/categories/categories_event_state.dart';
 import '../../bloc/services/services_bloc.dart';
@@ -57,6 +58,19 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         actions: [
+          // Show Switch to Provider button if user is a provider
+          BlocBuilder<AuthBloc, AuthState>(
+            builder: (context, state) {
+              if (state is Authenticated && state.user?.isProvider == true) {
+                return IconButton(
+                  icon: const Icon(Icons.swap_horiz),
+                  tooltip: 'Switch to Provider View',
+                  onPressed: () => context.go('/provider/home'),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () {
@@ -91,7 +105,74 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            // Quick Book Card
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: InkWell(
+                onTap: () => context.push('/booking/new'),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppColors.primaryDark, AppColors.primary],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.add_circle_outline,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              'Book a Service',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Create a new booking with full details',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios,
+                          color: Colors.white70, size: 20),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
             // Categories
             Padding(
@@ -126,7 +207,10 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                           category.name,
                           _getCategoryIcon(category.code),
                           () {
-                            context.push('/category/${category.id}');
+                            context.push(
+                              '/category/${category.id}',
+                              extra: category,
+                            );
                           },
                         );
                       },

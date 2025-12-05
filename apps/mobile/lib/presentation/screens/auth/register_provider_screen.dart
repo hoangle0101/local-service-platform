@@ -26,13 +26,30 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  // Step 2: Provider Details
+  // Step 2: OTP
+  final _otpController = TextEditingController();
+
+  // Step 3: Provider Details
   final _displayNameController = TextEditingController();
   final _bioController = TextEditingController();
   final _skillsController = TextEditingController();
-  final _otpController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _experienceYearsController = TextEditingController();
+
+  // Location
+  double _latitude = 21.0285; // Default Hanoi
+  double _longitude = 105.8542;
+
+  // Service Radius
+  double _serviceRadius = 5; // km
+
+  // Working Hours
+  TimeOfDay _workStartTime = const TimeOfDay(hour: 8, minute: 0);
+  TimeOfDay _workEndTime = const TimeOfDay(hour: 18, minute: 0);
+  List<String> _workingDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
   bool _isCreatingProvider = false;
+  bool _acceptsTerms = false;
 
   @override
   void dispose() {
@@ -43,6 +60,8 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
     _displayNameController.dispose();
     _bioController.dispose();
     _skillsController.dispose();
+    _addressController.dispose();
+    _experienceYearsController.dispose();
     _otpController.dispose();
     super.dispose();
   }
@@ -60,6 +79,11 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
           } else {
             phone = '+84$phone';
           }
+        }
+
+        // Pre-fill display name from full name
+        if (_displayNameController.text.isEmpty) {
+          _displayNameController.text = _fullNameController.text;
         }
 
         // Register user account
@@ -91,6 +115,16 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
   Future<void> _createProviderProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (!_acceptsTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please accept the Terms of Service'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isCreatingProvider = true;
     });
@@ -113,15 +147,26 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
         print('⚠️ No access token found. Attempting explicit login...');
         try {
           final authDataSource = AuthDataSource();
+          String phone = _phoneController.text.trim();
+          if (!phone.startsWith('+')) {
+            if (phone.startsWith('0')) {
+              phone = '+84${phone.substring(1)}';
+            } else if (phone.startsWith('84')) {
+              phone = '+$phone';
+            } else {
+              phone = '+84$phone';
+            }
+          }
+
           final tokens = await authDataSource.login(
-            phone: _phoneController.text,
+            phone: phone,
             password: _passwordController.text,
           );
 
           await SecureStorage.saveAuthData(
             accessToken: tokens.accessToken,
             refreshToken: tokens.refreshToken,
-            userPhone: _phoneController.text,
+            userPhone: phone,
           );
 
           token = tokens.accessToken;
@@ -137,15 +182,15 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
         displayName: _displayNameController.text,
         bio: _bioController.text.isNotEmpty ? _bioController.text : null,
         skills: skillsList,
-        serviceRadiusM: 5000,
+        serviceRadiusM: (_serviceRadius * 1000).toInt(),
+        latitude: _latitude,
+        longitude: _longitude,
+        address:
+            _addressController.text.isNotEmpty ? _addressController.text : null,
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Provider profile created successfully!')),
-        );
-        context.go('/provider/home');
+        _showSuccessDialog();
       }
     } catch (e) {
       if (mounted) {
@@ -163,6 +208,60 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
         });
       }
     }
+  }
+
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child:
+                  const Icon(Icons.check_circle, color: Colors.green, size: 64),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Welcome, Provider!',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Your provider profile has been created successfully.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '• Add your services to start receiving bookings\n• Set your availability\n• Complete your profile',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              context.go('/provider/home');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 48),
+            ),
+            child: const Text('Go to Dashboard'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -249,13 +348,17 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
               shape: BoxShape.circle,
             ),
             child: Center(
-              child: Text(
-                '${step + 1}',
-                style: TextStyle(
-                  color: isActive ? AppColors.white : AppColors.textSecondary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              child: isActive && _currentStep > step
+                  ? const Icon(Icons.check, color: Colors.white, size: 18)
+                  : Text(
+                      '${step + 1}',
+                      style: TextStyle(
+                        color: isActive
+                            ? AppColors.white
+                            : AppColors.textSecondary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(height: 4),
@@ -305,53 +408,61 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Basic Information',
+              'Create Your Account',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 8),
             Text(
-              'Create your account to get started',
+              'Enter your personal information',
               style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                     color: AppColors.textSecondary,
                   ),
             ),
             const SizedBox(height: 32),
             CustomTextField(
-              label: 'Full Name',
-              hint: 'John Doe',
+              label: 'Full Name *',
+              hint: 'Nguyễn Văn A',
               controller: _fullNameController,
               prefixIcon: const Icon(Icons.person_outline),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter your full name';
+                  return 'Full name is required';
+                }
+                if (value.length < 2) {
+                  return 'Name must be at least 2 characters';
                 }
                 return null;
               },
             ),
             const SizedBox(height: 20),
             CustomTextField(
-              label: 'Phone Number',
-              hint: '+84987654321',
+              label: 'Phone Number *',
+              hint: '0987654321',
               type: TextFieldType.phone,
               controller: _phoneController,
               prefixIcon: const Icon(Icons.phone_outlined),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter your phone number';
+                  return 'Phone number is required';
+                }
+                // Remove any formatting
+                final cleaned = value.replaceAll(RegExp(r'[^\d+]'), '');
+                if (cleaned.length < 9) {
+                  return 'Please enter a valid phone number';
                 }
                 return null;
               },
             ),
             const SizedBox(height: 20),
             CustomTextField(
-              label: 'Password',
+              label: 'Password *',
               hint: 'At least 6 characters',
               type: TextFieldType.password,
               controller: _passwordController,
               prefixIcon: const Icon(Icons.lock_outline),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter a password';
+                  return 'Password is required';
                 }
                 if (value.length < 6) {
                   return 'Password must be at least 6 characters';
@@ -361,7 +472,7 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
             ),
             const SizedBox(height: 20),
             CustomTextField(
-              label: 'Confirm Password',
+              label: 'Confirm Password *',
               hint: 'Re-enter your password',
               type: TextFieldType.password,
               controller: _confirmPasswordController,
@@ -383,6 +494,17 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
               isLoading: isLoading,
               isFullWidth: true,
               size: ButtonSize.large,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('Already have an account? '),
+                TextButton(
+                  onPressed: () => context.go('/login'),
+                  child: const Text('Login'),
+                ),
+              ],
             ),
           ],
         );
@@ -407,7 +529,7 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
         ),
         const SizedBox(height: 32),
 
-        // OTP Input (simplified - you can use a proper OTP input widget)
+        // OTP Input
         CustomTextField(
           label: 'Enter OTP',
           hint: '123456',
@@ -472,35 +594,41 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Tell us about your services',
+          'Complete your professional profile',
           style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                 color: AppColors.textSecondary,
               ),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 24),
+
+        // Display Name
         CustomTextField(
-          label: 'Display Name',
-          hint: 'How you want to be known',
+          label: 'Display Name *',
+          hint: 'How customers will see you',
           controller: _displayNameController,
           prefixIcon: const Icon(Icons.badge_outlined),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Please enter a display name';
+              return 'Display name is required';
             }
             return null;
           },
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
+
+        // Bio
         CustomTextField(
-          label: 'Bio',
-          hint: 'Tell customers about yourself',
+          label: 'About You',
+          hint: 'Describe your experience and expertise...',
           controller: _bioController,
-          maxLines: 4,
+          maxLines: 3,
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
+
+        // Skills
         CustomTextField(
-          label: 'Skills',
-          hint: 'e.g., Plumbing, Electrical, Carpentry',
+          label: 'Skills *',
+          hint: 'e.g., Plumbing, Electrical, AC Repair',
           controller: _skillsController,
           prefixIcon: const Icon(Icons.construction_outlined),
           validator: (value) {
@@ -510,7 +638,234 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
             return null;
           },
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 4),
+        Text(
+          'Separate multiple skills with commas',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
+
+        const SizedBox(height: 24),
+        const Divider(),
+        const SizedBox(height: 16),
+
+        // Location Section
+        Row(
+          children: [
+            const Icon(Icons.location_on, color: AppColors.primary),
+            const SizedBox(width: 8),
+            const Text(
+              'Service Location',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        CustomTextField(
+          label: 'Work Address',
+          hint: 'Your base location for services',
+          controller: _addressController,
+          prefixIcon: const Icon(Icons.home_work_outlined),
+          suffixIcon: IconButton(
+            icon: const Icon(Icons.my_location, color: AppColors.primary),
+            onPressed: _getCurrentLocation,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.gps_fixed, size: 16, color: Colors.grey.shade600),
+              const SizedBox(width: 8),
+              Text(
+                'GPS: ${_latitude.toStringAsFixed(4)}, ${_longitude.toStringAsFixed(4)}',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Service Radius
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Service Radius'),
+            Text(
+              '${_serviceRadius.toInt()} km',
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, color: AppColors.primary),
+            ),
+          ],
+        ),
+        Slider(
+          value: _serviceRadius,
+          min: 1,
+          max: 50,
+          divisions: 49,
+          activeColor: AppColors.primary,
+          onChanged: (value) {
+            setState(() {
+              _serviceRadius = value;
+            });
+          },
+        ),
+        Text(
+          'You will receive booking requests within this radius',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
+
+        const SizedBox(height: 24),
+        const Divider(),
+        const SizedBox(height: 16),
+
+        // Working Hours
+        Row(
+          children: [
+            const Icon(Icons.schedule, color: AppColors.primary),
+            const SizedBox(width: 8),
+            const Text(
+              'Working Hours',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: () async {
+                  final time = await showTimePicker(
+                    context: context,
+                    initialTime: _workStartTime,
+                  );
+                  if (time != null) {
+                    setState(() => _workStartTime = time);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.access_time, size: 18),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Start',
+                              style: TextStyle(
+                                  fontSize: 10, color: Colors.grey.shade600)),
+                          Text(_workStartTime.format(context),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: InkWell(
+                onTap: () async {
+                  final time = await showTimePicker(
+                    context: context,
+                    initialTime: _workEndTime,
+                  );
+                  if (time != null) {
+                    setState(() => _workEndTime = time);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.access_time, size: 18),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('End',
+                              style: TextStyle(
+                                  fontSize: 10, color: Colors.grey.shade600)),
+                          Text(_workEndTime.format(context),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 16),
+
+        // Working Days
+        const Text('Working Days'),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children:
+              ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) {
+            final isSelected = _workingDays.contains(day);
+            return FilterChip(
+              label: Text(day),
+              selected: isSelected,
+              onSelected: (selected) {
+                setState(() {
+                  if (selected) {
+                    _workingDays.add(day);
+                  } else {
+                    _workingDays.remove(day);
+                  }
+                });
+              },
+              selectedColor: AppColors.primaryLight,
+              checkmarkColor: AppColors.primaryDark,
+            );
+          }).toList(),
+        ),
+
+        const SizedBox(height: 24),
+
+        // Terms of Service
+        CheckboxListTile(
+          value: _acceptsTerms,
+          onChanged: (value) {
+            setState(() {
+              _acceptsTerms = value ?? false;
+            });
+          },
+          title: const Text(
+            'I agree to the Terms of Service and Privacy Policy',
+            style: TextStyle(fontSize: 14),
+          ),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
+        ),
+
+        const SizedBox(height: 24),
+
         CustomButton(
           text: 'Create Provider Profile',
           onPressed: _isCreatingProvider ? null : _createProviderProfile,
@@ -526,6 +881,28 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
           isFullWidth: true,
         ),
       ],
+    );
+  }
+
+  void _getCurrentLocation() {
+    // For simplicity, use default Hanoi location
+    // In production, use geolocator package
+    setState(() {
+      _addressController.text = 'Hoàn Kiếm, Hà Nội, Việt Nam';
+      _latitude = 21.0285;
+      _longitude = 105.8542;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.location_on, color: Colors.white),
+            SizedBox(width: 8),
+            Text('Using default location (Hanoi)'),
+          ],
+        ),
+        backgroundColor: AppColors.primary,
+      ),
     );
   }
 }

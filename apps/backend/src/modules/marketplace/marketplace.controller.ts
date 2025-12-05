@@ -27,6 +27,13 @@ export class MarketplaceController {
     return this.marketplaceService.searchServices(dto);
   }
 
+  @Get('services/:id')
+  @ApiOperation({ summary: 'Get provider service details by ID' })
+  @ApiParam({ name: 'id', example: '1' })
+  async getServiceById(@Param('id') id: string) {
+    return this.marketplaceService.getProviderServiceById(parseInt(id));
+  }
+
   @Get('providers/:id')
   @ApiOperation({ summary: 'Get provider details' })
   @ApiParam({ name: 'id', example: '1' })

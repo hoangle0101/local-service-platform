@@ -70,80 +70,48 @@ export class BookingsService {
         throw new NotFoundException('Service not found');
       }
 
-      // Find provider
-      const provider = await this.findNearestProvider(
+      // 1. Create Booking (Pending, no provider yet)
+      const code = `BK${Date.now()}`;
+      const basePrice = Number(service.basePrice); // Initial estimate
+
+      const bookingIdResult = await tx.$queryRawUnsafe<any[]>(
+        `
+        INSERT INTO bookings (
+          code, customer_id, service_id,
+          status, scheduled_at, address_text, location, notes,
+          estimated_price, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3,
+          'pending', $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326), $8,
+          $9, NOW(), NOW()
+        ) RETURNING id, code, status, scheduled_at, estimated_price
+      `,
+        code,
+        customerId,
+        dto.serviceId,
+        new Date(dto.scheduledAt),
+        dto.addressText,
+        dto.longitude,
+        dto.latitude,
+        dto.notes || null,
+        basePrice,
+      );
+
+      const booking = bookingIdResult[0];
+      const bookingId = booking.id;
+
+      // 2. Find Nearby Providers
+      const providers = await this.findNearbyProviders(
         dto.serviceId,
         dto.latitude,
         dto.longitude,
         tx,
       );
 
-      if (!provider) {
-        throw new NotFoundException('No provider available for this service');
-      }
-
-      // Get provider service price
-      const providerService = await tx.providerService.findUnique({
-        where: {
-          providerUserId_serviceId: {
-            providerUserId: (provider as any).user_id,
-            serviceId: dto.serviceId,
-          },
-        },
-      });
-
-      if (!providerService) {
-        throw new NotFoundException('Provider service not found');
-      }
-
-      const basePrice = Number(providerService.price);
-      const platformFee = basePrice * 0.1;
-      const providerEarning = basePrice * 0.9;
-
-      // Create booking
-      // Use raw query for Point creation to ensure PostGIS compatibility
-      const pointQuery = `ST_SetSRID(ST_MakePoint(${dto.longitude}, ${dto.latitude}), 4326)`;
-      
-      const code = `BK${Date.now()}`;
-      
-      // Insert Booking via raw SQL to handle PostGIS point
-      const bookingIdResult = await tx.$queryRawUnsafe<any[]>(`
-        INSERT INTO bookings (
-          code, customer_id, provider_id, service_id, provider_service_price,
-          status, scheduled_at, address_text, location, notes,
-          estimated_price, platform_fee, provider_earning, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5,
-          'pending', $6, $7, ST_SetSRID(ST_MakePoint($8, $9), 4326), $10,
-          $11, $12, $13, NOW(), NOW()
-        ) RETURNING id, code, status, scheduled_at, estimated_price
-      `, 
-        code, 
-        customerId, 
-        (provider as any).user_id, 
-        dto.serviceId, 
-        basePrice,
-        new Date(dto.scheduledAt), 
-        dto.addressText, 
-        dto.longitude, 
-        dto.latitude, 
-        dto.notes || null,
-        basePrice,
-        platformFee,
-        providerEarning
-      );
-
-      const booking = bookingIdResult[0];
-
-      // Create booking event
-      await tx.bookingEvent.create({
-        data: {
-          bookingId: booking.id,
-          newStatus: 'pending',
-          actorUserId: customerId,
-          note: 'Booking created',
-        },
-      });
+      // 3. Notify Providers (via Socket)
+      // We can't inject SocketGateway here directly if it causes circular dependency or if we are in transaction
+      // Ideally, we return the list of provider IDs and emit events after transaction commits.
+      // For now, we'll assume we can emit after this function returns in the controller.
 
       return {
         id: booking.id.toString(),
@@ -151,17 +119,261 @@ export class BookingsService {
         status: booking.status,
         scheduledAt: booking.scheduled_at,
         estimatedPrice: booking.estimated_price?.toString(),
+        nearbyProviderIds: providers.map((p) => (p as any).user_id.toString()),
       };
     });
+  }
+
+  // Helper: Find nearby providers (multiple)
+  private async findNearbyProviders(
+    serviceId: number,
+    latitude: number,
+    longitude: number,
+    tx?: any,
+  ) {
+    const prisma = tx || this.prisma;
+    const radiusMeters = 10000; // 10km radius
+
+    return await prisma.$queryRawUnsafe(
+      `
+      SELECT 
+        pp.user_id,
+        pp.display_name,
+        ST_Distance(
+          pp.location::geography,
+          ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+        ) as distance
+      FROM provider_profiles pp
+      INNER JOIN provider_services ps ON pp.user_id = ps.provider_user_id
+      WHERE ps.service_id = $3
+        AND ps.is_active = true
+        AND ps.deleted_at IS NULL
+        AND pp.is_available = true
+        AND ST_DWithin(
+          pp.location::geography,
+          ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+          $4
+        )
+      ORDER BY distance ASC
+      LIMIT 10
+    `,
+      longitude,
+      latitude,
+      serviceId,
+      radiusMeters,
+    );
+  }
+
+  async acceptBookingRequest(providerId: bigint, bookingId: bigint) {
+    // Check if booking exists and is pending
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+    });
+
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.status !== 'pending')
+      throw new BadRequestException('Booking is not pending');
+
+    // Check if provider offers this service
+    const providerService = await this.prisma.providerService.findUnique({
+      where: {
+        providerUserId_serviceId: {
+          providerUserId: providerId,
+          serviceId: booking.serviceId,
+        },
+      },
+    });
+
+    if (!providerService)
+      throw new ForbiddenException('You do not provide this service');
+
+    // Create BookingOffer using raw SQL (until Prisma regenerates)
+    const offerResult = await this.prisma.$queryRawUnsafe<any[]>(
+      `
+      INSERT INTO booking_offers (booking_id, provider_id, price, status, created_at, updated_at)
+      VALUES ($1, $2, $3, 'PENDING', NOW(), NOW())
+      RETURNING id
+    `,
+      bookingId,
+      providerId,
+      Number(providerService.price),
+    );
+
+    return {
+      message: 'Offer sent',
+      offerId: offerResult[0].id.toString(),
+      bookingId: bookingId.toString(),
+      customerId: booking.customerId.toString(),
+    };
+  }
+
+  async selectProvider(
+    customerId: bigint,
+    bookingId: bigint,
+    providerId: bigint,
+  ) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+    });
+
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.customerId !== customerId)
+      throw new ForbiddenException('Not your booking');
+
+    // Verify offer exists using raw SQL
+    const offers = await this.prisma.$queryRawUnsafe<any[]>(
+      `
+      SELECT id, price FROM booking_offers 
+      WHERE booking_id = $1 AND provider_id = $2
+    `,
+      bookingId,
+      providerId,
+    );
+
+    if (!offers || offers.length === 0)
+      throw new NotFoundException('Provider offer not found');
+
+    const offer = offers[0];
+
+    // Update Booking and Offers
+    return await this.prisma.$transaction(async (tx) => {
+      // Update Booking
+      const updatedBooking = await tx.booking.update({
+        where: { id: bookingId },
+        data: {
+          providerId,
+          providerServicePrice: offer.price,
+          status: 'accepted',
+          estimatedPrice: offer.price,
+        },
+      });
+
+      // Update Offers using raw SQL
+      await tx.$executeRawUnsafe(
+        `
+        UPDATE booking_offers SET status = 'ACCEPTED', updated_at = NOW() WHERE id = $1
+      `,
+        offer.id,
+      );
+
+      await tx.$executeRawUnsafe(
+        `
+        UPDATE booking_offers SET status = 'REJECTED', updated_at = NOW() 
+        WHERE booking_id = $1 AND id != $2
+      `,
+        bookingId,
+        offer.id,
+      );
+
+      return {
+        message: 'Provider selected',
+        bookingId: updatedBooking.id.toString(),
+        providerId: providerId.toString(),
+      };
+    });
+  }
+
+  // GET /bookings/:id/offers
+  async getBookingOffers(userId: bigint, bookingId: bigint) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+    });
+
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.customerId !== userId)
+      throw new ForbiddenException('Not your booking');
+
+    // Get offers using raw SQL
+    const offers = await this.prisma.$queryRawUnsafe<any[]>(
+      `
+      SELECT 
+        bo.id,
+        bo.booking_id,
+        bo.provider_id,
+        bo.price,
+        bo.status,
+        pp.display_name as provider_name,
+        pp.rating_avg
+      FROM booking_offers bo
+      JOIN provider_profiles pp ON bo.provider_id = pp.user_id
+      WHERE bo.booking_id = $1
+      ORDER BY bo.created_at DESC
+    `,
+      bookingId,
+    );
+
+    return {
+      offers: offers.map((o) => ({
+        id: o.id.toString(),
+        bookingId: o.booking_id.toString(),
+        providerId: o.provider_id.toString(),
+        providerName: o.provider_name,
+        rating: o.rating_avg?.toString(),
+        price: o.price.toString(),
+        status: o.status,
+      })),
+    };
+  }
+
+  // GET /provider/bookings/requests
+  async getProviderRequests(providerId: bigint) {
+    // Find pending bookings where the provider offers the service
+    // and hasn't already made an offer
+    const requests = await this.prisma.$queryRawUnsafe<any[]>(
+      `
+      SELECT DISTINCT
+        b.id,
+        b.code,
+        b.status,
+        b.scheduled_at,
+        b.address_text,
+        b.estimated_price,
+        s.name as service_name,
+        up.full_name as customer_name,
+        ST_Distance(
+          b.location::geography,
+          pp.location::geography
+        ) as distance
+      FROM bookings b
+      JOIN services s ON b.service_id = s.id
+      JOIN user_profiles up ON b.customer_id = up.user_id
+      JOIN provider_services ps ON ps.service_id = b.service_id AND ps.provider_user_id = $1
+      JOIN provider_profiles pp ON pp.user_id = $1
+      LEFT JOIN booking_offers bo ON bo.booking_id = b.id AND bo.provider_id = $1
+      WHERE b.status = 'pending'
+        AND b.provider_id IS NULL
+        AND bo.id IS NULL
+        AND ps.is_active = true
+        AND ST_DWithin(
+          b.location::geography,
+          pp.location::geography,
+          pp.service_radius_m
+        )
+      ORDER BY b.created_at DESC
+      LIMIT 20
+    `,
+      providerId,
+    );
+
+    return {
+      requests: requests.map((r) => ({
+        id: r.id.toString(),
+        code: r.code,
+        status: r.status,
+        scheduledAt: r.scheduled_at,
+        addressText: r.address_text,
+        estimatedPrice: r.estimated_price?.toString(),
+        serviceName: r.service_name,
+        customerName: r.customer_name,
+        distance: Math.round(r.distance),
+      })),
+    };
   }
 
   // GET /bookings
   async getBookings(userId: bigint, query: BookingQueryDto) {
     const where: any = {
-      OR: [
-        { customerId: userId },
-        { providerId: userId },
-      ],
+      OR: [{ customerId: userId }, { providerId: userId }],
     };
 
     if (query.status) {
@@ -328,7 +540,11 @@ export class BookingsService {
   }
 
   // PATCH /bookings/:id/cancel
-  async cancelBooking(userId: bigint, bookingId: bigint, dto: CancelBookingDto) {
+  async cancelBooking(
+    userId: bigint,
+    bookingId: bigint,
+    dto: CancelBookingDto,
+  ) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
     });
@@ -503,7 +719,11 @@ export class BookingsService {
   }
 
   // POST /bookings/:id/review
-  async reviewBooking(userId: bigint, bookingId: bigint, dto: ReviewBookingDto) {
+  async reviewBooking(
+    userId: bigint,
+    bookingId: bigint,
+    dto: ReviewBookingDto,
+  ) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
       include: { review: true },
@@ -572,7 +792,8 @@ export class BookingsService {
 
     // Use queryRawUnsafe for dynamic params
     // Cast geography to text to avoid Prisma deserialization error
-    const providers = await prisma.$queryRawUnsafe(`
+    const providers = await prisma.$queryRawUnsafe(
+      `
       SELECT 
         pp.user_id,
         pp.display_name,
@@ -599,8 +820,14 @@ export class BookingsService {
         )
       ORDER BY distance ASC
       LIMIT 1
-    `, longitude, latitude, serviceId);
+    `,
+      longitude,
+      latitude,
+      serviceId,
+    );
 
-    return Array.isArray(providers) && providers.length > 0 ? providers[0] : null;
+    return Array.isArray(providers) && providers.length > 0
+      ? providers[0]
+      : null;
   }
 }
