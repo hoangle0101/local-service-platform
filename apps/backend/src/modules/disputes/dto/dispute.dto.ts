@@ -48,3 +48,22 @@ export class CreateDisputeDto {
     @IsArray()
     evidence?: string[];
 }
+
+export class GetDisputeDetailDto {
+    @ApiPropertyOptional({ example: true, description: 'Include related booking and service data' })
+    @IsOptional()
+    @Type(() => Boolean)
+    includeRelations?: boolean = true;
+}
+
+export class UpdateDisputeAppealDto {
+    @ApiProperty({ example: 'I disagree with this resolution. Here is why...' })
+    @IsNotEmpty()
+    @IsString()
+    appealReason: string;
+
+    @ApiPropertyOptional({ type: [String], example: ['evidence_url_1', 'evidence_url_2'] })
+    @IsOptional()
+    @IsArray()
+    newEvidence?: string[];
+}
