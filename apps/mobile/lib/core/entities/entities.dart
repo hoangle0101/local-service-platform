@@ -19,6 +19,30 @@ class Category extends Equatable {
     this.parentId,
   });
 
+  factory Category.fromJson(Map<String, dynamic> json) {
+    return Category(
+      id: json['id'] as int,
+      code: json['code'] as String,
+      name: json['name'] as String,
+      slug: json['slug'] as String?,
+      description: json['description'] as String?,
+      iconUrl: json['icon_url'] as String? ?? json['iconUrl'] as String?,
+      parentId: json['parent_id'] as int? ?? json['parentId'] as int?,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'code': code,
+      'name': name,
+      'slug': slug,
+      'description': description,
+      'iconUrl': iconUrl,
+      'parentId': parentId,
+    };
+  }
+
   @override
   List<Object?> get props =>
       [id, code, name, slug, description, iconUrl, parentId];
@@ -26,71 +50,55 @@ class Category extends Equatable {
 
 class Service extends Equatable {
   final int id;
-  final int? categoryId;
   final String name;
   final String? description;
-  final double basePrice;
-  final int? durationMinutes;
+  final int categoryId;
+  final String? iconUrl;
 
   const Service({
     required this.id,
-    this.categoryId,
     required this.name,
     this.description,
-    required this.basePrice,
-    this.durationMinutes,
+    required this.categoryId,
+    this.iconUrl,
   });
 
-  @override
-  List<Object?> get props =>
-      [id, categoryId, name, description, basePrice, durationMinutes];
-}
+  factory Service.fromJson(Map<String, dynamic> json) {
+    return Service(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      description: json['description'] as String?,
+      categoryId: json['category_id'] as int? ?? json['categoryId'] as int,
+      iconUrl: json['icon_url'] as String? ?? json['iconUrl'] as String?,
+    );
+  }
 
-class Provider extends Equatable {
-  final String userId;
-  final String displayName;
-  final String? bio;
-  final double ratingAvg;
-  final int ratingCount;
-  final bool isAvailable;
-  final String verificationStatus;
-
-  const Provider({
-    required this.userId,
-    required this.displayName,
-    this.bio,
-    required this.ratingAvg,
-    required this.ratingCount,
-    required this.isAvailable,
-    required this.verificationStatus,
-  });
-
-  bool get isVerified => verificationStatus == 'verified';
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'category_id': categoryId,
+      'icon_url': iconUrl,
+    };
+  }
 
   @override
-  List<Object?> get props => [
-        userId,
-        displayName,
-        bio,
-        ratingAvg,
-        ratingCount,
-        isAvailable,
-        verificationStatus
-      ];
+  List<Object?> get props => [id, name, description, categoryId, iconUrl];
 }
 
 class ProviderService extends Equatable {
-  final String providerUserId;
   final int serviceId;
+  final String providerUserId;
   final double price;
   final String currency;
   final bool isActive;
   final Service service;
-  final Provider provider;
+  final ProviderInfo provider;
 
   const ProviderService({
-    required this.providerUserId,
     required this.serviceId,
+    required this.providerUserId,
     required this.price,
     required this.currency,
     required this.isActive,
@@ -98,7 +106,55 @@ class ProviderService extends Equatable {
     required this.provider,
   });
 
+  factory ProviderService.fromJson(Map<String, dynamic> json) {
+    return ProviderService(
+      serviceId: json['service_id'] as int? ?? json['serviceId'] as int,
+      providerUserId: json['provider_user_id'] as String? ??
+          json['providerUserId'] as String,
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      currency: json['currency'] as String? ?? 'VND',
+      isActive: json['is_active'] as bool? ?? json['isActive'] as bool? ?? true,
+      service: Service.fromJson(json['service'] as Map<String, dynamic>),
+      provider: ProviderInfo.fromJson(json['provider'] as Map<String, dynamic>),
+    );
+  }
+
   @override
   List<Object?> get props =>
-      [providerUserId, serviceId, price, currency, isActive, service, provider];
+      [serviceId, providerUserId, price, currency, isActive, service, provider];
+}
+
+class ProviderInfo extends Equatable {
+  final String userId;
+  final String displayName;
+  final bool isVerified;
+  final double ratingAvg;
+  final int ratingCount;
+
+  const ProviderInfo({
+    required this.userId,
+    required this.displayName,
+    required this.isVerified,
+    required this.ratingAvg,
+    required this.ratingCount,
+  });
+
+  factory ProviderInfo.fromJson(Map<String, dynamic> json) {
+    return ProviderInfo(
+      userId: json['user_id'] as String? ?? json['userId'] as String,
+      displayName:
+          json['display_name'] as String? ?? json['displayName'] as String,
+      isVerified:
+          json['is_verified'] as bool? ?? json['isVerified'] as bool? ?? false,
+      ratingAvg: (json['rating_avg'] as num?)?.toDouble() ??
+          (json['ratingAvg'] as num?)?.toDouble() ??
+          0.0,
+      ratingCount:
+          json['rating_count'] as int? ?? json['ratingCount'] as int? ?? 0,
+    );
+  }
+
+  @override
+  List<Object?> get props =>
+      [userId, displayName, isVerified, ratingAvg, ratingCount];
 }

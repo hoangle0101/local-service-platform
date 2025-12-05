@@ -1,7 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/entities/auth_entities.dart';
 import '../../../data/datasources/auth_datasource.dart';
 import '../../../data/storage/secure_storage.dart';
-import '../../../core/entities/auth_entities.dart';
 import 'auth_event.dart';
 
 export 'auth_event.dart';
@@ -19,6 +19,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<OtpSendRequested>(_onOtpSendRequested);
     on<OtpVerifyRequested>(_onOtpVerifyRequested);
     on<LogoutRequested>(_onLogoutRequested);
+    on<ProfileFetchRequested>(_onProfileFetchRequested);
   }
 
   Future<void> _onAuthCheckRequested(
@@ -30,13 +31,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final accessToken = await SecureStorage.getAccessToken();
       final refreshToken = await SecureStorage.getRefreshToken();
       if (accessToken != null && refreshToken != null) {
-        emit(Authenticated(
-          tokens: AuthTokens(
-            accessToken: accessToken,
-            refreshToken: refreshToken,
-          ),
-        ));
-        return;
+        try {
+          // Fetch user profile to get role information
+          final user = await _authDataSource.getUserProfile(accessToken);
+          emit(Authenticated(
+            tokens: AuthTokens(
+              accessToken: accessToken,
+              refreshToken: refreshToken,
+            ),
+            user: user,
+          ));
+          return;
+        } catch (e) {
+          // If profile fetch fails, clear auth and show unauthenticated
+          await SecureStorage.clearAuthData();
+        }
       }
     }
     emit(Unauthenticated());
@@ -59,7 +68,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         userPhone: event.phone,
       );
 
-      emit(Authenticated(tokens: tokens));
+      // Fetch user profile to determine role
+      final user = await _authDataSource.getUserProfile(tokens.accessToken);
+
+      emit(Authenticated(tokens: tokens, user: user));
     } catch (e) {
       emit(AuthError(_extractErrorMessage(e)));
     }
@@ -82,11 +94,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         userPhone: event.phone,
       );
 
-      emit(Authenticated(tokens: tokens));
+      // Fetch user profile to determine role
+      final user = await _authDataSource.getUserProfile(tokens.accessToken);
+
+      emit(Authenticated(tokens: tokens, user: user));
     } catch (e) {
       emit(AuthError(_extractErrorMessage(e)));
     }
   }
+
+  // Temporary credentials for auto-login after registration
+  String? _tempPhone;
+  String? _tempPassword;
 
   Future<void> _onRegisterRequested(
     RegisterRequested event,
@@ -94,6 +113,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     try {
+      _tempPhone = event.phone;
+      _tempPassword = event.password;
+
       final result = await _authDataSource.register(
         phone: event.phone,
         password: event.password,
@@ -106,6 +128,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         phone: event.phone,
       ));
     } catch (e) {
+      _tempPhone = null;
+      _tempPassword = null;
       emit(AuthError(_extractErrorMessage(e)));
     }
   }
@@ -145,6 +169,36 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         purpose: purpose,
       );
 
+      // If this was for registration (verify_phone) and we have credentials, auto-login
+      if (purpose == OtpPurpose.verifyPhone &&
+          _tempPhone == event.phone &&
+          _tempPassword != null) {
+        try {
+          final tokens = await _authDataSource.login(
+            phone: _tempPhone!,
+            password: _tempPassword!,
+          );
+
+          await SecureStorage.saveAuthData(
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+            userPhone: _tempPhone!,
+          );
+
+          // Clear temp credentials
+          _tempPhone = null;
+          _tempPassword = null;
+        } catch (e) {
+          print('Auto-login failed: $e');
+          // Continue even if login fails, user can login manually later
+          // But for provider registration, this is critical.
+          // However, we still emit OtpVerified so user sees success.
+        }
+      } else {
+        print(
+            'Skipping auto-login: purpose=$purpose, tempPhone=$_tempPhone, hasPassword=${_tempPassword != null}');
+      }
+
       emit(OtpVerified(
         result['message'] as String? ?? 'OTP verified successfully',
       ));
@@ -168,6 +222,34 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // Even if logout fails, clear local data
       await SecureStorage.clearAuthData();
       emit(Unauthenticated());
+    }
+  }
+
+  Future<void> _onProfileFetchRequested(
+    ProfileFetchRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    try {
+      final accessToken = await SecureStorage.getAccessToken();
+      if (accessToken == null) {
+        emit(Unauthenticated());
+        return;
+      }
+
+      final user = await _authDataSource.getUserProfile(accessToken);
+      final refreshToken = await SecureStorage.getRefreshToken();
+
+      if (refreshToken != null) {
+        emit(Authenticated(
+          tokens: AuthTokens(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+          ),
+          user: user,
+        ));
+      }
+    } catch (e) {
+      emit(AuthError(_extractErrorMessage(e)));
     }
   }
 

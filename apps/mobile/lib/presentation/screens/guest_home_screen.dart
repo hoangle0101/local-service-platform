@@ -19,14 +19,11 @@ class GuestHomeScreen extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider(
-          create: (context) => CategoriesBloc(
-            dataSource: MarketplaceDataSource(),
-          )..add(LoadCategories()),
+          create: (context) => CategoriesBloc()..add(LoadCategories()),
         ),
         BlocProvider(
-          create: (context) => ServicesBloc(
-            dataSource: MarketplaceDataSource(),
-          )..add(LoadServices(limit: 10)),
+          create: (context) =>
+              ServicesBloc()..add(const LoadServices(limit: 10)),
         ),
         BlocProvider(
           create: (context) => AuthBloc()..add(AuthCheckRequested()),
@@ -78,7 +75,7 @@ class GuestHomeScreen extends StatelessWidget {
   Widget _buildHeroSection(BuildContext context) {
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppColors.primaryDark,
       ),
       padding: const EdgeInsets.all(24),

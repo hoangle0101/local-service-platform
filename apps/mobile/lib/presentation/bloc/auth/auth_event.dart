@@ -82,6 +82,10 @@ class OtpVerifyRequested extends AuthEvent {
 
 class LogoutRequested extends AuthEvent {}
 
+class ProfileFetchRequested extends AuthEvent {
+  const ProfileFetchRequested();
+}
+
 // States
 abstract class AuthState extends Equatable {
   const AuthState();

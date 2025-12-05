@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import '../../core/entities/auth_entities.dart';
 import '../storage/secure_storage.dart';
 
 class ProviderDataSource {
@@ -13,100 +12,163 @@ class ProviderDataSource {
             receiveTimeout: const Duration(seconds: 10),
             headers: {'Content-Type': 'application/json'},
           ),
-        ) {
-    // Add interceptor to include auth token
-    _dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) async {
-          final token = await SecureStorage.getAccessToken();
-          if (token != null) {
-            options.headers['Authorization'] = 'Bearer $token';
-          }
-          return handler.next(options);
-        },
-      ),
-    );
+        );
+
+  Future<Map<String, dynamic>> getStatistics() async {
+    try {
+      final token = await SecureStorage.getAccessToken();
+      final response = await _dio.get(
+        '/provider/statistics',
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      return response.data['data'] as Map<String, dynamic>;
+    } catch (e) {
+      throw Exception('Failed to load statistics: ${e.toString()}');
+    }
   }
 
-  // Create provider profile
-  Future<ProviderProfileEntity> createProviderProfile({
+  Future<void> updateAvailability(bool isAvailable) async {
+    try {
+      final token = await SecureStorage.getAccessToken();
+      await _dio.patch(
+        '/provider/me/availability',
+        data: {'isAvailable': isAvailable},
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+    } catch (e) {
+      throw Exception('Failed to update availability: ${e.toString()}');
+    }
+  }
+
+  Future<void> createProviderProfile({
     required String displayName,
     String? bio,
-    Map<String, dynamic>? skills,
-    Map<String, dynamic>? location,
-    int serviceRadiusM = 5000,
-  }) async {
-    try {
-      final response = await _dio.post('/provider', data: {
-        'displayName': displayName,
-        if (bio != null) 'bio': bio,
-        if (skills != null) 'skills': skills,
-        if (location != null) 'location': location,
-        'serviceRadiusM': serviceRadiusM,
-      });
-
-      final data = response.data;
-      if (data is Map<String, dynamic>) {
-        if (data.containsKey('data')) {
-          return ProviderProfileEntity.fromJson(
-              data['data'] as Map<String, dynamic>);
-        }
-        return ProviderProfileEntity.fromJson(data);
-      }
-      throw Exception('Unexpected response format');
-    } catch (e) {
-      throw Exception('Failed to create provider profile: $e');
-    }
-  }
-
-  // Get provider profile
-  Future<ProviderProfileEntity> getProviderProfile(String userId) async {
-    try {
-      final response = await _dio.get('/provider/$userId');
-
-      final data = response.data;
-      if (data is Map<String, dynamic>) {
-        if (data.containsKey('data')) {
-          return ProviderProfileEntity.fromJson(
-              data['data'] as Map<String, dynamic>);
-        }
-        return ProviderProfileEntity.fromJson(data);
-      }
-      throw Exception('Unexpected response format');
-    } catch (e) {
-      throw Exception('Failed to get provider profile: $e');
-    }
-  }
-
-  // Update provider profile
-  Future<ProviderProfileEntity> updateProviderProfile({
-    required String userId,
-    String? displayName,
-    String? bio,
-    Map<String, dynamic>? skills,
-    bool? isAvailable,
+    List<String>? skills,
     int? serviceRadiusM,
   }) async {
     try {
-      final response = await _dio.patch('/provider/$userId', data: {
-        if (displayName != null) 'displayName': displayName,
+      final token = await SecureStorage.getAccessToken();
+      print(
+          'Creating provider profile with token: ${token?.substring(0, 10)}...');
+      print('Request data: ${{
+        'displayName': displayName,
         if (bio != null) 'bio': bio,
         if (skills != null) 'skills': skills,
-        if (isAvailable != null) 'isAvailable': isAvailable,
         if (serviceRadiusM != null) 'serviceRadiusM': serviceRadiusM,
-      });
+      }}');
 
-      final data = response.data;
-      if (data is Map<String, dynamic>) {
-        if (data.containsKey('data')) {
-          return ProviderProfileEntity.fromJson(
-              data['data'] as Map<String, dynamic>);
+      await _dio.post(
+        '/provider/onboarding',
+        data: {
+          'displayName': displayName,
+          if (bio != null) 'bio': bio,
+          if (skills != null) 'skills': skills,
+          if (serviceRadiusM != null) 'serviceRadiusM': serviceRadiusM,
+        },
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+    } on DioException catch (e) {
+      // Detailed error handling
+      if (e.response != null) {
+        final statusCode = e.response!.statusCode;
+        final errorData = e.response!.data;
+        String errorMessage = 'Failed to create provider profile';
+
+        if (errorData is Map && errorData.containsKey('message')) {
+          errorMessage = errorData['message'].toString();
         }
-        return ProviderProfileEntity.fromJson(data);
+
+        throw Exception('Error $statusCode: $errorMessage');
+      } else {
+        throw Exception('Network error: ${e.message}');
       }
-      throw Exception('Unexpected response format');
     } catch (e) {
-      throw Exception('Failed to update provider profile: $e');
+      throw Exception('Failed to create provider profile: ${e.toString()}');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getMyServices() async {
+    try {
+      final token = await SecureStorage.getAccessToken();
+      final response = await _dio.get(
+        '/provider/services',
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      final data = response.data['data'];
+      if (data is List) {
+        return List<Map<String, dynamic>>.from(data);
+      }
+      return [];
+    } catch (e) {
+      throw Exception('Failed to load services: ${e.toString()}');
+    }
+  }
+
+  Future<void> addService({
+    required int serviceId,
+    required double price,
+    String currency = 'VND',
+  }) async {
+    try {
+      final token = await SecureStorage.getAccessToken();
+      await _dio.post(
+        '/provider/services',
+        data: {
+          'serviceId': serviceId,
+          'price': price,
+          'currency': currency,
+        },
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+    } catch (e) {
+      throw Exception('Failed to add service: ${e.toString()}');
+    }
+  }
+
+  Future<void> updateService({
+    required int serviceId,
+    double? price,
+    bool? isActive,
+  }) async {
+    try {
+      final token = await SecureStorage.getAccessToken();
+      await _dio.patch(
+        '/provider/services/$serviceId',
+        data: {
+          if (price != null) 'price': price,
+          if (isActive != null) 'isActive': isActive,
+        },
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+    } catch (e) {
+      throw Exception('Failed to update service: ${e.toString()}');
+    }
+  }
+
+  Future<void> deleteService(int serviceId) async {
+    try {
+      final token = await SecureStorage.getAccessToken();
+      await _dio.delete(
+        '/provider/services/$serviceId',
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+    } catch (e) {
+      throw Exception('Failed to delete service: ${e.toString()}');
     }
   }
 }

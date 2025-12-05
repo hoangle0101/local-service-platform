@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/provider_datasource.dart';
+import '../../../data/datasources/auth_datasource.dart';
+import '../../../data/storage/secure_storage.dart';
 import '../../bloc/auth/auth_bloc.dart';
 import '../../widgets/atoms/custom_button.dart';
 import '../../widgets/atoms/custom_text_field.dart';
@@ -28,6 +30,7 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
   final _displayNameController = TextEditingController();
   final _bioController = TextEditingController();
   final _skillsController = TextEditingController();
+  final _otpController = TextEditingController();
 
   bool _isCreatingProvider = false;
 
@@ -40,16 +43,29 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
     _displayNameController.dispose();
     _bioController.dispose();
     _skillsController.dispose();
+    _otpController.dispose();
     super.dispose();
   }
 
   void _handleNext() {
     if (_currentStep == 0) {
       if (_formKey.currentState!.validate()) {
+        // Format phone number with +84 if not present
+        String phone = _phoneController.text.trim();
+        if (!phone.startsWith('+')) {
+          if (phone.startsWith('0')) {
+            phone = '+84${phone.substring(1)}';
+          } else if (phone.startsWith('84')) {
+            phone = '+$phone';
+          } else {
+            phone = '+84$phone';
+          }
+        }
+
         // Register user account
         context.read<AuthBloc>().add(
               RegisterRequested(
-                phone: _phoneController.text,
+                phone: phone,
                 password: _passwordController.text,
                 fullName: _fullNameController.text,
               ),
@@ -89,10 +105,38 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
           .where((s) => s.isNotEmpty)
           .toList();
 
+      // Check if we have a valid token
+      var token = await SecureStorage.getAccessToken();
+
+      // If no token, try to login with the credentials we have
+      if (token == null) {
+        print('⚠️ No access token found. Attempting explicit login...');
+        try {
+          final authDataSource = AuthDataSource();
+          final tokens = await authDataSource.login(
+            phone: _phoneController.text,
+            password: _passwordController.text,
+          );
+
+          await SecureStorage.saveAuthData(
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+            userPhone: _phoneController.text,
+          );
+
+          token = tokens.accessToken;
+          print('✅ Explicit login successful. Token obtained.');
+        } catch (e) {
+          print('❌ Explicit login failed: $e');
+          throw Exception(
+              'Authentication failed. Please try logging in again.');
+        }
+      }
+
       await providerDataSource.createProviderProfile(
         displayName: _displayNameController.text,
         bio: _bioController.text.isNotEmpty ? _bioController.text : null,
-        skills: {'skills': skillsList},
+        skills: skillsList,
         serviceRadiusM: 5000,
       );
 
@@ -101,7 +145,7 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
           const SnackBar(
               content: Text('Provider profile created successfully!')),
         );
-        context.go('/');
+        context.go('/provider/home');
       }
     } catch (e) {
       if (mounted) {
@@ -367,6 +411,7 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
         CustomTextField(
           label: 'Enter OTP',
           hint: '123456',
+          controller: _otpController,
           type: TextFieldType.number,
           maxLength: 6,
           validator: (value) {
@@ -384,11 +429,15 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
         CustomButton(
           text: 'Verify OTP',
           onPressed: () {
-            // For now, just move to next step
-            // In production, verify OTP via BLoC
-            setState(() {
-              _currentStep = 2;
-            });
+            if (_formKey.currentState!.validate()) {
+              context.read<AuthBloc>().add(
+                    OtpVerifyRequested(
+                      phone: _phoneController.text,
+                      code: _otpController.text,
+                      purpose: 'verify_phone',
+                    ),
+                  );
+            }
           },
           isFullWidth: true,
           size: ButtonSize.large,

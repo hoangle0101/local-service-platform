@@ -3,6 +3,8 @@ import '../../../core/entities/entities.dart';
 
 // Events
 abstract class ServicesEvent extends Equatable {
+  const ServicesEvent();
+
   @override
   List<Object?> get props => [];
 }
@@ -10,7 +12,7 @@ abstract class ServicesEvent extends Equatable {
 class LoadServices extends ServicesEvent {
   final int limit;
 
-  LoadServices({this.limit = 10});
+  const LoadServices({this.limit = 10});
 
   @override
   List<Object?> get props => [limit];
@@ -18,6 +20,8 @@ class LoadServices extends ServicesEvent {
 
 // States
 abstract class ServicesState extends Equatable {
+  const ServicesState();
+
   @override
   List<Object?> get props => [];
 }
@@ -29,7 +33,7 @@ class ServicesLoading extends ServicesState {}
 class ServicesLoaded extends ServicesState {
   final List<ProviderService> services;
 
-  ServicesLoaded(this.services);
+  const ServicesLoaded(this.services);
 
   @override
   List<Object?> get props => [services];
@@ -38,7 +42,7 @@ class ServicesLoaded extends ServicesState {
 class ServicesError extends ServicesState {
   final String message;
 
-  ServicesError(this.message);
+  const ServicesError(this.message);
 
   @override
   List<Object?> get props => [message];
