@@ -17,6 +17,11 @@ import {
     VerifyProviderDto,
     AdminBookingsQueryDto,
     AdminPaymentsQueryDto,
+    AdminRevenueReportQueryDto,
+    AdminServicesReportQueryDto,
+    AdminUsersReportQueryDto,
+    CreateAnnouncementDto,
+    AdminAnnouncementsQueryDto,
 } from './dto/admin.dto';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -226,7 +231,8 @@ export class AdminService {
         const page = query.page || 1;
         const limit = Math.min(query.limit || 20, 100);
         const skip = (page - 1) * limit;
-        const sortBy = query.sortBy === 'asc' ? 'asc' : 'desc';
+        const sortOrder = query.sortOrder === 'asc' ? 'asc' : 'desc';
+        const sortField = query.sortBy || 'createdAt';
 
         // Build where clause with filters
         const where: any = {};
@@ -265,7 +271,9 @@ export class AdminService {
                 },
                 skip,
                 take: limit,
-                orderBy: { createdAt: sortBy }
+                orderBy: {
+                    [sortField]: sortOrder
+                }
             }),
             this.prisma.dispute.count({ where })
         ]);
@@ -310,7 +318,8 @@ export class AdminService {
         const page = query.page || 1;
         const limit = Math.min(query.limit || 20, 100);
         const skip = (page - 1) * limit;
-        const sortBy = query.sortBy === 'asc' ? 'asc' : 'desc';
+        const sortOrder = query.sortOrder === 'asc' ? 'asc' : 'desc';
+        const sortField = query.sortBy || 'createdAt';
 
         // Build where clause
         const where: any = {
@@ -337,7 +346,9 @@ export class AdminService {
                 where,
                 skip,
                 take: limit,
-                orderBy: { createdAt: sortBy }
+                orderBy: {
+                    [sortField]: sortOrder
+                }
             }),
             this.prisma.walletTransaction.count({ where })
         ]);
@@ -1349,6 +1360,295 @@ export class AdminService {
                 limit: cleanLimit,
                 totalPages: Math.ceil(transactionCount / cleanLimit),
                 hasNextPage: page < Math.ceil(transactionCount / cleanLimit)
+            }
+        };
+    }
+
+    /**
+     * Get revenue analytics report
+     */
+    async getRevenueReport(query: AdminRevenueReportQueryDto) {
+        const startDate = query.startDate ? new Date(query.startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const endDate = query.endDate ? new Date(query.endDate) : new Date();
+
+        const [payments, totalPayments] = await Promise.all([
+            this.prisma.payment.findMany({
+                where: {
+                    status: 'succeeded',
+                    createdAt: { gte: startDate, lte: endDate }
+                },
+                include: {
+                    booking: {
+                        select: { id: true, serviceId: true, platformFee: true, providerEarning: true }
+                    }
+                },
+                orderBy: { createdAt: 'desc' }
+            }),
+            this.prisma.payment.count({
+                where: { status: 'succeeded', createdAt: { gte: startDate, lte: endDate } }
+            })
+        ]);
+
+        const totalRevenue = payments.reduce((sum, p) => sum + p.amount.toNumber(), 0);
+        const totalFee = payments.reduce((sum, p) => sum + (p.booking?.platformFee?.toNumber() || 0), 0);
+        const totalProviderEarning = payments.reduce((sum, p) => sum + (p.booking?.providerEarning?.toNumber() || 0), 0);
+
+        return {
+            summary: {
+                startDate,
+                endDate,
+                groupBy: query.groupBy,
+                totalRevenue,
+                totalPlatformFee: totalFee,
+                totalProviderEarning: totalProviderEarning,
+                totalTransactions: totalPayments,
+                averageTransactionValue: totalPayments > 0 ? totalRevenue / totalPayments : 0
+            },
+            data: payments.map(p => ({
+                paymentId: p.id.toString(),
+                amount: p.amount.toNumber(),
+                currency: p.currency,
+                status: p.status,
+                gateway: p.gateway,
+                platformFee: p.booking?.platformFee?.toNumber() || 0,
+                providerEarning: p.booking?.providerEarning?.toNumber() || 0,
+                createdAt: p.createdAt
+            }))
+        };
+    }
+
+    /**
+     * Get services analytics report
+     */
+    async getServicesReport(query: AdminServicesReportQueryDto) {
+        const startDate = query.startDate ? new Date(query.startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const endDate = query.endDate ? new Date(query.endDate) : new Date();
+
+        const services = await this.prisma.service.findMany({
+            where: query.categoryId ? { categoryId: query.categoryId } : {},
+            select: {
+                id: true,
+                name: true,
+                basePrice: true
+            },
+            orderBy: { name: 'asc' }
+        });
+
+        const servicesWithStats = await Promise.all(
+            services.map(async (service) => {
+                const bookings = await this.prisma.booking.findMany({
+                    where: {
+                        serviceId: service.id,
+                        createdAt: { gte: startDate, lte: endDate }
+                    },
+                    select: { actualPrice: true, review: { select: { rating: true } } }
+                });
+
+                const revenue = bookings.reduce((sum, b) => sum + (b.actualPrice?.toNumber() || 0), 0);
+                const ratings = bookings.filter(b => b.review).map(b => b.review?.rating || 0);
+                const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0;
+
+                return {
+                    serviceId: service.id,
+                    serviceName: service.name,
+                    bookingCount: bookings.length,
+                    revenue,
+                    averagePrice: bookings.length > 0 ? revenue / bookings.length : 0,
+                    averageRating: avgRating,
+                    ratingCount: ratings.length
+                };
+            })
+        );
+
+        const sorted = servicesWithStats.sort((a, b) => {
+            const multiplier = query.sortOrder === 'desc' ? -1 : 1;
+            switch (query.sortBy) {
+                case 'revenue': return (b.revenue - a.revenue) * multiplier;
+                case 'rating': return (b.averageRating - a.averageRating) * multiplier;
+                default: return (b.bookingCount - a.bookingCount) * multiplier;
+            }
+        }).slice(0, query.limit);
+
+        return {
+            summary: {
+                startDate,
+                endDate,
+                totalServices: services.length,
+                totalBookings: servicesWithStats.reduce((sum, s) => sum + s.bookingCount, 0),
+                totalRevenue: servicesWithStats.reduce((sum, s) => sum + s.revenue, 0)
+            },
+            data: sorted
+        };
+    }
+
+    /**
+     * Get users analytics report
+     */
+    async getUsersReport(query: AdminUsersReportQueryDto) {
+        const startDate = query.startDate ? new Date(query.startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const endDate = query.endDate ? new Date(query.endDate) : new Date();
+
+        const [totalUsers, newUsers, activeUsers] = await Promise.all([
+            this.prisma.user.count(),
+            this.prisma.user.count({ where: { createdAt: { gte: startDate, lte: endDate } } }),
+            this.prisma.booking.findMany({
+                where: { createdAt: { gte: startDate, lte: endDate } },
+                distinct: ['customerId'],
+                select: { customerId: true }
+            }).then(bookings => new Set(bookings.map(b => b.customerId)).size)
+        ]);
+
+        const walletStats = await this.prisma.wallet.aggregate({
+            _sum: { balance: true },
+            _avg: { balance: true }
+        });
+
+        return {
+            summary: {
+                startDate,
+                endDate,
+                groupBy: query.groupBy,
+                totalUsers,
+                newUsers,
+                activeUsers,
+                totalWalletValue: walletStats._sum.balance?.toNumber() || 0,
+                averageWalletBalance: walletStats._avg.balance?.toNumber() || 0,
+                userRole: query.userRole
+            },
+            data: []
+        };
+    }
+
+    /**
+     * Create system announcement
+     */
+    async createAnnouncement(adminId: bigint, dto: CreateAnnouncementDto) {
+        const scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : new Date();
+
+        return this.prisma.$transaction(async (tx) => {
+            const announcement = await tx.notification.create({
+                data: {
+                    userId: adminId,
+                    type: `announcement_${dto.type}`,
+                    title: dto.title,
+                    body: dto.body,
+                    payload: {
+                        type: dto.type,
+                        targetRole: dto.targetRole,
+                        isAnnouncement: true,
+                        createdBy: adminId.toString()
+                    },
+                    isRead: false,
+                    sentAt: dto.sendNotification ? scheduledAt : null
+                }
+            });
+
+            if (dto.sendNotification) {
+                const targetUsers = await tx.user.findMany({
+                    select: { id: true },
+                    take: 1000
+                });
+
+                await Promise.all(
+                    targetUsers.map(user =>
+                        tx.notification.create({
+                            data: {
+                                userId: user.id,
+                                type: `announcement_${dto.type}`,
+                                title: dto.title,
+                                body: dto.body,
+                                payload: {
+                                    type: dto.type,
+                                    targetRole: dto.targetRole,
+                                    isAnnouncement: true,
+                                    announcementId: announcement.id.toString()
+                                },
+                                isRead: false,
+                                sentAt: new Date()
+                            }
+                        })
+                    )
+                );
+            }
+
+            await tx.auditLog.create({
+                data: {
+                    actorUserId: adminId,
+                    action: 'announcement_created',
+                    objectType: 'announcement',
+                    objectId: announcement.id,
+                    detail: {
+                        title: dto.title,
+                        type: dto.type,
+                        targetRole: dto.targetRole
+                    }
+                }
+            });
+
+            return {
+                id: announcement.id.toString(),
+                title: announcement.title,
+                body: announcement.body,
+                type: dto.type,
+                targetRole: dto.targetRole,
+                status: 'active',
+                createdAt: announcement.createdAt,
+                sentAt: announcement.sentAt
+            };
+        });
+    }
+
+    /**
+     * Get system announcements
+     */
+    async getAnnouncements(query: AdminAnnouncementsQueryDto) {
+        const page = Math.max(1, query.page || 1);
+        const limit = Math.min(100, query.limit || 20);
+        const skip = (page - 1) * limit;
+
+        const where: any = { type: { startsWith: 'announcement_' } };
+
+        if (query.type) {
+            where.type = `announcement_${query.type}`;
+        }
+
+        const [announcements, total] = await Promise.all([
+            this.prisma.notification.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy: query.sortBy === 'title' ? { title: query.sortOrder as any } : { createdAt: query.sortOrder as any },
+                select: {
+                    id: true,
+                    title: true,
+                    body: true,
+                    type: true,
+                    payload: true,
+                    isRead: true,
+                    createdAt: true,
+                    sentAt: true
+                }
+            }),
+            this.prisma.notification.count({ where })
+        ]);
+
+        return {
+            announcements: announcements.map(a => ({
+                id: a.id.toString(),
+                title: a.title,
+                body: a.body,
+                type: (a.payload as any)?.type || 'general',
+                targetRole: (a.payload as any)?.targetRole || 'all',
+                status: a.sentAt ? 'active' : 'scheduled',
+                createdAt: a.createdAt,
+                sentAt: a.sentAt
+            })),
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: page < Math.ceil(total / limit)
             }
         };
     }

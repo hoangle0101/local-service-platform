@@ -19,6 +19,11 @@ import {
     VerifyProviderDto,
     AdminBookingsQueryDto,
     AdminPaymentsQueryDto,
+    AdminRevenueReportQueryDto,
+    AdminServicesReportQueryDto,
+    AdminUsersReportQueryDto,
+    CreateAnnouncementDto,
+    AdminAnnouncementsQueryDto,
 } from './dto/admin.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -225,5 +230,63 @@ export class AdminController {
         const pageNum = page ? parseInt(page, 10) : 1;
         const limitNum = limit ? parseInt(limit, 10) : 20;
         return this.adminService.getWallet(BigInt(userId), pageNum, limitNum);
+    }
+
+    /**
+     * Get revenue analytics report
+     */
+    @Get('reports/revenue')
+    @Roles('admin', 'super_admin')
+    @ApiOperation({ summary: 'Get revenue analytics report' })
+    @ApiResponse({ status: 200, description: 'Revenue report retrieved successfully' })
+    async getRevenueReport(@Query() query: AdminRevenueReportQueryDto) {
+        return this.adminService.getRevenueReport(query);
+    }
+
+    /**
+     * Get services analytics report
+     */
+    @Get('reports/services')
+    @Roles('admin', 'super_admin')
+    @ApiOperation({ summary: 'Get services analytics report' })
+    @ApiResponse({ status: 200, description: 'Services report retrieved successfully' })
+    async getServicesReport(@Query() query: AdminServicesReportQueryDto) {
+        return this.adminService.getServicesReport(query);
+    }
+
+    /**
+     * Get users analytics report
+     */
+    @Get('reports/users')
+    @Roles('admin', 'super_admin')
+    @ApiOperation({ summary: 'Get users analytics report' })
+    @ApiResponse({ status: 200, description: 'Users report retrieved successfully' })
+    async getUsersReport(@Query() query: AdminUsersReportQueryDto) {
+        return this.adminService.getUsersReport(query);
+    }
+
+    /**
+     * Create system announcement
+     */
+    @Post('announcements')
+    @Roles('admin', 'super_admin')
+    @ApiOperation({ summary: 'Create system announcement' })
+    @ApiResponse({ status: 201, description: 'Announcement created successfully' })
+    async createAnnouncement(
+        @CurrentUser() user: JwtPayload,
+        @Body() dto: CreateAnnouncementDto
+    ) {
+        return this.adminService.createAnnouncement(BigInt(user.userId), dto);
+    }
+
+    /**
+     * Get system announcements
+     */
+    @Get('announcements')
+    @Roles('admin', 'super_admin')
+    @ApiOperation({ summary: 'Get system announcements' })
+    @ApiResponse({ status: 200, description: 'Announcements list retrieved successfully' })
+    async getAnnouncements(@Query() query: AdminAnnouncementsQueryDto) {
+        return this.adminService.getAnnouncements(query);
     }
 }

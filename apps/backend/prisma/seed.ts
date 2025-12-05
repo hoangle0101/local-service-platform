@@ -436,7 +436,44 @@ async function main() {
     },
   });
 
-  console.log('✅ Created 4 test users (2 customers, 2 providers)');
+  // Admin User
+  const admin = await prisma.user.upsert({
+    where: { phone: '0911111111' },
+    update: {},
+    create: {
+      phone: '0911111111',
+      email: 'admin@test.com',
+      passwordHash: hashedPassword,
+      status: 'active',
+      isVerified: true,
+    },
+  });
+
+  await prisma.userProfile.upsert({
+    where: { userId: admin.id },
+    update: {},
+    create: {
+      userId: admin.id,
+      fullName: 'System Administrator',
+      birthDate: new Date('1980-01-01'),
+    },
+  });
+
+  await prisma.userRole.upsert({
+    where: {
+      userId_roleId: {
+        userId: admin.id,
+        roleId: adminRole!.id,
+      },
+    },
+    update: {},
+    create: {
+      userId: admin.id,
+      roleId: adminRole!.id,
+    },
+  });
+
+  console.log('✅ Created 5 test users (2 customers, 2 providers, 1 admin)');
 
   // ============================================
   // Seed Provider Profiles with PostGIS Locations
@@ -594,6 +631,15 @@ async function main() {
     },
   });
 
+  await prisma.wallet.upsert({
+    where: { userId: admin.id },
+    update: {},
+    create: {
+      userId: admin.id,
+      balance: 10000000, // 10,000,000 VND (admin wallet)
+    },
+  });
+
   console.log('✅ Created wallets for all users');
 
   // ============================================
@@ -660,11 +706,11 @@ async function main() {
   console.log(`  - ${permissions.length} permissions`);
   console.log(`  - ${categories.length} service categories`);
   console.log(`  - ${services.length} services`);
-  console.log('  - 4 test users (2 customers, 2 providers)');
+  console.log('  - 5 test users (2 customers, 2 providers, 1 admin)');
   console.log('  - 2 provider profiles with PostGIS locations');
   console.log('  - 9 provider services');
   console.log('  - 2 customer addresses');
-  console.log('  - 4 wallets');
+  console.log('  - 5 wallets');
   console.log('  - 5 settings');
   console.log('');
   console.log('📋 Test Accounts:');
@@ -672,6 +718,7 @@ async function main() {
   console.log('  Customer 2: 0912345678 / Test123!@#');
   console.log('  Provider 1: 0901234567 / Test123!@# (ABC Service - Quận 1)');
   console.log('  Provider 2: 0908888888 / Test123!@# (XYZ Repair - Quận 3)');
+  console.log('  Admin: 0911111111 / Test123!@# ⭐ (Quản trị viên hệ thống)');
 }
 
 main()

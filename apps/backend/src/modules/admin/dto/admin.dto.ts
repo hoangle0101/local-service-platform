@@ -64,10 +64,15 @@ export class AdminDisputesQueryDto {
     @IsEnum(['open', 'under_review', 'resolved', 'closed'])
     status?: string;
 
-    @ApiPropertyOptional({ example: 'asc', description: 'Sort order', enum: ['asc', 'desc'] })
+    @ApiPropertyOptional({ example: 'createdAt', description: 'Sort by field', enum: ['createdAt', 'status'] })
+    @IsOptional()
+    @IsEnum(['createdAt', 'status'])
+    sortBy?: string = 'createdAt';
+
+    @ApiPropertyOptional({ example: 'desc', description: 'Sort order', enum: ['asc', 'desc'] })
     @IsOptional()
     @IsEnum(['asc', 'desc'])
-    sortBy?: 'asc' | 'desc' = 'desc';
+    sortOrder?: 'asc' | 'desc' = 'desc';
 
     @ApiPropertyOptional({ example: 'pending', description: 'Filter by resolution status', enum: ['pending', 'resolved', 'appealed'] })
     @IsOptional()
@@ -101,10 +106,15 @@ export class AdminWithdrawalsQueryDto {
     @IsEnum(['pending', 'approved', 'rejected', 'processing', 'completed', 'failed'])
     status?: string;
 
-    @ApiPropertyOptional({ example: 'asc', description: 'Sort order', enum: ['asc', 'desc'] })
+    @ApiPropertyOptional({ example: 'createdAt', description: 'Sort by field', enum: ['createdAt', 'status'] })
+    @IsOptional()
+    @IsEnum(['createdAt', 'status'])
+    sortBy?: string = 'createdAt';
+
+    @ApiPropertyOptional({ example: 'desc', description: 'Sort order', enum: ['asc', 'desc'] })
     @IsOptional()
     @IsEnum(['asc', 'desc'])
-    sortBy?: 'asc' | 'desc' = 'desc';
+    sortOrder?: 'asc' | 'desc' = 'desc';
 
     @ApiPropertyOptional({ example: '2025-12-01', description: 'Start date' })
     @IsOptional()
@@ -417,6 +427,231 @@ export class AdminPaymentsQueryDto {
     @ApiPropertyOptional({ example: 'createdAt', description: 'Sort by field', enum: ['createdAt', 'amount', 'status'] })
     @IsOptional()
     @IsEnum(['createdAt', 'amount', 'status'])
+    sortBy?: string = 'createdAt';
+
+    @ApiPropertyOptional({ example: 'desc', description: 'Sort order', enum: ['asc', 'desc'] })
+    @IsOptional()
+    @IsEnum(['asc', 'desc'])
+    sortOrder?: 'asc' | 'desc' = 'desc';
+}
+
+/**
+ * DTO for listing revenue reports
+ */
+export class AdminRevenueReportQueryDto {
+    @ApiPropertyOptional({ example: '2025-12-01', description: 'Start date for report' })
+    @IsOptional()
+    @IsString()
+    startDate?: string;
+
+    @ApiPropertyOptional({ example: '2025-12-06', description: 'End date for report' })
+    @IsOptional()
+    @IsString()
+    endDate?: string;
+
+    @ApiPropertyOptional({
+        example: 'daily',
+        description: 'Grouping period',
+        enum: ['daily', 'weekly', 'monthly']
+    })
+    @IsOptional()
+    @IsEnum(['daily', 'weekly', 'monthly'])
+    groupBy?: 'daily' | 'weekly' | 'monthly' = 'daily';
+
+    @ApiPropertyOptional({ example: 1, description: 'Service category ID to filter' })
+    @IsOptional()
+    @Type(() => Number)
+    categoryId?: number;
+
+    @ApiPropertyOptional({ example: true, description: 'Include service-wise breakdown' })
+    @IsOptional()
+    @Type(() => Boolean)
+    includeServiceBreakdown?: boolean = false;
+
+    @ApiPropertyOptional({ example: true, description: 'Include provider-wise breakdown' })
+    @IsOptional()
+    @Type(() => Boolean)
+    includeProviderBreakdown?: boolean = false;
+}
+
+/**
+ * DTO for listing services analytics reports
+ */
+export class AdminServicesReportQueryDto {
+    @ApiPropertyOptional({ example: '2025-12-01', description: 'Start date for report' })
+    @IsOptional()
+    @IsString()
+    startDate?: string;
+
+    @ApiPropertyOptional({ example: '2025-12-06', description: 'End date for report' })
+    @IsOptional()
+    @IsString()
+    endDate?: string;
+
+    @ApiPropertyOptional({
+        example: 'bookings',
+        description: 'Sort by metric',
+        enum: ['bookings', 'revenue', 'rating', 'providers']
+    })
+    @IsOptional()
+    @IsEnum(['bookings', 'revenue', 'rating', 'providers'])
+    sortBy?: 'bookings' | 'revenue' | 'rating' | 'providers' = 'bookings';
+
+    @ApiPropertyOptional({ example: 'desc', description: 'Sort order', enum: ['asc', 'desc'] })
+    @IsOptional()
+    @IsEnum(['asc', 'desc'])
+    sortOrder?: 'asc' | 'desc' = 'desc';
+
+    @ApiPropertyOptional({ example: 20, description: 'Number of top services' })
+    @IsOptional()
+    @Type(() => Number)
+    @Min(1)
+    @Max(100)
+    limit?: number = 20;
+
+    @ApiPropertyOptional({ example: 1, description: 'Category ID filter' })
+    @IsOptional()
+    @Type(() => Number)
+    categoryId?: number;
+}
+
+/**
+ * DTO for listing users analytics reports
+ */
+export class AdminUsersReportQueryDto {
+    @ApiPropertyOptional({ example: '2025-12-01', description: 'Start date for report' })
+    @IsOptional()
+    @IsString()
+    startDate?: string;
+
+    @ApiPropertyOptional({ example: '2025-12-06', description: 'End date for report' })
+    @IsOptional()
+    @IsString()
+    endDate?: string;
+
+    @ApiPropertyOptional({
+        example: 'daily',
+        description: 'Grouping period',
+        enum: ['daily', 'weekly', 'monthly']
+    })
+    @IsOptional()
+    @IsEnum(['daily', 'weekly', 'monthly'])
+    groupBy?: 'daily' | 'weekly' | 'monthly' = 'daily';
+
+    @ApiPropertyOptional({
+        example: 'newUsers',
+        description: 'Sort by metric',
+        enum: ['newUsers', 'activeUsers', 'bookings', 'walletValue']
+    })
+    @IsOptional()
+    @IsEnum(['newUsers', 'activeUsers', 'bookings', 'walletValue'])
+    sortBy?: 'newUsers' | 'activeUsers' | 'bookings' | 'walletValue' = 'newUsers';
+
+    @ApiPropertyOptional({ example: 'desc', description: 'Sort order', enum: ['asc', 'desc'] })
+    @IsOptional()
+    @IsEnum(['asc', 'desc'])
+    sortOrder?: 'asc' | 'desc' = 'desc';
+
+    @ApiPropertyOptional({
+        example: 'customer',
+        description: 'Filter by user role',
+        enum: ['customer', 'provider', 'all']
+    })
+    @IsOptional()
+    @IsEnum(['customer', 'provider', 'all'])
+    userRole?: 'customer' | 'provider' | 'all' = 'all';
+}
+
+/**
+ * DTO for creating system announcements
+ */
+export class CreateAnnouncementDto {
+    @ApiProperty({ example: 'System Maintenance' })
+    @IsNotEmpty()
+    @IsString()
+    title: string;
+
+    @ApiProperty({ example: 'The platform will be down for maintenance on Dec 10' })
+    @IsNotEmpty()
+    @IsString()
+    body: string;
+
+    @ApiPropertyOptional({
+        example: 'maintenance',
+        description: 'Type of announcement',
+        enum: ['maintenance', 'promotion', 'alert', 'general']
+    })
+    @IsOptional()
+    @IsEnum(['maintenance', 'promotion', 'alert', 'general'])
+    type?: 'maintenance' | 'promotion' | 'alert' | 'general' = 'general';
+
+    @ApiPropertyOptional({
+        example: 'all',
+        description: 'Target audience',
+        enum: ['all', 'customers', 'providers', 'admins']
+    })
+    @IsOptional()
+    @IsEnum(['all', 'customers', 'providers', 'admins'])
+    targetRole?: 'all' | 'customers' | 'providers' | 'admins' = 'all';
+
+    @ApiPropertyOptional({ example: true, description: 'Whether to send notifications' })
+    @IsOptional()
+    @Type(() => Boolean)
+    sendNotification?: boolean = true;
+
+    @ApiPropertyOptional({ example: '2025-12-10T10:00:00Z', description: 'Scheduled time to send' })
+    @IsOptional()
+    @IsString()
+    scheduledAt?: string;
+}
+
+/**
+ * DTO for listing announcements
+ */
+export class AdminAnnouncementsQueryDto {
+    @ApiPropertyOptional({ example: 1, description: 'Page number' })
+    @IsOptional()
+    @Type(() => Number)
+    @Min(1)
+    page?: number = 1;
+
+    @ApiPropertyOptional({ example: 20, description: 'Items per page' })
+    @IsOptional()
+    @Type(() => Number)
+    @Min(1)
+    @Max(100)
+    limit?: number = 20;
+
+    @ApiPropertyOptional({
+        example: 'general',
+        description: 'Filter by announcement type',
+        enum: ['maintenance', 'promotion', 'alert', 'general']
+    })
+    @IsOptional()
+    @IsEnum(['maintenance', 'promotion', 'alert', 'general'])
+    type?: string;
+
+    @ApiPropertyOptional({
+        example: 'all',
+        description: 'Filter by target role',
+        enum: ['all', 'customers', 'providers', 'admins']
+    })
+    @IsOptional()
+    @IsEnum(['all', 'customers', 'providers', 'admins'])
+    targetRole?: string;
+
+    @ApiPropertyOptional({
+        example: 'active',
+        description: 'Filter by status',
+        enum: ['active', 'scheduled', 'archived']
+    })
+    @IsOptional()
+    @IsEnum(['active', 'scheduled', 'archived'])
+    status?: string;
+
+    @ApiPropertyOptional({ example: 'createdAt', description: 'Sort by field', enum: ['createdAt', 'title', 'status'] })
+    @IsOptional()
+    @IsEnum(['createdAt', 'title', 'status'])
     sortBy?: string = 'createdAt';
 
     @ApiPropertyOptional({ example: 'desc', description: 'Sort order', enum: ['asc', 'desc'] })
