@@ -236,7 +236,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         return;
       }
 
+      print('[AuthBloc] ProfileFetchRequested - fetching profile...');
       final user = await _authDataSource.getUserProfile(accessToken);
+      print('[AuthBloc] Profile fetched for user: ${user.profile?.fullName}');
+      print('[AuthBloc] Avatar URL: ${user.profile?.avatarUrl}');
+      print('[AuthBloc] Provider address: ${user.providerProfile?.address}');
+
       final refreshToken = await SecureStorage.getRefreshToken();
 
       if (refreshToken != null) {
@@ -247,8 +252,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           ),
           user: user,
         ));
+        print('[AuthBloc] Emitted Authenticated state with updated user');
       }
     } catch (e) {
+      print('[AuthBloc] ProfileFetchRequested error: $e');
       emit(AuthError(_extractErrorMessage(e)));
     }
   }

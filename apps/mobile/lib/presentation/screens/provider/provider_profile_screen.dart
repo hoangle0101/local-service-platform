@@ -44,19 +44,42 @@ class ProviderProfileScreen extends StatelessWidget {
                       ),
                       child: Column(
                         children: [
-                          CircleAvatar(
-                            radius: 50,
-                            backgroundColor: AppColors.primaryLight,
-                            child: Text(
-                              user.fullName.isNotEmpty
-                                  ? user.fullName[0].toUpperCase()
-                                  : 'P',
-                              style: const TextStyle(
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primaryDark,
-                              ),
-                            ),
+                          // Avatar with network image support
+                          Builder(
+                            builder: (context) {
+                              final avatarUrl = user.profile?.avatarUrl;
+                              // Build full URL for avatar
+                              final fullAvatarUrl =
+                                  avatarUrl != null && avatarUrl.isNotEmpty
+                                      ? 'http://10.0.2.2:3000$avatarUrl'
+                                      : null;
+
+                              return CircleAvatar(
+                                radius: 50,
+                                backgroundColor: AppColors.primaryLight,
+                                backgroundImage: fullAvatarUrl != null
+                                    ? NetworkImage(fullAvatarUrl)
+                                    : null,
+                                onBackgroundImageError: fullAvatarUrl != null
+                                    ? (exception, stackTrace) {
+                                        debugPrint(
+                                            '[Profile] Avatar load error: $exception');
+                                      }
+                                    : null,
+                                child: fullAvatarUrl == null
+                                    ? Text(
+                                        user.fullName.isNotEmpty
+                                            ? user.fullName[0].toUpperCase()
+                                            : 'P',
+                                        style: const TextStyle(
+                                          fontSize: 36,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.primaryDark,
+                                        ),
+                                      )
+                                    : null,
+                              );
+                            },
                           ),
                           const SizedBox(height: 16),
                           Text(
@@ -78,6 +101,60 @@ class ProviderProfileScreen extends StatelessWidget {
                                   color: AppColors.textSecondary,
                                 ),
                           ),
+                          // Address display
+                          if (user.providerProfile?.address != null) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.location_on,
+                                    size: 16, color: AppColors.textSecondary),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    user.providerProfile!.address!,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall!
+                                        .copyWith(
+                                          color: AppColors.textSecondary,
+                                        ),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          // Service Radius display
+                          if (user.providerProfile?.serviceRadiusM != null) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.radar,
+                                      size: 14, color: AppColors.primary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Phạm vi: ${(user.providerProfile!.serviceRadiusM! / 1000).toStringAsFixed(0)} km',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -152,7 +229,7 @@ class ProviderProfileScreen extends StatelessWidget {
                             icon: Icons.person_outline,
                             title: 'Edit Profile',
                             onTap: () {
-                              // TODO: Navigate to edit profile
+                              context.push('/provider/profile/edit');
                             },
                           ),
                           _buildMenuItem(

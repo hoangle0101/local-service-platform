@@ -241,19 +241,33 @@ class BookingOffer {
   final int bookingId;
   final int providerId;
   final String providerName;
+  final String? providerAddress;
   final double? rating;
   final double price;
   final String status;
+  final int? distance; // Distance in meters from booking location
 
   BookingOffer({
     required this.id,
     required this.bookingId,
     required this.providerId,
     required this.providerName,
+    this.providerAddress,
     this.rating,
     required this.price,
     required this.status,
+    this.distance,
   });
+
+  /// Get formatted distance string (e.g., "1.5 km" or "500 m")
+  String? get formattedDistance {
+    if (distance == null) return null;
+    if (distance! < 1000) {
+      return '$distance m';
+    } else {
+      return '${(distance! / 1000).toStringAsFixed(1)} km';
+    }
+  }
 
   factory BookingOffer.fromJson(Map<String, dynamic> json) {
     return BookingOffer(
@@ -261,11 +275,15 @@ class BookingOffer {
       bookingId: int.parse(json['bookingId'].toString()),
       providerId: int.parse(json['providerId'].toString()),
       providerName: json['providerName'] ?? 'Unknown',
+      providerAddress: json['providerAddress'],
       rating: json['rating'] != null
           ? double.tryParse(json['rating'].toString())
           : null,
       price: double.parse(json['price'].toString()),
       status: json['status'],
+      distance: json['distance'] != null
+          ? int.tryParse(json['distance'].toString())
+          : null,
     );
   }
 }

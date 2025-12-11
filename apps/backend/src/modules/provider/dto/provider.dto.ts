@@ -1,4 +1,12 @@
-import { IsNotEmpty, IsOptional, IsString, IsNumber, Min, IsBoolean, IsArray } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsNumber,
+  Min,
+  IsBoolean,
+  IsArray,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -8,12 +16,16 @@ export class OnboardingDto {
   @IsString()
   displayName: string;
 
-  @ApiPropertyOptional({ example: 'Professional cleaner with 5 years experience' })
+  @ApiPropertyOptional({
+    example: 'Professional cleaner with 5 years experience',
+  })
   @IsOptional()
   @IsString()
   bio?: string;
 
-  @ApiPropertyOptional({ example: ['cleaning', 'deep-cleaning', 'sanitization'] })
+  @ApiPropertyOptional({
+    example: ['cleaning', 'deep-cleaning', 'sanitization'],
+  })
   @IsOptional()
   @IsArray()
   skills?: string[];
@@ -48,6 +60,23 @@ export class UpdateProviderProfileDto {
   @IsNumber()
   @Min(0)
   serviceRadiusM?: number;
+
+  @ApiPropertyOptional({ example: '123 Nguyễn Huệ, Quận 1, TP.HCM' })
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @ApiPropertyOptional({ example: 10.762622 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  latitude?: number;
+
+  @ApiPropertyOptional({ example: 106.660172 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  longitude?: number;
 }
 
 export class UpdateAvailabilityDto {

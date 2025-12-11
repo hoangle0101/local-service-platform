@@ -126,6 +126,105 @@ class ProviderDataSource {
     }
   }
 
+  Future<void> updateProviderProfile({
+    String? displayName,
+    String? bio,
+    List<String>? skills,
+    int? serviceRadiusM,
+    double? latitude,
+    double? longitude,
+    String? address,
+  }) async {
+    try {
+      final token = await SecureStorage.getAccessToken();
+      if (token == null || token.isEmpty) {
+        throw Exception('Vui lòng đăng nhập lại');
+      }
+
+      await _dio.patch(
+        '/provider/me',
+        data: {
+          if (displayName != null) 'displayName': displayName,
+          if (bio != null) 'bio': bio,
+          if (skills != null) 'skills': skills,
+          if (serviceRadiusM != null) 'serviceRadiusM': serviceRadiusM,
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+          if (address != null) 'address': address,
+        },
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        throw Exception('Phiên đăng nhập hết hạn');
+      }
+      throw Exception('Lỗi cập nhật: ${e.message}');
+    } catch (e) {
+      throw Exception('Lỗi: $e');
+    }
+  }
+
+  /// Upload avatar image
+  Future<String?> uploadAvatar(String filePath) async {
+    try {
+      print('[ProviderDataSource] uploadAvatar called with path: $filePath');
+
+      final token = await SecureStorage.getAccessToken();
+      if (token == null || token.isEmpty) {
+        print('[ProviderDataSource] No token found');
+        throw Exception('Vui lòng đăng nhập lại');
+      }
+      print('[ProviderDataSource] Token exists, preparing FormData');
+
+      final formData = FormData.fromMap({
+        'avatar': await MultipartFile.fromFile(
+          filePath,
+          filename: filePath.split('/').last,
+        ),
+      });
+      print('[ProviderDataSource] FormData created, sending request...');
+
+      final response = await _dio.post(
+        '/provider/me/avatar',
+        data: formData,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'multipart/form-data',
+          },
+        ),
+      );
+
+      print(
+          '[ProviderDataSource] Upload response status: ${response.statusCode}');
+      print('[ProviderDataSource] Upload response data: ${response.data}');
+
+      // Extract avatar URL from response
+      final data = response.data;
+      if (data is Map && data.containsKey('data')) {
+        final avatarUrl = data['data']['avatarUrl'] as String?;
+        print('[ProviderDataSource] Avatar URL from data.data: $avatarUrl');
+        return avatarUrl;
+      }
+      final avatarUrl = data['avatarUrl'] as String?;
+      print('[ProviderDataSource] Avatar URL direct: $avatarUrl');
+      return avatarUrl;
+    } on DioException catch (e) {
+      print('[ProviderDataSource] DioException: ${e.message}');
+      print('[ProviderDataSource] Response status: ${e.response?.statusCode}');
+      print('[ProviderDataSource] Response data: ${e.response?.data}');
+      if (e.response?.statusCode == 401) {
+        throw Exception('Phiên đăng nhập hết hạn');
+      }
+      throw Exception('Lỗi upload ảnh: ${e.message}');
+    } catch (e) {
+      print('[ProviderDataSource] Upload error: $e');
+      throw Exception('Lỗi: $e');
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getMyServices() async {
     try {
       final token = await SecureStorage.getAccessToken();
