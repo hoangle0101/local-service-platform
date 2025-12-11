@@ -124,7 +124,7 @@ export class BookingsService {
     });
   }
 
-  // Helper: Find nearby providers (multiple)
+  // Helper: Find nearby providers (multiple) based on their registered service radius
   private async findNearbyProviders(
     serviceId: number,
     latitude: number,
@@ -132,13 +132,14 @@ export class BookingsService {
     tx?: any,
   ) {
     const prisma = tx || this.prisma;
-    const radiusMeters = 10000; // 10km radius
 
+    // Use each provider's own service_radius_m for filtering
     return await prisma.$queryRawUnsafe(
       `
       SELECT 
         pp.user_id,
         pp.display_name,
+        pp.service_radius_m,
         ST_Distance(
           pp.location::geography,
           ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
@@ -149,10 +150,11 @@ export class BookingsService {
         AND ps.is_active = true
         AND ps.deleted_at IS NULL
         AND pp.is_available = true
+        AND pp.location IS NOT NULL
         AND ST_DWithin(
           pp.location::geography,
           ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
-          $4
+          COALESCE(pp.service_radius_m, 5000)
         )
       ORDER BY distance ASC
       LIMIT 10
@@ -160,7 +162,6 @@ export class BookingsService {
       longitude,
       latitude,
       serviceId,
-      radiusMeters,
     );
   }
 
@@ -366,6 +367,61 @@ export class BookingsService {
         serviceName: r.service_name,
         customerName: r.customer_name,
         distance: Math.round(r.distance),
+      })),
+    };
+  }
+
+  // GET /provider/bookings/global - Bookings outside provider's radius but matching their services
+  async getGlobalRequests(providerId: bigint) {
+    const requests = await this.prisma.$queryRawUnsafe<any[]>(
+      `
+      SELECT DISTINCT
+        b.id,
+        b.code,
+        b.status,
+        b.scheduled_at,
+        b.address_text,
+        b.estimated_price,
+        s.name as service_name,
+        up.full_name as customer_name,
+        ST_Distance(
+          b.location::geography,
+          pp.location::geography
+        ) as distance,
+        pp.service_radius_m
+      FROM bookings b
+      JOIN services s ON b.service_id = s.id
+      JOIN user_profiles up ON b.customer_id = up.user_id
+      JOIN provider_services ps ON ps.service_id = b.service_id AND ps.provider_user_id = $1
+      JOIN provider_profiles pp ON pp.user_id = $1
+      LEFT JOIN booking_offers bo ON bo.booking_id = b.id AND bo.provider_id = $1
+      WHERE b.status = 'pending'
+        AND b.provider_id IS NULL
+        AND bo.id IS NULL
+        AND ps.is_active = true
+        AND NOT ST_DWithin(
+          b.location::geography,
+          pp.location::geography,
+          COALESCE(pp.service_radius_m, 5000)
+        )
+      ORDER BY distance ASC
+      LIMIT 20
+    `,
+      providerId,
+    );
+
+    return {
+      requests: requests.map((r) => ({
+        id: r.id.toString(),
+        code: r.code,
+        status: r.status,
+        scheduledAt: r.scheduled_at,
+        addressText: r.address_text,
+        estimatedPrice: r.estimated_price?.toString(),
+        serviceName: r.service_name,
+        customerName: r.customer_name,
+        distance: Math.round(r.distance),
+        isOutsideRadius: true,
       })),
     };
   }

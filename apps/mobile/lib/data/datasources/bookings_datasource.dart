@@ -166,6 +166,17 @@ class BookingsDataSource {
     }
   }
 
+  /// Get global booking requests (outside provider's registered radius)
+  Future<List<Booking>> getGlobalRequests() async {
+    try {
+      final response = await _dio.get('/provider/bookings/global');
+      final List<dynamic> data = response.data['requests'] ?? [];
+      return data.map((json) => Booking.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception('Failed to load global requests: $e');
+    }
+  }
+
   Future<Map<String, dynamic>> acceptBookingRequest(int bookingId) async {
     try {
       final response = await _dio.post('/provider/bookings/$bookingId/offer');

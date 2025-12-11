@@ -209,7 +209,7 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        booking.serviceName,
+                        booking.serviceName ?? 'Dịch vụ',
                         style:
                             Theme.of(context).textTheme.titleMedium!.copyWith(
                                   fontWeight: FontWeight.bold,
@@ -235,18 +235,21 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
             // Details
             _buildInfoRow(
               Icons.calendar_today_outlined,
-              DateFormat('EEE, dd MMM yyyy • HH:mm')
-                  .format(booking.scheduledAt),
+              booking.scheduledAt != null
+                  ? DateFormat('EEE, dd MMM yyyy • HH:mm')
+                      .format(booking.scheduledAt!)
+                  : 'Chưa xác định',
             ),
             const SizedBox(height: 8),
-            _buildInfoRow(Icons.location_on_outlined, booking.addressText),
+            _buildInfoRow(
+                Icons.location_on_outlined, booking.addressText ?? ''),
 
             if (booking.estimatedPrice != null) ...[
               const SizedBox(height: 8),
               _buildInfoRow(
                 Icons.attach_money,
                 NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
-                    .format(booking.estimatedPrice),
+                    .format(double.tryParse(booking.estimatedPrice!) ?? 0),
               ),
             ],
 

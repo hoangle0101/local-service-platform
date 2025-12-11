@@ -134,57 +134,87 @@ class MarketplaceDataSource {
   }
 
   Category _categoryFromJson(Map<String, dynamic> json) {
-    return Category(
-      id: _parseInt(json['id']),
-      code: json['code'] as String,
-      name: json['name'] as String,
-      slug: json['slug'] as String?,
-      description: json['description'] as String?,
-      iconUrl: json['iconUrl'] as String?,
-      parentId: json['parentId'] != null ? _parseInt(json['parentId']) : null,
-    );
+    try {
+      return Category(
+        id: _parseInt(json['id']),
+        code: (json['code'] ?? '').toString(),
+        name: (json['name'] ?? 'Category').toString(),
+        slug: json['slug']?.toString(),
+        description: json['description']?.toString(),
+        iconUrl: json['iconUrl']?.toString() ?? json['icon_url']?.toString(),
+        parentId: json['parentId'] != null
+            ? _parseInt(json['parentId'])
+            : (json['parent_id'] != null ? _parseInt(json['parent_id']) : null),
+      );
+    } catch (e, stackTrace) {
+      print('[Marketplace] Error parsing Category: $e');
+      print('[Marketplace] Category JSON: $json');
+      print('[Marketplace] Stack: $stackTrace');
+      rethrow;
+    }
   }
 
   ProviderService _providerServiceFromJson(Map<String, dynamic> json) {
-    final serviceData = json['service'];
-    final providerData = json['provider'];
+    try {
+      final serviceData = json['service'];
+      final providerData = json['provider'];
 
-    if (serviceData == null || providerData == null) {
-      throw Exception('Missing service or provider data');
+      if (serviceData == null || providerData == null) {
+        print('[Marketplace] Missing service or provider data: $json');
+        throw Exception('Missing service or provider data');
+      }
+
+      // Extract categoryId: first try direct field, then try nested category object
+      int categoryId = 0;
+      if (serviceData['categoryId'] != null) {
+        categoryId = _parseInt(serviceData['categoryId']);
+      } else if (serviceData['category_id'] != null) {
+        categoryId = _parseInt(serviceData['category_id']);
+      } else if (serviceData['category'] != null &&
+          serviceData['category'] is Map) {
+        categoryId = _parseInt(serviceData['category']['id']);
+      }
+
+      return ProviderService(
+        providerUserId:
+            (json['providerUserId'] ?? json['provider_user_id'] ?? '')
+                .toString(),
+        serviceId: _parseInt(json['serviceId'] ?? json['service_id']),
+        price: _parseDouble(json['price']),
+        currency: (json['currency'] ?? 'VND').toString(),
+        isActive:
+            json['isActive'] as bool? ?? json['is_active'] as bool? ?? true,
+        service: Service(
+          id: _parseInt(serviceData['id']),
+          categoryId: categoryId,
+          name: (serviceData['name'] ?? 'Service').toString(),
+          description: serviceData['description']?.toString(),
+          iconUrl: serviceData['iconUrl']?.toString() ??
+              serviceData['icon_url']?.toString(),
+          durationMinutes: _parseInt(serviceData['durationMinutes'] ??
+              serviceData['duration_minutes']),
+        ),
+        provider: ProviderInfo(
+          userId: (providerData['userId'] ?? providerData['user_id'] ?? '')
+              .toString(),
+          displayName: (providerData['displayName'] ??
+                  providerData['display_name'] ??
+                  'Provider')
+              .toString(),
+          isVerified: providerData['isVerified'] as bool? ??
+              providerData['is_verified'] as bool? ??
+              false,
+          ratingAvg: _parseDouble(
+              providerData['ratingAvg'] ?? providerData['rating_avg']),
+          ratingCount: _parseInt(
+              providerData['ratingCount'] ?? providerData['rating_count']),
+        ),
+      );
+    } catch (e, stackTrace) {
+      print('[Marketplace] Error parsing ProviderService: $e');
+      print('[Marketplace] JSON data: $json');
+      print('[Marketplace] Stack trace: $stackTrace');
+      rethrow;
     }
-
-    // Extract categoryId: first try direct field, then try nested category object
-    int categoryId = 0;
-    if (serviceData['categoryId'] != null) {
-      categoryId = _parseInt(serviceData['categoryId']);
-    } else if (serviceData['category_id'] != null) {
-      categoryId = _parseInt(serviceData['category_id']);
-    } else if (serviceData['category'] != null &&
-        serviceData['category'] is Map) {
-      categoryId = _parseInt(serviceData['category']['id']);
-    }
-
-    return ProviderService(
-      providerUserId: json['providerUserId'].toString(),
-      serviceId: _parseInt(json['serviceId']),
-      price: _parseDouble(json['price']),
-      currency: json['currency'] as String? ?? 'VND',
-      isActive: json['isActive'] as bool? ?? true,
-      service: Service(
-        id: _parseInt(serviceData['id']),
-        categoryId: categoryId,
-        name: serviceData['name'] as String,
-        description: serviceData['description'] as String?,
-        iconUrl: serviceData['iconUrl'] as String?,
-        durationMinutes: _parseInt(serviceData['durationMinutes']),
-      ),
-      provider: ProviderInfo(
-        userId: providerData['userId'].toString(),
-        displayName: providerData['displayName'] as String,
-        isVerified: providerData['isVerified'] as bool? ?? false,
-        ratingAvg: _parseDouble(providerData['ratingAvg']),
-        ratingCount: _parseInt(providerData['ratingCount']),
-      ),
-    );
   }
 }
