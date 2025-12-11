@@ -36,6 +36,9 @@ dependencies:
   geolocator: ^12.0.0
   geocoding: ^3.0.0
 
+  # Image Picker
+  image_picker: ^1.0.4
+
   # Icons
   cupertino_icons: ^1.0.8
 

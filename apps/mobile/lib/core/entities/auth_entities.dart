@@ -109,10 +109,15 @@ class ProviderProfileEntity {
   final String userId;
   final String displayName;
   final String? bio;
-  final dynamic skills; // Can be List or Map from backend
+  final dynamic skills;
   final int? serviceRadiusM;
   final String verificationStatus;
   final bool isAvailable;
+  final String? address;
+  final double? latitude;
+  final double? longitude;
+  final double? ratingAvg;
+  final int? ratingCount;
 
   ProviderProfileEntity({
     required this.userId,
@@ -122,6 +127,11 @@ class ProviderProfileEntity {
     this.serviceRadiusM,
     required this.verificationStatus,
     required this.isAvailable,
+    this.address,
+    this.latitude,
+    this.longitude,
+    this.ratingAvg,
+    this.ratingCount,
   });
 
   factory ProviderProfileEntity.fromJson(Map<String, dynamic> json) {
@@ -129,10 +139,47 @@ class ProviderProfileEntity {
       userId: json['userId']?.toString() ?? '',
       displayName: json['displayName'] as String? ?? 'Provider',
       bio: json['bio'] as String?,
-      skills: json['skills'], // Keep as dynamic, don't cast
-      serviceRadiusM: json['serviceRadiusM'] as int?,
+      skills: json['skills'],
+      serviceRadiusM: json['serviceRadiusM'] != null
+          ? (json['serviceRadiusM'] is int
+              ? json['serviceRadiusM']
+              : int.tryParse(json['serviceRadiusM'].toString()))
+          : null,
       verificationStatus: json['verificationStatus'] as String? ?? 'unverified',
       isAvailable: json['isAvailable'] as bool? ?? false,
+      address: json['address'] as String?,
+      latitude: json['latitude'] != null
+          ? (json['latitude'] is double
+              ? json['latitude']
+              : double.tryParse(json['latitude'].toString()))
+          : null,
+      longitude: json['longitude'] != null
+          ? (json['longitude'] is double
+              ? json['longitude']
+              : double.tryParse(json['longitude'].toString()))
+          : null,
+      ratingAvg: json['ratingAvg'] != null
+          ? (json['ratingAvg'] is double
+              ? json['ratingAvg']
+              : double.tryParse(json['ratingAvg'].toString()))
+          : null,
+      ratingCount: json['ratingCount'] != null
+          ? (json['ratingCount'] is int
+              ? json['ratingCount']
+              : int.tryParse(json['ratingCount'].toString()))
+          : null,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'displayName': displayName,
+      'bio': bio,
+      'skills': skills,
+      'serviceRadiusM': serviceRadiusM,
+      'address': address,
+      'latitude': latitude,
+      'longitude': longitude,
+    };
   }
 }

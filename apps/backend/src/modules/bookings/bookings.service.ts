@@ -284,7 +284,7 @@ export class BookingsService {
     if (booking.customerId !== userId)
       throw new ForbiddenException('Not your booking');
 
-    // Get offers using raw SQL
+    // Get offers using raw SQL with distance calculation
     const offers = await this.prisma.$queryRawUnsafe<any[]>(
       `
       SELECT 
@@ -294,9 +294,16 @@ export class BookingsService {
         bo.price,
         bo.status,
         pp.display_name as provider_name,
-        pp.rating_avg
+        pp.rating_avg,
+        pp.address as provider_address,
+        CASE 
+          WHEN b.location IS NOT NULL AND pp.location IS NOT NULL 
+          THEN ST_Distance(b.location::geography, pp.location::geography)
+          ELSE NULL 
+        END as distance
       FROM booking_offers bo
       JOIN provider_profiles pp ON bo.provider_id = pp.user_id
+      JOIN bookings b ON bo.booking_id = b.id
       WHERE bo.booking_id = $1
       ORDER BY bo.created_at DESC
     `,
@@ -309,9 +316,11 @@ export class BookingsService {
         bookingId: o.booking_id.toString(),
         providerId: o.provider_id.toString(),
         providerName: o.provider_name,
+        providerAddress: o.provider_address,
         rating: o.rating_avg?.toString(),
         price: o.price.toString(),
         status: o.status,
+        distance: o.distance ? Math.round(o.distance) : null, // distance in meters
       })),
     };
   }

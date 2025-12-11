@@ -6,7 +6,8 @@ class TrackAsiaDataSource {
 
   // Track Asia API base URL and key
   static const String _baseUrl = 'https://maps.track-asia.com/api/v2';
-  static const String _apiKey = 'a7de17654364332e589f9357257ca01d10'; // Free tier key
+  static const String _apiKey =
+      'a7de17654364332e589f9357257ca01d10'; // Free tier key
 
   TrackAsiaDataSource()
       : _dio = Dio(
@@ -65,6 +66,49 @@ class TrackAsiaDataSource {
       return null;
     } catch (e) {
       print('[TrackAsia] Place detail error: $e');
+      return null;
+    }
+  }
+
+  /// Reverse geocode: Get full address from GPS coordinates
+  /// Returns [FullAddress] with street, ward, district, province, etc.
+  Future<FullAddress?> reverseGeocode(double latitude, double longitude) async {
+    try {
+      print(
+          '[TrackAsia] Reverse geocode request: lat=$latitude, lng=$longitude');
+
+      final response = await _dio.get(
+        '/geocode/json',
+        queryParameters: {
+          'latlng': '$latitude,$longitude',
+          'key': _apiKey,
+          'new_admin': 'true',
+        },
+      );
+
+      print('[TrackAsia] Reverse geocode status: ${response.data['status']}');
+
+      if (response.data['status'] == 'OK' &&
+          response.data['results'] != null &&
+          (response.data['results'] as List).isNotEmpty) {
+        final result = response.data['results'][0] as Map<String, dynamic>;
+
+        // Debug: Print what we received
+        print('[TrackAsia] Formatted address: ${result['formatted_address']}');
+        print(
+            '[TrackAsia] Address components: ${result['address_components']}');
+
+        final address =
+            FullAddress.fromGeocodeResult(result, latitude, longitude);
+        print('[TrackAsia] Parsed displayText: ${address.displayText}');
+        print('[TrackAsia] Parsed fullAddress: ${address.fullAddress}');
+
+        return address;
+      }
+      print('[TrackAsia] No results from reverse geocode');
+      return null;
+    } catch (e) {
+      print('[TrackAsia] Reverse geocode error: $e');
       return null;
     }
   }
@@ -172,4 +216,159 @@ class AddressComponent {
 
   /// Check if this is a street/route
   bool get isStreet => types.contains('route');
+}
+
+/// Model for full address with all components from reverse geocoding
+class FullAddress {
+  final String? streetNumber;
+  final String? street;
+  final String? ward;
+  final String? district;
+  final String? province;
+  final String? country;
+  final String fullAddress;
+  final double latitude;
+  final double longitude;
+
+  FullAddress({
+    this.streetNumber,
+    this.street,
+    this.ward,
+    this.district,
+    this.province,
+    this.country,
+    required this.fullAddress,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  /// Create from reverse geocode result
+  factory FullAddress.fromGeocodeResult(
+    Map<String, dynamic> json,
+    double lat,
+    double lng,
+  ) {
+    final components = (json['address_components'] as List<dynamic>?)
+            ?.map((c) => AddressComponent.fromJson(c))
+            .toList() ??
+        [];
+
+    String? streetNumber;
+    String? street;
+    String? ward;
+    String? district;
+    String? province;
+    String? country;
+
+    for (final comp in components) {
+      if (comp.types.contains('street_number')) {
+        streetNumber = comp.longName;
+      } else if (comp.isStreet) {
+        street = comp.longName;
+      } else if (comp.isWard) {
+        ward = comp.longName;
+      } else if (comp.isDistrict) {
+        district = comp.longName;
+      } else if (comp.isProvince) {
+        province = comp.longName;
+      } else if (comp.types.contains('country')) {
+        country = comp.longName;
+      }
+    }
+
+    return FullAddress(
+      streetNumber: streetNumber,
+      street: street,
+      ward: ward,
+      district: district,
+      province: province,
+      country: country,
+      fullAddress: json['formatted_address'] as String? ?? '',
+      latitude: lat,
+      longitude: lng,
+    );
+  }
+
+  /// Create from PlaceDetail
+  factory FullAddress.fromPlaceDetail(PlaceDetail detail) {
+    String? streetNumber;
+    String? street;
+    String? ward;
+    String? district;
+    String? province;
+    String? country;
+
+    for (final comp in detail.addressComponents) {
+      if (comp.types.contains('street_number')) {
+        streetNumber = comp.longName;
+      } else if (comp.isStreet) {
+        street = comp.longName;
+      } else if (comp.isWard) {
+        ward = comp.longName;
+      } else if (comp.isDistrict) {
+        district = comp.longName;
+      } else if (comp.isProvince) {
+        province = comp.longName;
+      } else if (comp.types.contains('country')) {
+        country = comp.longName;
+      }
+    }
+
+    return FullAddress(
+      streetNumber: streetNumber,
+      street: street,
+      ward: ward,
+      district: district,
+      province: province,
+      country: country,
+      fullAddress: detail.formattedAddress,
+      latitude: detail.latitude,
+      longitude: detail.longitude,
+    );
+  }
+
+  /// Get display text - prioritize fullAddress from API
+  String get displayText {
+    // Always use fullAddress from API as it's most complete
+    if (fullAddress.isNotEmpty) {
+      return fullAddress;
+    }
+    // Fallback: build from components if fullAddress is empty
+    final parts = <String>[];
+    if (streetNumber != null && streetNumber!.isNotEmpty) {
+      parts.add(streetNumber!);
+    }
+    if (street != null && street!.isNotEmpty) {
+      parts.add(street!);
+    }
+    if (ward != null && ward!.isNotEmpty) {
+      parts.add(ward!);
+    }
+    if (district != null && district!.isNotEmpty) {
+      parts.add(district!);
+    }
+    if (province != null && province!.isNotEmpty) {
+      parts.add(province!);
+    }
+    return parts.join(', ');
+  }
+
+  /// Get short display text (street + ward + district)
+  String get shortText {
+    final parts = <String>[];
+    if (street != null && street!.isNotEmpty) {
+      if (streetNumber != null && streetNumber!.isNotEmpty) {
+        parts.add('$streetNumber $street');
+      } else {
+        parts.add(street!);
+      }
+    }
+    if (ward != null && ward!.isNotEmpty) {
+      parts.add(ward!);
+    }
+    if (district != null && district!.isNotEmpty) {
+      parts.add(district!);
+    }
+    return parts.isEmpty ? fullAddress : parts.join(', ');
+  }
 }

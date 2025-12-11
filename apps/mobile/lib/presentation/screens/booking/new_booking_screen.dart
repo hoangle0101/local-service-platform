@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/entities/entities.dart';
+import '../../../data/datasources/track_asia_datasource.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../bloc/services/services_bloc.dart';
@@ -36,6 +38,12 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
 
   int _currentStep = 0;
 
+  // Track Asia API for address autocomplete
+  final TrackAsiaDataSource _trackAsiaDataSource = TrackAsiaDataSource();
+  List<AddressPrediction> _addressPredictions = [];
+  Timer? _debounceTimer;
+  bool _showPredictions = false;
+
   @override
   void initState() {
     super.initState();
@@ -47,7 +55,59 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
   void dispose() {
     _addressController.dispose();
     _notesController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
+  }
+
+  /// Search for addresses using Track Asia API
+  void _onAddressSearch(String query) {
+    _debounceTimer?.cancel();
+
+    if (query.length < 3) {
+      setState(() {
+        _addressPredictions = [];
+        _showPredictions = false;
+      });
+      return;
+    }
+
+    _debounceTimer = Timer(const Duration(milliseconds: 400), () async {
+      try {
+        final predictions = await _trackAsiaDataSource.searchAddress(query);
+        if (mounted) {
+          setState(() {
+            _addressPredictions = predictions;
+            _showPredictions = predictions.isNotEmpty;
+          });
+        }
+      } catch (e) {
+        debugPrint('[NewBooking] Address search error: $e');
+      }
+    });
+  }
+
+  /// Select an address from predictions
+  Future<void> _selectAddress(AddressPrediction prediction) async {
+    setState(() => _showPredictions = false);
+
+    try {
+      final detail =
+          await _trackAsiaDataSource.getPlaceDetail(prediction.placeId);
+      if (mounted && detail != null) {
+        // Use FullAddress for better display
+        final fullAddress = FullAddress.fromPlaceDetail(detail);
+        setState(() {
+          _addressController.text = fullAddress.displayText;
+          _latitude = fullAddress.latitude;
+          _longitude = fullAddress.longitude;
+        });
+      } else {
+        setState(() => _addressController.text = prediction.description);
+      }
+    } catch (e) {
+      debugPrint('[NewBooking] Place detail error: $e');
+      setState(() => _addressController.text = prediction.description);
+    }
   }
 
   @override
@@ -373,15 +433,22 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Where should we come?',
+            'Địa điểm cần đến',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
           ),
+          const SizedBox(height: 4),
+          Text(
+            'Sử dụng Track Asia API để tìm địa chỉ chính xác',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
           const SizedBox(height: 16),
+
+          // Address input with autocomplete
           TextFormField(
             controller: _addressController,
             decoration: InputDecoration(
-              labelText: 'Address',
-              hintText: 'Enter your full address',
+              labelText: 'Địa chỉ',
+              hintText: 'Nhập địa chỉ để tìm kiếm...',
               prefixIcon: const Icon(Icons.location_on_outlined),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -391,42 +458,105 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
                 onPressed: _getCurrentLocation,
               ),
             ),
+            onChanged: _onAddressSearch,
             validator: (value) {
               if (value == null || value.isEmpty) {
-                return 'Please enter your address';
+                return 'Vui lòng nhập địa chỉ';
               }
               return null;
             },
             maxLines: 2,
           ),
+
+          // Address predictions dropdown
+          if (_showPredictions && _addressPredictions.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              constraints: const BoxConstraints(maxHeight: 200),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _addressPredictions.length,
+                itemBuilder: (context, index) {
+                  final prediction = _addressPredictions[index];
+                  return ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.location_on,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                    ),
+                    title: Text(
+                      prediction.mainText,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    subtitle: Text(
+                      prediction.secondaryText,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    onTap: () => _selectAddress(prediction),
+                  );
+                },
+              ),
+            ),
+
           const SizedBox(height: 8),
+
+          // GPS coordinates display
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: AppColors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.primary.withOpacity(0.2)),
             ),
             child: Row(
               children: [
-                Icon(Icons.gps_fixed, size: 16, color: Colors.grey.shade600),
+                const Icon(Icons.gps_fixed, size: 18, color: AppColors.primary),
                 const SizedBox(width: 8),
-                Text(
-                  'GPS: ${_latitude.toStringAsFixed(4)}, ${_longitude.toStringAsFixed(4)}',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                Expanded(
+                  child: Text(
+                    'Tọa độ: ${_latitude.toStringAsFixed(6)}, ${_longitude.toStringAsFixed(6)}',
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
+
           const SizedBox(height: 24),
           const Text(
-            'Additional Notes (Optional)',
+            'Ghi chú thêm (Tùy chọn)',
             style: TextStyle(fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 8),
           TextFormField(
             controller: _notesController,
             decoration: InputDecoration(
-              hintText: 'Any special instructions or requirements...',
+              hintText: 'Yêu cầu đặc biệt hoặc hướng dẫn...',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

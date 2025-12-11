@@ -18,6 +18,7 @@ import '../screens/provider/provider_home_screen.dart';
 import '../screens/provider/provider_profile_screen.dart';
 import '../screens/provider/provider_services_screen.dart';
 import '../screens/provider/provider_bookings_screen.dart';
+import '../screens/provider/provider_edit_profile_screen.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -90,6 +91,10 @@ final router = GoRouter(
     GoRoute(
       path: '/provider/bookings',
       builder: (context, state) => const ProviderBookingsScreen(),
+    ),
+    GoRoute(
+      path: '/provider/profile/edit',
+      builder: (context, state) => const ProviderEditProfileScreen(),
     ),
 
     // Service Routes

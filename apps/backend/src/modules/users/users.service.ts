@@ -55,6 +55,11 @@ export class UsersService {
             serviceRadiusM: user.providerProfile.serviceRadiusM,
             verificationStatus: user.providerProfile.verificationStatus,
             isAvailable: user.providerProfile.isAvailable,
+            address: (user.providerProfile as any).address,
+            latitude: (user.providerProfile as any).latitude,
+            longitude: (user.providerProfile as any).longitude,
+            ratingAvg: user.providerProfile.ratingAvg?.toString() || '0',
+            ratingCount: user.providerProfile.ratingCount,
           }
         : null,
       wallet: user.wallet
