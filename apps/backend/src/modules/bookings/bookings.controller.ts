@@ -143,9 +143,17 @@ export class ProviderBookingsController {
   constructor(private bookingsService: BookingsService) {}
 
   @Get('requests')
-  @ApiOperation({ summary: 'Get pending booking requests near provider' })
+  @ApiOperation({
+    summary: 'Get pending booking requests near provider (within radius)',
+  })
   async getProviderRequests(@CurrentUser() user: any) {
     return this.bookingsService.getProviderRequests(BigInt(user.userId));
+  }
+
+  @Get('global')
+  @ApiOperation({ summary: 'Get all pending booking requests outside radius' })
+  async getGlobalRequests(@CurrentUser() user: any) {
+    return this.bookingsService.getGlobalRequests(BigInt(user.userId));
   }
 
   @Post(':id/offer')

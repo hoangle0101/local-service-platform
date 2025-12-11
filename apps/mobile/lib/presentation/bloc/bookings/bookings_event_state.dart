@@ -274,23 +274,25 @@ class Booking {
   final String id;
   final String code;
   final String status;
-  final DateTime scheduledAt;
-  final String addressText;
-  final double? estimatedPrice;
-  final String serviceName;
+  final DateTime? scheduledAt;
+  final String? addressText;
+  final String? estimatedPrice;
+  final String? serviceName;
   final String? providerName;
   final String? customerName;
+  final int? distance; // Distance in meters from provider
 
   Booking({
     required this.id,
     required this.code,
     required this.status,
-    required this.scheduledAt,
-    required this.addressText,
+    this.scheduledAt,
+    this.addressText,
     this.estimatedPrice,
-    required this.serviceName,
+    this.serviceName,
     this.providerName,
     this.customerName,
+    this.distance,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) {
@@ -299,16 +301,15 @@ class Booking {
       code: json['code'] ?? '',
       status: json['status'] ?? 'pending',
       scheduledAt: json['scheduledAt'] != null
-          ? DateTime.parse(json['scheduledAt'])
-          : DateTime.now(),
-      addressText: json['addressText'] ?? '',
-      estimatedPrice: json['estimatedPrice'] != null
-          ? double.tryParse(json['estimatedPrice'].toString())
+          ? DateTime.tryParse(json['scheduledAt'].toString())
           : null,
-      serviceName:
-          json['service']?['name'] ?? json['serviceName'] ?? 'Unknown Service',
+      addressText: json['addressText'] as String?,
+      estimatedPrice: json['estimatedPrice']?.toString(),
+      serviceName: json['service']?['name'] ?? json['serviceName'] ?? 'Dịch vụ',
       providerName: json['provider']?['fullName'] ?? json['providerName'],
       customerName: json['customer']?['fullName'] ?? json['customerName'],
+      distance:
+          json['distance'] != null ? (json['distance'] as num).toInt() : null,
     );
   }
 }

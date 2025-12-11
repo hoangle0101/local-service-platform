@@ -18,10 +18,14 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
   ) async {
     emit(ServicesLoading());
     try {
+      print('[ServicesBloc] Loading services...');
       final services =
           await _marketplaceDataSource.searchServices(limit: event.limit);
+      print('[ServicesBloc] Loaded ${services.length} services');
       emit(ServicesLoaded(services));
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('[ServicesBloc] ERROR: $e');
+      print('[ServicesBloc] Stack: $stackTrace');
       emit(ServicesError(e.toString()));
     }
   }

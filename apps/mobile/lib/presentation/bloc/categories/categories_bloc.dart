@@ -16,9 +16,13 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
   ) async {
     emit(CategoriesLoading());
     try {
+      print('[CategoriesBloc] Loading categories...');
       final categories = await _marketplaceDataSource.getCategories();
+      print('[CategoriesBloc] Loaded ${categories.length} categories');
       emit(CategoriesLoaded(categories));
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('[CategoriesBloc] ERROR: $e');
+      print('[CategoriesBloc] Stack: $stackTrace');
       emit(CategoriesError(e.toString()));
     }
   }
