@@ -108,6 +108,35 @@ class BookingsDataSource {
     }
   }
 
+  Future<Booking> getBookingById(String bookingId) async {
+    try {
+      print('[BookingsDataSource] Fetching booking detail for id: $bookingId');
+      final response = await _dio.get('/bookings/$bookingId');
+
+      print('[BookingsDataSource] Booking detail response: ${response.data}');
+
+      // Handle different response formats from backend
+      final responseData = response.data;
+      Map<String, dynamic> bookingData = {};
+
+      if (responseData is Map<String, dynamic>) {
+        // Try different possible keys
+        if (responseData.containsKey('data')) {
+          bookingData = responseData['data'] as Map<String, dynamic>;
+        } else {
+          bookingData = responseData;
+        }
+      }
+
+      print('[BookingsDataSource] Parsed booking detail: $bookingData');
+
+      return Booking.fromJson(bookingData);
+    } catch (e) {
+      print('[BookingsDataSource] Error fetching booking detail: $e');
+      throw Exception('Failed to load booking detail: $e');
+    }
+  }
+
   Future<List<Booking>> getUserBookings({String? status}) async {
     try {
       final queryParams = <String, dynamic>{};

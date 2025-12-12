@@ -444,12 +444,20 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
         ],
       );
     } else if (status == 'completed') {
+      // Check if booking has a review
+      final hasReview = booking.review != null;
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
-          onPressed: () => _showReviewDialog(booking.id),
-          icon: const Icon(Icons.star),
-          label: const Text('Leave Review'),
+          onPressed: () {
+            if (hasReview) {
+              _showViewReviewDialog(booking.review!);
+            } else {
+              _showReviewDialog(booking.id);
+            }
+          },
+          icon: Icon(hasReview ? Icons.visibility : Icons.star),
+          label: Text(hasReview ? 'View Your Review' : 'Leave Review'),
         ),
       );
     } else if (status == 'cancelled' || status == 'disputed') {
@@ -657,5 +665,105 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
         ),
       );
     }
+  }
+
+  void _showViewReviewDialog(BookingReview review) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Your Review'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Star Rating Display
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(5, (index) {
+                    return Icon(
+                      index < review.rating ? Icons.star : Icons.star_border,
+                      color: Colors.amber,
+                      size: 24,
+                    );
+                  }),
+                ),
+              ),
+              // Rating Text
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: Text(
+                  '${review.rating}.0 / 5.0',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const Divider(),
+              // Comment Section
+              if (review.comment != null && review.comment!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12.0, bottom: 12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Comment:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        review.comment!,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.only(top: 12.0),
+                  child: Text(
+                    'No comment provided',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              const Divider(),
+              // Review Date
+              if (review.createdAt != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12.0),
+                  child: Text(
+                    'Reviewed on: ${_formatDate(review.createdAt!)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime dateTime) {
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }

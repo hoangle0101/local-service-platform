@@ -47,7 +47,14 @@ npm run build
 
 **Kiểm tra:** Không có TypeScript errors
 
-#### **2.5 (Optional) Seed Test Data**
+#### **2.5 Run Backend**
+```bash
+npm run start:dev
+```
+
+**Verify:** Backend chạy port 3000, không có lỗi
+
+#### **2.6 (Optional) Seed Test Data**
 ```bash
 npx prisma db seed
 ```
@@ -130,6 +137,81 @@ flutter run
 | 4 | `npx prisma generate` | Sync types | ✅ Required |
 | 5 | `npm run build` | Build backend | ✅ Verify |
 | 6 | `flutter pub get` (mobile) | Install dependencies | ✅ Required |
+
+---
+
+## 🚀 **Development Guidelines for New Features**
+
+### **State Management: MUST USE RIVERPOD**
+
+**Quy tắc:**
+- ✅ **PHẢI dùng Riverpod** cho tất cả new features
+- ✅ **Định nghĩa Provider** trong `lib/presentation/providers/`
+- ✅ **Sử dụng `ConsumerWidget` hoặc `ConsumerStatefulWidget`** khi cần Riverpod
+- ✅ **Error handling** với `.when(data:, loading:, error:,)`
+- ❌ **KHÔNG dùng BLoC** cho features mới (chỉ dùng cho auth)
+
+**Example Provider Structure:**
+```dart
+// lib/presentation/providers/review_provider.dart
+final reviewProvider = FutureProvider.family<Review, int>((ref, bookingId) async {
+  final datasource = ref.watch(reviewDatasourceProvider);
+  return datasource.getReview(bookingId);
+});
+```
+
+**Example Widget:**
+```dart
+class ReviewDetailWidget extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ref.watch(reviewProvider(bookingId)).when(
+      data: (review) => Text(review.comment),
+      loading: () => CircularProgressIndicator(),
+      error: (err, st) => Text('Error: $err'),
+    );
+  }
+}
+```
+
+### **Task Management:**
+1. ✅ **Chia nhỏ tasks** - 1 feature = multiple sub-tasks
+2. ✅ **Implement từng task** - code → test → commit
+3. ✅ **Compile check**: `npm run build` (backend) + `flutter analyze` (mobile)
+4. ✅ **Test on real device/emulator** - verify UI + logic
+5. ✅ **Commit with descriptive message**
+
+### **No Breaking Changes:**
+- ✅ **Append-only** - chỉ thêm mới, không sửa code cũ
+- ✅ **Backward compatible** - tất cả old features phải hoạt động
+- ✅ **Zero migration issues** - đã chạy migrations
+- ✅ **Type-safe** - 0 TypeScript/Dart errors
+
+---
+
+## ✅ **Verification Checklist**
+
+After merge, verify:
+
+- [ ] Backend starts without errors: `npm run start:dev`
+- [ ] Database migration successful: `npx prisma migrate deploy`
+- [ ] Mobile compiles: `flutter analyze` (0 issues)
+- [ ] Mobile runs: `flutter run` (no crashes)
+- [ ] Login works (auth still uses BLoC)
+- [ ] Provider profile shows rating (Riverpod)
+- [ ] Dashboard shows rating stats (Riverpod)
+- [ ] Review features work (new Riverpod providers)
+
+---
+
+## 📞 **Support**
+
+Nếu gặp lỗi:
+1. Check **[SETUP-AFTER-MERGE.md](./SETUP-AFTER-MERGE.md)** này
+2. Check **git log** để xem các commits mới
+3. Run `git status` để verify workspace clean
+4. Delete `.dart_tool` và `build/` folders nếu Flutter cache bị corrupt
+
 | 7 | `npm run start:dev` (backend) | Start server | ✅ Test |
 | 8 | `flutter run` (mobile) | Launch app | ✅ Test |
 

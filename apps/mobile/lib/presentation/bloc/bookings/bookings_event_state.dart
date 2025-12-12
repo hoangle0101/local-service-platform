@@ -302,6 +302,28 @@ class BookingOffer {
   }
 }
 
+class BookingReview {
+  final int rating;
+  final String? comment;
+  final DateTime? createdAt;
+
+  BookingReview({
+    required this.rating,
+    this.comment,
+    this.createdAt,
+  });
+
+  factory BookingReview.fromJson(Map<String, dynamic> json) {
+    return BookingReview(
+      rating: (json['rating'] as num).toInt(),
+      comment: json['comment'] as String?,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString())
+          : null,
+    );
+  }
+}
+
 class Booking {
   final String id;
   final String code;
@@ -316,6 +338,7 @@ class Booking {
   final int? distance; // Distance in meters from provider
   final String? bookingType; // 'DIRECT' or 'GENERAL'
   final bool isDirectBooking;
+  final BookingReview? review;
 
   Booking({
     required this.id,
@@ -331,6 +354,7 @@ class Booking {
     this.distance,
     this.bookingType,
     this.isDirectBooking = false,
+    this.review,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) {
@@ -351,6 +375,9 @@ class Booking {
           json['distance'] != null ? (json['distance'] as num).toInt() : null,
       bookingType: json['bookingType'] as String?,
       isDirectBooking: json['isDirectBooking'] == true,
+      review: json['review'] != null
+          ? BookingReview.fromJson(json['review'] as Map<String, dynamic>)
+          : null,
     );
   }
 }
