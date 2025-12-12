@@ -7,10 +7,10 @@ async function main() {
 
     // 1. Get IDs
     const users = await prisma.user.findMany({
-        where: { phone: { in: ['0987654321', '0901234567'] } },
+        where: { phone: { in: ['0912345678', '0901234567'] } },
     });
 
-    const customer = users.find(u => u.phone === '0987654321');
+    const customer = users.find(u => u.phone === '0912345678');
     const provider = users.find(u => u.phone === '0901234567');
 
     if (!customer || !provider) {
@@ -64,7 +64,7 @@ async function main() {
     console.log(`   - ID: ${newBooking?.id}`);
     console.log(`   - Code: ${bookingCode}`);
     console.log(`   - Status: completed`);
-    console.log(`   - Customer: 0987654321`);
+    console.log(`   - Customer: 0912345678`);
     console.log(`   - Provider: 0901234567`);
     console.log('👉 You can now log in as Customer 1 and review this booking.');
 }
