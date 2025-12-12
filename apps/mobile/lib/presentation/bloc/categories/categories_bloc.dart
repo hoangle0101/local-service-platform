@@ -1,5 +1,4 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../core/entities/entities.dart';
 import '../../../data/datasources/marketplace_datasource.dart';
 import 'categories_event_state.dart';
 

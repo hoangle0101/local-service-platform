@@ -399,11 +399,11 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
                 const SizedBox(width: 8),
                 OutlinedButton(
                   onPressed: () => _viewDetails(booking),
-                  child: const Text('Chi tiết'),
                   style: OutlinedButton.styleFrom(
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),
+                  child: const Text('Chi tiết'),
                 ),
               ],
             ),

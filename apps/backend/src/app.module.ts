@@ -15,6 +15,7 @@ import { WalletsModule } from './modules/wallets/wallets.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { DisputesModule } from './modules/disputes/disputes.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -36,8 +37,9 @@ import configuration from './config/configuration';
     ConversationsModule,
     DisputesModule,
     AdminModule,
+    ReviewsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
