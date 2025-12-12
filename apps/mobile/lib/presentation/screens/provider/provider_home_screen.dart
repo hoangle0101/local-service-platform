@@ -277,7 +277,7 @@ class _ProviderHomeScreenState extends ConsumerState<ProviderHomeScreen> {
                       child: Switch(
                         value: _isAvailable,
                         onChanged: (_) => _toggleAvailability(),
-                        activeColor: Colors.green,
+                        activeThumbColor: Colors.green,
                         activeTrackColor: Colors.green.shade200,
                         inactiveThumbColor: Colors.orange,
                         inactiveTrackColor: Colors.orange.shade200,

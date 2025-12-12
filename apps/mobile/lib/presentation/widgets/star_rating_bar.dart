@@ -13,7 +13,7 @@ class StarRatingBar extends StatefulWidget {
   final Color inactiveColor;
 
   const StarRatingBar({
-    Key? key,
+    super.key,
     this.initialRating = 0,
     this.maxRating = 5,
     this.starSize = 40.0,
@@ -21,7 +21,7 @@ class StarRatingBar extends StatefulWidget {
     this.readOnly = false,
     this.activeColor = AppColors.primary,
     this.inactiveColor = AppColors.grey300,
-  }) : super(key: key);
+  });
 
   @override
   State<StarRatingBar> createState() => _StarRatingBarState();
@@ -121,7 +121,7 @@ class StarRatingDisplay extends StatelessWidget {
   final bool showLabel;
 
   const StarRatingDisplay({
-    Key? key,
+    super.key,
     required this.rating,
     this.maxRating = 5,
     this.starSize = 16.0,
@@ -129,7 +129,7 @@ class StarRatingDisplay extends StatelessWidget {
     this.inactiveColor = AppColors.grey300,
     this.labelStyle,
     this.showLabel = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -175,13 +175,13 @@ class RatingDistributionBar extends StatelessWidget {
   final Color barColor;
 
   const RatingDistributionBar({
-    Key? key,
+    super.key,
     required this.rating,
     required this.count,
     required this.totalReviews,
     this.barHeight = 8.0,
     this.barColor = AppColors.primary,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -46,7 +46,7 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
   // Working Hours
   TimeOfDay _workStartTime = const TimeOfDay(hour: 8, minute: 0);
   TimeOfDay _workEndTime = const TimeOfDay(hour: 18, minute: 0);
-  List<String> _workingDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  final List<String> _workingDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
   bool _isCreatingProvider = false;
   bool _acceptsTerms = false;
@@ -649,11 +649,11 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
         const SizedBox(height: 16),
 
         // Location Section
-        Row(
+        const Row(
           children: [
-            const Icon(Icons.location_on, color: AppColors.primary),
-            const SizedBox(width: 8),
-            const Text(
+            Icon(Icons.location_on, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text(
               'Service Location',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
@@ -726,11 +726,11 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
         const SizedBox(height: 16),
 
         // Working Hours
-        Row(
+        const Row(
           children: [
-            const Icon(Icons.schedule, color: AppColors.primary),
-            const SizedBox(width: 8),
-            const Text(
+            Icon(Icons.schedule, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text(
               'Working Hours',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),

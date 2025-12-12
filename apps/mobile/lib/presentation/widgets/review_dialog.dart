@@ -10,12 +10,12 @@ class ReviewDialog extends StatelessWidget {
   final VoidCallback? onSubmitSuccess;
 
   const ReviewDialog({
-    Key? key,
+    super.key,
     required this.bookingId,
     required this.revieweeId,
     required this.serviceTitle,
     this.onSubmitSuccess,
-  }) : super(key: key);
+  });
 
   static void show({
     required BuildContext context,
@@ -65,11 +65,11 @@ class QuickReviewDialog extends StatefulWidget {
   final VoidCallback? onSubmitSuccess;
 
   const QuickReviewDialog({
-    Key? key,
+    super.key,
     required this.bookingId,
     required this.revieweeId,
     this.onSubmitSuccess,
-  }) : super(key: key);
+  });
 
   static void show({
     required BuildContext context,
@@ -117,7 +117,7 @@ class _QuickReviewDialogState extends State<QuickReviewDialog> {
             // Icon
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.grey100,
                 shape: BoxShape.circle,
               ),

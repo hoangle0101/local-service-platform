@@ -62,7 +62,7 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
     super.initState();
     // Load categories and services
     context.read<CategoriesBloc>().add(LoadCategories());
-    context.read<ServicesBloc>().add(LoadServices());
+    context.read<ServicesBloc>().add(const LoadServices());
   }
 
   @override
@@ -472,7 +472,7 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
               border: Border.all(color: Colors.grey.shade300),
             ),
             child: DropdownButtonFormField<Category>(
-              value: _selectedCategory,
+              initialValue: _selectedCategory,
               decoration: const InputDecoration(
                 contentPadding:
                     EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -566,7 +566,7 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
                                 AppColors.primaryLight.withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(Icons.home_repair_service,
+                          child: const Icon(Icons.home_repair_service,
                               color: AppColors.primary),
                         ),
                         const SizedBox(width: 12),
@@ -601,7 +601,7 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
                             ),
                             Row(
                               children: [
-                                Icon(Icons.star, size: 14, color: Colors.amber),
+                                const Icon(Icons.star, size: 14, color: Colors.amber),
                                 Text(
                                   ' ${service.provider.ratingAvg.toStringAsFixed(1)}',
                                   style: const TextStyle(fontSize: 12),

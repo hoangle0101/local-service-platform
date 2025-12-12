@@ -317,12 +317,12 @@ export class BookingsService {
   }
 
   // GET /provider/bookings/requests
+  // Returns pending bookings that match provider's service categories
+  // Handles both: Direct Booking (provider_id = this provider) AND General Booking (category match)
   async getProviderRequests(providerId: bigint) {
-    // Find pending bookings where the provider offers the service
-    // and hasn't already made an offer
     const requests = await this.prisma.$queryRawUnsafe<any[]>(
       `
-      SELECT DISTINCT
+      SELECT 
         b.id,
         b.code,
         b.status,
@@ -330,32 +330,71 @@ export class BookingsService {
         b.address_text,
         b.estimated_price,
         b.created_at,
+        b.provider_id,
         s.name as service_name,
+        sc.name as category_name,
         up.full_name as customer_name,
-        ST_Distance(
-          b.location::geography,
-          pp.location::geography
-        ) as distance
+        CASE 
+          WHEN b.location IS NOT NULL AND pp.location IS NOT NULL 
+          THEN ST_Distance(b.location::geography, pp.location::geography)
+          ELSE NULL 
+        END as distance,
+        CASE 
+          WHEN b.provider_id = $1 THEN 'DIRECT'
+          ELSE 'GENERAL'
+        END as booking_type,
+        CASE WHEN b.provider_id = $1 THEN 0 ELSE 1 END as sort_priority
       FROM bookings b
       JOIN services s ON b.service_id = s.id
+      LEFT JOIN service_categories sc ON s.category_id = sc.id
       JOIN user_profiles up ON b.customer_id = up.user_id
-      JOIN provider_services ps ON ps.service_id = b.service_id AND ps.provider_user_id = $1
-      JOIN provider_profiles pp ON pp.user_id = $1
-      LEFT JOIN booking_offers bo ON bo.booking_id = b.id AND bo.provider_id = $1
-      WHERE b.status = 'pending'
-        AND b.provider_id IS NULL
-        AND bo.id IS NULL
-        AND ps.is_active = true
-        AND ST_DWithin(
-          b.location::geography,
-          pp.location::geography,
-          pp.service_radius_m
+      CROSS JOIN provider_profiles pp
+      WHERE pp.user_id = $1
+        AND b.status = 'pending'
+        AND (
+          -- Case 1: Direct booking - provider was specifically chosen
+          b.provider_id = $1
+          
+          -- Case 2: General booking - match by category + radius
+          OR (
+            b.provider_id IS NULL
+            AND EXISTS (
+              SELECT 1 FROM provider_services ps
+              JOIN services ps_svc ON ps.service_id = ps_svc.id
+              WHERE ps.provider_user_id = $1
+                AND ps.is_active = true
+                AND ps.deleted_at IS NULL
+                AND ps_svc.category_id = s.category_id
+            )
+            AND (
+              -- Check radius if both locations available
+              (b.location IS NOT NULL AND pp.location IS NOT NULL AND ST_DWithin(
+                b.location::geography,
+                pp.location::geography,
+                COALESCE(pp.service_radius_m, 5000)
+              ))
+              -- Or if no location data, still show (flexible)
+              OR b.location IS NULL 
+              OR pp.location IS NULL
+            )
+          )
         )
-      ORDER BY b.created_at DESC
+        -- Haven't already submitted an offer for this booking
+        AND NOT EXISTS (
+          SELECT 1 FROM booking_offers bo 
+          WHERE bo.booking_id = b.id AND bo.provider_id = $1
+        )
+      ORDER BY sort_priority, b.created_at DESC
       LIMIT 20
     `,
       providerId,
     );
+
+    console.log('[getProviderRequests] providerId:', providerId.toString());
+    console.log('[getProviderRequests] Found', requests.length, 'requests');
+    if (requests.length > 0) {
+      console.log('[getProviderRequests] First request:', requests[0]);
+    }
 
     return {
       requests: requests.map((r) => ({
@@ -366,8 +405,11 @@ export class BookingsService {
         addressText: r.address_text,
         estimatedPrice: r.estimated_price?.toString(),
         serviceName: r.service_name,
+        categoryName: r.category_name,
         customerName: r.customer_name,
-        distance: Math.round(r.distance),
+        distance: r.distance != null ? Math.round(r.distance) : null,
+        bookingType: r.booking_type, // 'DIRECT' or 'GENERAL'
+        isDirectBooking: r.provider_id != null,
       })),
     };
   }

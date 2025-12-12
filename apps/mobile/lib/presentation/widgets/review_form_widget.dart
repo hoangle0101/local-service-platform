@@ -14,12 +14,12 @@ class ReviewFormWidget extends ConsumerWidget {
   final int revieweeId;
 
   const ReviewFormWidget({
-    Key? key,
+    super.key,
     this.onSubmitSuccess,
     this.onCancel,
     required this.bookingId,
     required this.revieweeId,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

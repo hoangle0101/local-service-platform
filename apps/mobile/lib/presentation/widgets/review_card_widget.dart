@@ -10,11 +10,11 @@ class ReviewCardWidget extends StatelessWidget {
   final VoidCallback? onDeleteTap;
 
   const ReviewCardWidget({
-    Key? key,
+    super.key,
     required this.review,
     this.isOwnReview = false,
     this.onDeleteTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +38,7 @@ class ReviewCardWidget extends StatelessWidget {
                   child: Row(
                     children: [
                       // Avatar
-                      CircleAvatar(
+                      const CircleAvatar(
                         radius: 20,
                         backgroundColor: AppColors.grey200,
                         child: Icon(
@@ -92,6 +92,7 @@ class ReviewCardWidget extends StatelessWidget {
                       PopupMenuButton(
                         itemBuilder: (context) => [
                           PopupMenuItem(
+                            onTap: onDeleteTap,
                             child: Row(
                               children: const [
                                 Icon(
@@ -103,7 +104,6 @@ class ReviewCardWidget extends StatelessWidget {
                                 Text('Delete'),
                               ],
                             ),
-                            onTap: onDeleteTap,
                           ),
                         ],
                         icon: const Icon(
@@ -193,13 +193,13 @@ class ReviewListWidget extends StatelessWidget {
   final VoidCallback? onDeleteReview;
 
   const ReviewListWidget({
-    Key? key,
+    super.key,
     required this.reviews,
     this.isLoading = false,
     this.hasMore = false,
     this.onLoadMore,
     this.onDeleteReview,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -210,7 +210,7 @@ class ReviewListWidget extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
+              const Icon(
                 Icons.rate_review_outlined,
                 size: 48,
                 color: AppColors.grey300,
