@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile/presentation/bloc/auth/auth_bloc.dart';
 import 'package:mobile/presentation/bloc/categories/categories_bloc.dart';
 import 'package:mobile/presentation/bloc/services/services_bloc.dart';
@@ -9,22 +10,24 @@ import 'presentation/theme/app_theme.dart';
 
 void main() {
   runApp(
-    MultiBlocProvider(
-      providers: [
-        BlocProvider<AuthBloc>(
-          create: (_) => AuthBloc(),
-        ),
-        BlocProvider<CategoriesBloc>(
-          create: (_) => CategoriesBloc(),
-        ),
-        BlocProvider<ServicesBloc>(
-          create: (_) => ServicesBloc(),
-        ),
-        BlocProvider<BookingsBloc>(
-          create: (_) => BookingsBloc(),
-        ),
-      ],
-      child: const MyApp(),
+    ProviderScope(
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<AuthBloc>(
+            create: (_) => AuthBloc(),
+          ),
+          BlocProvider<CategoriesBloc>(
+            create: (_) => CategoriesBloc(),
+          ),
+          BlocProvider<ServicesBloc>(
+            create: (_) => ServicesBloc(),
+          ),
+          BlocProvider<BookingsBloc>(
+            create: (_) => BookingsBloc(),
+          ),
+        ],
+        child: const MyApp(),
+      ),
     ),
   );
 }
