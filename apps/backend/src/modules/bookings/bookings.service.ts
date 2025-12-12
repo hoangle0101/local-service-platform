@@ -70,25 +70,142 @@ export class BookingsService {
         throw new NotFoundException('Service not found');
       }
 
-      // 1. Create Booking (Pending, no provider yet)
+      // 1. Create Booking
+      // If providerId is specified, this is a Direct Booking (assigned to specific provider)
+      // Otherwise, it's a General Booking (providers in that category will see it)
       const code = `BK${Date.now()}`;
       const basePrice = Number(service.basePrice); // Initial estimate
+      const isDirectBooking = dto.providerId != null;
+
+      // Debug logging
+      console.log('[createBooking] DTO received:', {
+        serviceId: dto.serviceId,
+        providerId: dto.providerId,
+        isDirectBooking,
+        addressText: dto.addressText,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+      });
+
+      // VALIDATION 1: Prevent self-booking (provider cannot book their own service)
+      if (isDirectBooking && BigInt(dto.providerId!) === customerId) {
+        throw new BadRequestException(
+          'Bạn không thể đặt dịch vụ của chính mình',
+        );
+      }
+
+      // Also check if customer is the owner of the service they're trying to book
+      const serviceProvider = await tx.providerService.findFirst({
+        where: {
+          serviceId: dto.serviceId,
+          providerUserId: customerId,
+          isActive: true,
+        },
+      });
+      if (serviceProvider) {
+        throw new BadRequestException(
+          'Bạn không thể đặt dịch vụ của chính mình',
+        );
+      }
+
+      // VALIDATION 2: Prevent duplicate booking
+      // Rule 1: Cannot book same service with same provider again (any time)
+      // Rule 2: Cannot book different service with same provider at same time (within 2 hours)
+      const scheduledTime = new Date(dto.scheduledAt);
+      const twoHoursBefore = new Date(
+        scheduledTime.getTime() - 2 * 60 * 60 * 1000,
+      );
+      const twoHoursAfter = new Date(
+        scheduledTime.getTime() + 2 * 60 * 60 * 1000,
+      );
+
+      // Rule 1: Check if same service + same provider already exists
+      if (isDirectBooking) {
+        const sameServiceBooking = await tx.booking.findFirst({
+          where: {
+            customerId: customerId,
+            serviceId: dto.serviceId,
+            providerId: BigInt(dto.providerId!),
+            status: { in: ['pending', 'accepted', 'in_progress'] },
+          },
+        });
+
+        if (sameServiceBooking) {
+          throw new BadRequestException(
+            'Bạn đã đặt dịch vụ này với provider này rồi. Vui lòng chọn dịch vụ khác hoặc provider khác.',
+          );
+        }
+
+        // Rule 2: Check if different service but same provider + same time
+        const sameTimeBooking = await tx.booking.findFirst({
+          where: {
+            customerId: customerId,
+            providerId: BigInt(dto.providerId!),
+            status: { in: ['pending', 'accepted', 'in_progress'] },
+            scheduledAt: {
+              gte: twoHoursBefore,
+              lte: twoHoursAfter,
+            },
+          },
+        });
+
+        if (sameTimeBooking) {
+          throw new BadRequestException(
+            'Bạn đã có lịch đặt với provider này trong khoảng thời gian này. Vui lòng chọn thời gian khác.',
+          );
+        }
+      } else {
+        // General booking: just check same service + same time
+        const existingBooking = await tx.booking.findFirst({
+          where: {
+            customerId: customerId,
+            serviceId: dto.serviceId,
+            status: { in: ['pending', 'accepted', 'in_progress'] },
+            scheduledAt: {
+              gte: twoHoursBefore,
+              lte: twoHoursAfter,
+            },
+          },
+        });
+
+        if (existingBooking) {
+          throw new BadRequestException(
+            'Bạn đã có lịch đặt dịch vụ này trong khoảng thời gian tương tự. Vui lòng chọn thời gian khác.',
+          );
+        }
+      }
+
+      // Validate provider exists and is active if direct booking
+      if (isDirectBooking) {
+        console.log(
+          '[createBooking] Direct booking - checking provider:',
+          dto.providerId,
+        );
+        const providerExists = await tx.providerProfile.findUnique({
+          where: { userId: BigInt(dto.providerId!) },
+        });
+        console.log('[createBooking] Provider exists:', !!providerExists);
+        if (!providerExists) {
+          throw new NotFoundException('Selected provider not found');
+        }
+      }
 
       const bookingIdResult = await tx.$queryRawUnsafe<any[]>(
         `
         INSERT INTO bookings (
-          code, customer_id, service_id,
+          code, customer_id, service_id, provider_id,
           status, scheduled_at, address_text, location, notes,
           estimated_price, created_at, updated_at
         ) VALUES (
-          $1, $2, $3,
-          'pending', $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326), $8,
-          $9, NOW(), NOW()
-        ) RETURNING id, code, status, scheduled_at, estimated_price
+          $1, $2, $3, $4,
+          'pending', $5, $6, ST_SetSRID(ST_MakePoint($7, $8), 4326), $9,
+          $10, NOW(), NOW()
+        ) RETURNING id, code, status, scheduled_at, estimated_price, provider_id
       `,
         code,
         customerId,
         dto.serviceId,
+        isDirectBooking ? BigInt(dto.providerId!) : null, // provider_id for direct booking
         new Date(dto.scheduledAt),
         dto.addressText,
         dto.longitude,
@@ -100,26 +217,35 @@ export class BookingsService {
       const booking = bookingIdResult[0];
       const bookingId = booking.id;
 
-      // 2. Find Nearby Providers
-      const providers = await this.findNearbyProviders(
-        dto.serviceId,
-        dto.latitude,
-        dto.longitude,
-        tx,
-      );
+      // 2. Determine which providers to notify
+      let providerIdsToNotify: string[] = [];
 
-      // 3. Notify Providers (via Socket)
-      // We can't inject SocketGateway here directly if it causes circular dependency or if we are in transaction
-      // Ideally, we return the list of provider IDs and emit events after transaction commits.
-      // For now, we'll assume we can emit after this function returns in the controller.
+      if (isDirectBooking) {
+        // Direct booking: Only notify the chosen provider
+        providerIdsToNotify = [dto.providerId!.toString()];
+      } else {
+        // General booking: Find nearby providers by category
+        const providers = await this.findNearbyProviders(
+          dto.serviceId,
+          dto.latitude,
+          dto.longitude,
+          tx,
+        );
+        providerIdsToNotify = providers.map((p) =>
+          (p as any).user_id.toString(),
+        );
+      }
 
+      // 3. Return booking info with provider IDs for notification
       return {
         id: booking.id.toString(),
         code: booking.code,
         status: booking.status,
         scheduledAt: booking.scheduled_at,
         estimatedPrice: booking.estimated_price?.toString(),
-        nearbyProviderIds: providers.map((p) => (p as any).user_id.toString()),
+        providerId: booking.provider_id?.toString() || null,
+        isDirectBooking,
+        nearbyProviderIds: providerIdsToNotify,
       };
     });
   }
@@ -188,7 +314,41 @@ export class BookingsService {
     if (!providerService)
       throw new ForbiddenException('You do not provide this service');
 
-    // Create BookingOffer using raw SQL (until Prisma regenerates)
+    // DIRECT BOOKING: If this booking was specifically assigned to this provider
+    // Accept it directly (no offer needed), update status to 'accepted'
+    if (booking.providerId === providerId) {
+      console.log('[acceptBookingRequest] Direct booking - auto accepting');
+
+      const updated = await this.prisma.booking.update({
+        where: { id: bookingId },
+        data: {
+          status: 'accepted',
+          actualPrice: providerService.price,
+        },
+      });
+
+      // Create booking event
+      await this.prisma.bookingEvent.create({
+        data: {
+          bookingId,
+          previousStatus: 'pending',
+          newStatus: 'accepted',
+          actorUserId: providerId,
+          note: 'Provider accepted direct booking',
+        },
+      });
+
+      return {
+        message: 'Đã chấp nhận đặt lịch',
+        bookingId: bookingId.toString(),
+        status: 'accepted',
+        isDirectBooking: true,
+      };
+    }
+
+    // GENERAL BOOKING: Create offer for customer to choose
+    console.log('[acceptBookingRequest] General booking - creating offer');
+
     const offerResult = await this.prisma.$queryRawUnsafe<any[]>(
       `
       INSERT INTO booking_offers (booking_id, provider_id, price, status, created_at, updated_at)
@@ -205,6 +365,7 @@ export class BookingsService {
       offerId: offerResult[0].id.toString(),
       bookingId: bookingId.toString(),
       customerId: booking.customerId.toString(),
+      isDirectBooking: false,
     };
   }
 
@@ -326,44 +487,84 @@ export class BookingsService {
   }
 
   // GET /provider/bookings/requests
+  // Returns pending bookings that match provider's service categories
+  // Handles both: Direct Booking (provider_id = this provider) AND General Booking (category match)
   async getProviderRequests(providerId: bigint) {
-    // Find pending bookings where the provider offers the service
-    // and hasn't already made an offer
     const requests = await this.prisma.$queryRawUnsafe<any[]>(
       `
-      SELECT DISTINCT
+      SELECT 
         b.id,
         b.code,
         b.status,
         b.scheduled_at,
         b.address_text,
         b.estimated_price,
+        b.created_at,
+        b.provider_id,
         s.name as service_name,
+        sc.name as category_name,
         up.full_name as customer_name,
-        ST_Distance(
-          b.location::geography,
-          pp.location::geography
-        ) as distance
+        CASE 
+          WHEN b.location IS NOT NULL AND pp.location IS NOT NULL 
+          THEN ST_Distance(b.location::geography, pp.location::geography)
+          ELSE NULL 
+        END as distance,
+        CASE 
+          WHEN b.provider_id = $1 THEN 'DIRECT'
+          ELSE 'GENERAL'
+        END as booking_type,
+        CASE WHEN b.provider_id = $1 THEN 0 ELSE 1 END as sort_priority
       FROM bookings b
       JOIN services s ON b.service_id = s.id
+      LEFT JOIN service_categories sc ON s.category_id = sc.id
       JOIN user_profiles up ON b.customer_id = up.user_id
-      JOIN provider_services ps ON ps.service_id = b.service_id AND ps.provider_user_id = $1
-      JOIN provider_profiles pp ON pp.user_id = $1
-      LEFT JOIN booking_offers bo ON bo.booking_id = b.id AND bo.provider_id = $1
-      WHERE b.status = 'pending'
-        AND b.provider_id IS NULL
-        AND bo.id IS NULL
-        AND ps.is_active = true
-        AND ST_DWithin(
-          b.location::geography,
-          pp.location::geography,
-          pp.service_radius_m
+      CROSS JOIN provider_profiles pp
+      WHERE pp.user_id = $1
+        AND b.status = 'pending'
+        AND (
+          -- Case 1: Direct booking - provider was specifically chosen
+          b.provider_id = $1
+          
+          -- Case 2: General booking - match by category + radius
+          OR (
+            b.provider_id IS NULL
+            AND EXISTS (
+              SELECT 1 FROM provider_services ps
+              JOIN services ps_svc ON ps.service_id = ps_svc.id
+              WHERE ps.provider_user_id = $1
+                AND ps.is_active = true
+                AND ps.deleted_at IS NULL
+                AND ps_svc.category_id = s.category_id
+            )
+            AND (
+              -- Check radius if both locations available
+              (b.location IS NOT NULL AND pp.location IS NOT NULL AND ST_DWithin(
+                b.location::geography,
+                pp.location::geography,
+                COALESCE(pp.service_radius_m, 5000)
+              ))
+              -- Or if no location data, still show (flexible)
+              OR b.location IS NULL 
+              OR pp.location IS NULL
+            )
+          )
         )
-      ORDER BY b.created_at DESC
+        -- Haven't already submitted an offer for this booking
+        AND NOT EXISTS (
+          SELECT 1 FROM booking_offers bo 
+          WHERE bo.booking_id = b.id AND bo.provider_id = $1
+        )
+      ORDER BY sort_priority, b.created_at DESC
       LIMIT 20
     `,
       providerId,
     );
+
+    console.log('[getProviderRequests] providerId:', providerId.toString());
+    console.log('[getProviderRequests] Found', requests.length, 'requests');
+    if (requests.length > 0) {
+      console.log('[getProviderRequests] First request:', requests[0]);
+    }
 
     return {
       requests: requests.map((r) => ({
@@ -374,8 +575,11 @@ export class BookingsService {
         addressText: r.address_text,
         estimatedPrice: r.estimated_price?.toString(),
         serviceName: r.service_name,
+        categoryName: r.category_name,
         customerName: r.customer_name,
-        distance: Math.round(r.distance),
+        distance: r.distance != null ? Math.round(r.distance) : null,
+        bookingType: r.booking_type, // 'DIRECT' or 'GENERAL'
+        isDirectBooking: r.provider_id != null,
       })),
     };
   }
@@ -738,6 +942,7 @@ export class BookingsService {
   }
 
   // PATCH /provider/bookings/:id/complete
+  // Provider marks service as complete, waits for customer confirmation
   async completeBooking(providerId: bigint, bookingId: bigint) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
@@ -759,9 +964,8 @@ export class BookingsService {
       const updated = await tx.booking.update({
         where: { id: bookingId },
         data: {
-          status: 'completed',
-          completedAt: new Date(),
-          actualPrice: booking.estimatedPrice, // Assuming no extra charges for now
+          status: 'pending_completion', // Wait for customer confirmation
+          actualPrice: booking.estimatedPrice,
         },
       });
 
@@ -769,16 +973,111 @@ export class BookingsService {
         data: {
           bookingId,
           previousStatus: 'in_progress',
-          newStatus: 'completed',
+          newStatus: 'pending_completion',
           actorUserId: providerId,
-          note: 'Provider completed service',
+          note: 'Provider marked service as complete, awaiting customer confirmation',
         },
       });
 
       return {
         id: updated.id.toString(),
         status: updated.status,
-        message: 'Booking completed',
+        message: 'Đã đánh dấu hoàn thành. Đang chờ khách hàng xác nhận.',
+      };
+    });
+  }
+
+  // PATCH /bookings/:id/confirm-completion
+  // Customer confirms the service is completed
+  async confirmCompletion(customerId: bigint, bookingId: bigint) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { service: true },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (booking.customerId !== customerId) {
+      throw new ForbiddenException('Not your booking');
+    }
+
+    if (booking.status !== 'pending_completion') {
+      throw new BadRequestException('Booking is not pending completion');
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.booking.update({
+        where: { id: bookingId },
+        data: {
+          status: 'completed',
+          completedAt: new Date(),
+        },
+      });
+
+      await tx.bookingEvent.create({
+        data: {
+          bookingId,
+          previousStatus: 'pending_completion',
+          newStatus: 'completed',
+          actorUserId: customerId,
+          note: 'Customer confirmed service completion',
+        },
+      });
+
+      // Update provider rating if needed (can be done in review step)
+
+      return {
+        id: updated.id.toString(),
+        status: updated.status,
+        message: 'Công việc đã hoàn thành. Vui lòng đánh giá dịch vụ.',
+        canReview: true,
+      };
+    });
+  }
+
+  // PATCH /bookings/:id/dispute
+  // Customer disputes the service completion
+  async disputeBooking(customerId: bigint, bookingId: bigint, reason?: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (booking.customerId !== customerId) {
+      throw new ForbiddenException('Not your booking');
+    }
+
+    if (booking.status !== 'pending_completion') {
+      throw new BadRequestException('Booking is not pending completion');
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.booking.update({
+        where: { id: bookingId },
+        data: {
+          status: 'disputed',
+        },
+      });
+
+      await tx.bookingEvent.create({
+        data: {
+          bookingId,
+          previousStatus: 'pending_completion',
+          newStatus: 'disputed',
+          actorUserId: customerId,
+          note: reason || 'Customer disputed service completion',
+        },
+      });
+
+      return {
+        id: updated.id.toString(),
+        status: updated.status,
+        message: 'Đã gửi khiếu nại. Chúng tôi sẽ liên hệ với bạn sớm.',
       };
     });
   }

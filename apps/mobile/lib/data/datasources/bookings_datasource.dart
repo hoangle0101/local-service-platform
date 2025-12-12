@@ -37,25 +37,52 @@ class BookingsDataSource {
     required double latitude,
     required double longitude,
     String? notes,
+    int? providerId, // Optional: for direct booking (Book Now)
   }) async {
     try {
-      final response = await _dio.post('/bookings', data: {
+      final data = <String, dynamic>{
         'serviceId': serviceId,
         'scheduledAt': scheduledAt.toIso8601String(),
         'addressText': addressText,
         'latitude': latitude,
         'longitude': longitude,
         'notes': notes,
-      });
+      };
 
-      final data = response.data;
+      // Add providerId if this is a direct booking
+      if (providerId != null) {
+        data['providerId'] = providerId;
+        print(
+            '[BookingsDataSource] Direct booking with providerId: $providerId');
+      } else {
+        print('[BookingsDataSource] General booking (no providerId)');
+      }
+
+      print('[BookingsDataSource] Sending booking data: $data');
+
+      final response = await _dio.post('/bookings', data: data);
+
+      print('[BookingsDataSource] Response: ${response.data}');
+
+      // Handle nested response format: {statusCode, message, data: {...}}
+      final responseBody = response.data;
+      final bookingData =
+          responseBody is Map && responseBody.containsKey('data')
+              ? responseBody['data']
+              : responseBody;
+
+      print('[BookingsDataSource] Extracted booking data: $bookingData');
+
       return {
-        'id': data['id']?.toString() ?? '',
-        'code': data['code']?.toString() ?? 'N/A',
-        'status': data['status']?.toString() ?? 'pending',
-        'nearbyProviderIds': data['nearbyProviderIds'] ?? [],
+        'id': bookingData['id']?.toString() ?? '',
+        'code': bookingData['code']?.toString() ?? 'N/A',
+        'status': bookingData['status']?.toString() ?? 'pending',
+        'providerId': bookingData['providerId']?.toString(),
+        'isDirectBooking': bookingData['isDirectBooking'] ?? false,
+        'nearbyProviderIds': bookingData['nearbyProviderIds'] ?? [],
       };
     } catch (e) {
+      print('[BookingsDataSource] Error creating booking: $e');
       throw Exception('Failed to create booking: $e');
     }
   }
@@ -147,11 +174,34 @@ class BookingsDataSource {
       final queryParams = <String, dynamic>{};
       if (status != null) queryParams['status'] = status;
 
+      print('[BookingsDataSource] getProviderBookings called');
       final response =
           await _dio.get('/bookings', queryParameters: queryParams);
-      final List<dynamic> data = response.data['bookings'] ?? [];
-      return data.map((json) => Booking.fromJson(json)).toList();
+
+      print(
+          '[BookingsDataSource] getProviderBookings response: ${response.data}');
+
+      // Handle nested response format: {statusCode, message, data: {bookings: [...]}}
+      final responseBody = response.data;
+      List<dynamic> bookingsData = [];
+
+      if (responseBody is Map<String, dynamic>) {
+        if (responseBody.containsKey('data') && responseBody['data'] is Map) {
+          final data = responseBody['data'] as Map<String, dynamic>;
+          bookingsData = data['bookings'] as List? ?? [];
+        } else if (responseBody.containsKey('bookings')) {
+          bookingsData = responseBody['bookings'] as List? ?? [];
+        }
+      }
+
+      print(
+          '[BookingsDataSource] getProviderBookings found ${bookingsData.length} bookings');
+
+      return bookingsData
+          .map((json) => Booking.fromJson(json as Map<String, dynamic>))
+          .toList();
     } catch (e) {
+      print('[BookingsDataSource] getProviderBookings error: $e');
       throw Exception('Failed to load bookings: $e');
     }
   }
@@ -159,9 +209,30 @@ class BookingsDataSource {
   Future<List<Booking>> getProviderRequests() async {
     try {
       final response = await _dio.get('/provider/bookings/requests');
-      final List<dynamic> data = response.data['requests'] ?? [];
-      return data.map((json) => Booking.fromJson(json)).toList();
+      print(
+          '[BookingsDataSource] getProviderRequests response: ${response.data}');
+
+      // Handle nested response format: {statusCode, message, data: {requests: [...]}}
+      // OR direct format: {requests: [...]}
+      final responseBody = response.data;
+      Map<String, dynamic> dataObj;
+
+      if (responseBody is Map &&
+          responseBody.containsKey('data') &&
+          responseBody['data'] is Map) {
+        dataObj = responseBody['data'] as Map<String, dynamic>;
+      } else {
+        dataObj = responseBody as Map<String, dynamic>;
+      }
+
+      final List<dynamic> requestsList = dataObj['requests'] ?? [];
+      print('[BookingsDataSource] Found ${requestsList.length} requests');
+
+      return requestsList
+          .map((json) => Booking.fromJson(json as Map<String, dynamic>))
+          .toList();
     } catch (e) {
+      print('[BookingsDataSource] Error loading requests: $e');
       throw Exception('Failed to load requests: $e');
     }
   }
@@ -170,8 +241,23 @@ class BookingsDataSource {
   Future<List<Booking>> getGlobalRequests() async {
     try {
       final response = await _dio.get('/provider/bookings/global');
-      final List<dynamic> data = response.data['requests'] ?? [];
-      return data.map((json) => Booking.fromJson(json)).toList();
+
+      // Handle nested response format
+      final responseBody = response.data;
+      Map<String, dynamic> dataObj;
+
+      if (responseBody is Map &&
+          responseBody.containsKey('data') &&
+          responseBody['data'] is Map) {
+        dataObj = responseBody['data'] as Map<String, dynamic>;
+      } else {
+        dataObj = responseBody as Map<String, dynamic>;
+      }
+
+      final List<dynamic> requestsList = dataObj['requests'] ?? [];
+      return requestsList
+          .map((json) => Booking.fromJson(json as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       throw Exception('Failed to load global requests: $e');
     }
@@ -180,8 +266,17 @@ class BookingsDataSource {
   Future<Map<String, dynamic>> acceptBookingRequest(int bookingId) async {
     try {
       final response = await _dio.post('/provider/bookings/$bookingId/offer');
-      return response.data;
+      print(
+          '[BookingsDataSource] acceptBookingRequest response: ${response.data}');
+
+      // Handle nested response format
+      final responseBody = response.data;
+      if (responseBody is Map && responseBody.containsKey('data')) {
+        return responseBody['data'] as Map<String, dynamic>;
+      }
+      return responseBody as Map<String, dynamic>;
     } catch (e) {
+      print('[BookingsDataSource] Error accepting request: $e');
       throw Exception('Failed to send offer: $e');
     }
   }
@@ -229,6 +324,38 @@ class BookingsDataSource {
       await _dio.patch('/provider/bookings/$bookingId/complete');
     } catch (e) {
       throw Exception('Failed to complete service: $e');
+    }
+  }
+
+  // Customer confirms service completion
+  Future<Map<String, dynamic>> confirmCompletion(String bookingId) async {
+    try {
+      final response =
+          await _dio.patch('/bookings/$bookingId/confirm-completion');
+      final responseBody = response.data;
+      if (responseBody is Map && responseBody.containsKey('data')) {
+        return responseBody['data'] as Map<String, dynamic>;
+      }
+      return responseBody as Map<String, dynamic>;
+    } catch (e) {
+      throw Exception('Failed to confirm completion: $e');
+    }
+  }
+
+  // Customer disputes service completion
+  Future<Map<String, dynamic>> disputeBooking(
+      String bookingId, String reason) async {
+    try {
+      final response = await _dio.patch('/bookings/$bookingId/dispute', data: {
+        'reason': reason,
+      });
+      final responseBody = response.data;
+      if (responseBody is Map && responseBody.containsKey('data')) {
+        return responseBody['data'] as Map<String, dynamic>;
+      }
+      return responseBody as Map<String, dynamic>;
+    } catch (e) {
+      throw Exception('Failed to dispute booking: $e');
     }
   }
 }

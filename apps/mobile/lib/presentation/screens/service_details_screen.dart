@@ -6,6 +6,8 @@ import '../../../core/entities/entities.dart';
 import '../../../core/theme/app_colors.dart';
 import '../bloc/services/services_bloc.dart';
 import '../bloc/services/services_event_state.dart';
+import '../bloc/auth/auth_bloc.dart';
+import '../bloc/auth/auth_event.dart';
 
 class ServiceDetailsScreen extends StatefulWidget {
   final int serviceId;
@@ -327,6 +329,17 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
 
   Widget _buildBottomBar(BuildContext context, ProviderService service,
       NumberFormat currencyFormat) {
+    // Get current user to check if viewing own service
+    final authState = context.read<AuthBloc>().state;
+    String? currentUserId;
+    if (authState is Authenticated && authState.user != null) {
+      currentUserId = authState.user!.id;
+    }
+
+    // Check if this is user's own service
+    final isOwnService =
+        currentUserId != null && service.providerUserId == currentUserId;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -366,33 +379,53 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
               ),
             ),
             Expanded(
-              child: ElevatedButton(
-                onPressed: () {
-                  context.push(
-                    '/booking/create',
-                    extra: {
-                      'serviceId': service.serviceId,
-                      'service': service,
-                    },
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  'Book Now',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+              child: isOwnService
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.backgroundSecondary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'Dịch vụ của bạn',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    )
+                  : ElevatedButton(
+                      onPressed: () {
+                        context.push(
+                          '/booking/create',
+                          extra: {
+                            'serviceId': service.serviceId,
+                            'service': service,
+                            'providerId': int.tryParse(service
+                                .providerUserId), // Direct booking to this provider
+                          },
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Book Now',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
             ),
           ],
         ),

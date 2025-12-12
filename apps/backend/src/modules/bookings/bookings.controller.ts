@@ -132,6 +132,34 @@ export class BookingsController {
       BigInt(providerId),
     );
   }
+
+  @Patch(':id/confirm-completion')
+  @ApiOperation({ summary: 'Customer confirms service completion' })
+  @ApiParam({ name: 'id', example: 1 })
+  async confirmCompletion(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.bookingsService.confirmCompletion(
+      BigInt(user.userId),
+      BigInt(id),
+    );
+  }
+
+  @Patch(':id/dispute')
+  @ApiOperation({ summary: 'Customer disputes service completion' })
+  @ApiParam({ name: 'id', example: 1 })
+  async disputeBooking(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body('reason') reason?: string,
+  ) {
+    return this.bookingsService.disputeBooking(
+      BigInt(user.userId),
+      BigInt(id),
+      reason,
+    );
+  }
 }
 
 @ApiTags('Provider Bookings')

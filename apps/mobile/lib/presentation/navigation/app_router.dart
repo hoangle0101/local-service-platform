@@ -122,6 +122,7 @@ final router = GoRouter(
         return CreateBookingScreen(
           serviceId: extra['serviceId'] as int,
           service: extra['service'] as ProviderService?,
+          providerId: extra['providerId'] as int?, // For direct booking
         );
       },
     ),
