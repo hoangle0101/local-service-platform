@@ -33,7 +33,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class BookingsController {
-  constructor(private bookingsService: BookingsService) {}
+  constructor(private bookingsService: BookingsService) { }
 
   @Post('estimate')
   @ApiOperation({ summary: 'Estimate booking price' })
@@ -62,6 +62,15 @@ export class BookingsController {
   @ApiOperation({ summary: 'List my bookings' })
   async getBookings(@CurrentUser() user: any, @Query() query: BookingQueryDto) {
     return this.bookingsService.getBookings(BigInt(user.userId), query);
+  }
+
+  @Get('history')
+  @ApiOperation({ summary: 'Get service history (completed bookings)' })
+  async getServiceHistory(
+    @CurrentUser() user: any,
+    @Query() query: BookingQueryDto,
+  ) {
+    return this.bookingsService.getServiceHistory(BigInt(user.userId), query);
   }
 
   @Get(':id')
@@ -168,7 +177,7 @@ export class BookingsController {
 @Roles('provider')
 @ApiBearerAuth()
 export class ProviderBookingsController {
-  constructor(private bookingsService: BookingsService) {}
+  constructor(private bookingsService: BookingsService) { }
 
   @Get('requests')
   @ApiOperation({

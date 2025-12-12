@@ -724,6 +724,85 @@ export class BookingsService {
     };
   }
 
+  // GET /bookings/history - Service history (completed bookings only)
+  async getServiceHistory(userId: bigint, query: BookingQueryDto) {
+    const where: any = {
+      customerId: userId,
+      status: 'completed', // Only completed bookings
+    };
+
+    const page = query.page || 1;
+    const limit = query.limit || 20;
+
+    const [bookings, total] = await Promise.all([
+      this.prisma.booking.findMany({
+        where,
+        include: {
+          service: true,
+          customer: {
+            select: {
+              id: true,
+              profile: {
+                select: { fullName: true, avatarUrl: true },
+              },
+            },
+          },
+          providerUser: {
+            select: {
+              id: true,
+              profile: {
+                select: { fullName: true, avatarUrl: true },
+              },
+            },
+          },
+          review: true,
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { completedAt: 'desc' }, // Sort by completion date, newest first
+      }),
+      this.prisma.booking.count({ where }),
+    ]);
+
+    return {
+      bookings: bookings.map((b: any) => ({
+        id: b.id.toString(),
+        code: b.code,
+        status: b.status,
+        scheduledAt: b.scheduledAt,
+        completedAt: b.completedAt,
+        addressText: b.addressText,
+        estimatedPrice: b.estimatedPrice?.toString(),
+        actualPrice: b.actualPrice?.toString(),
+        service: {
+          id: b.service.id,
+          name: b.service.name,
+          description: b.service.description,
+        },
+        provider: b.providerUser
+          ? {
+            id: b.providerUser.id.toString(),
+            fullName: b.providerUser.profile?.fullName,
+            avatarUrl: b.providerUser.profile?.avatarUrl,
+          }
+          : null,
+        review: b.review
+          ? {
+            rating: b.review.rating,
+            comment: b.review.comment,
+            createdAt: b.review.createdAt,
+          }
+          : null,
+      })),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
   // GET /bookings/:id
   async getBookingById(userId: bigint, bookingId: bigint) {
     const booking = await this.prisma.booking.findUnique({

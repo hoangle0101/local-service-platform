@@ -14,6 +14,7 @@ import '../screens/user/user_home_screen.dart';
 import '../screens/user/user_profile_screen.dart';
 import '../screens/user/user_bookings_screen.dart';
 import '../screens/user/user_favorites_screen.dart';
+import '../screens/user/service_history_screen.dart';
 import '../screens/provider/provider_home_screen.dart';
 import '../screens/provider/provider_profile_screen.dart';
 import '../screens/provider/provider_services_screen.dart';
@@ -73,6 +74,10 @@ final router = GoRouter(
     GoRoute(
       path: '/user/favorites',
       builder: (context, state) => const UserFavoritesScreen(),
+    ),
+    GoRoute(
+      path: '/user/service-history',
+      builder: (context, state) => const ServiceHistoryScreen(),
     ),
 
     // Provider Routes

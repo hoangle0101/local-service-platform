@@ -72,6 +72,12 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
               return const SizedBox.shrink();
             },
           ),
+          // Service History Button
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Service History',
+            onPressed: () => context.push('/user/service-history'),
+          ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () {
