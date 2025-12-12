@@ -523,6 +523,32 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
                   minimumSize: const Size(double.infinity, 40),
                 ),
               ),
+            if (booking.status == 'completed')
+              ElevatedButton.icon(
+                onPressed: () {
+                  if (booking.review != null) {
+                    _showCustomerReviewDialog(
+                      booking.review!,
+                      customerName: booking.customerName,
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Chưa có đánh giá từ khách hàng'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.rate_review, size: 16),
+                label: const Text('View Customer Review'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 32),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+              ),
           ],
         ),
       ),
@@ -633,5 +659,118 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
         SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
       );
     }
+  }
+
+  void _showCustomerReviewDialog(BookingReview review, {String? customerName}) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Customer Review'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Customer Name
+              if (customerName != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12.0),
+                  child: Text(
+                    customerName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              if (customerName != null) const Divider(),
+              // Star Rating Display
+              Padding(
+                padding: const EdgeInsets.only(top: 12.0, bottom: 12.0),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(5, (index) {
+                    return Icon(
+                      index < review.rating ? Icons.star : Icons.star_border,
+                      color: Colors.amber,
+                      size: 24,
+                    );
+                  }),
+                ),
+              ),
+              // Rating Text
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: Text(
+                  '${review.rating}.0 / 5.0',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const Divider(),
+              // Comment Section
+              if (review.comment != null && review.comment!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12.0, bottom: 12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Comment:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        review.comment!,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.only(top: 12.0),
+                  child: Text(
+                    'No comment provided',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              const Divider(),
+              // Review Date
+              if (review.createdAt != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12.0),
+                  child: Text(
+                    'Reviewed on: ${_formatDate(review.createdAt!)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime dateTime) {
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }
