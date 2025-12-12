@@ -64,6 +64,7 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
         latitude: event.latitude,
         longitude: event.longitude,
         notes: event.notes,
+        providerId: event.providerId, // Pass providerId for direct booking
       );
 
       // Safely extract values with proper null handling and type conversion
@@ -73,11 +74,15 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
       final List<String> nearbyProviderIds = rawProviderIds != null
           ? (rawProviderIds as List).map((e) => e.toString()).toList()
           : <String>[];
+      final bool isDirectBooking = result['isDirectBooking'] == true;
+      final String? providerId = result['providerId']?.toString();
 
       emit(BookingCreated(
         bookingId: bookingId,
         bookingCode: bookingCode,
         nearbyProviderIds: nearbyProviderIds,
+        isDirectBooking: isDirectBooking,
+        providerId: providerId,
       ));
     } catch (e) {
       emit(BookingsError('Failed to create booking: ${e.toString()}'));

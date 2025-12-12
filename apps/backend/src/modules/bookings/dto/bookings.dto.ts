@@ -1,4 +1,13 @@
-import { IsNotEmpty, IsNumber, IsString, IsDateString, IsOptional, IsEnum, Min, Max } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  IsDateString,
+  IsOptional,
+  IsEnum,
+  Min,
+  Max,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -54,6 +63,15 @@ export class CreateBookingDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description:
+      'Provider ID for direct booking. If provided, the booking will be assigned directly to this provider.',
+  })
+  @IsOptional()
+  @IsNumber()
+  providerId?: number;
 }
 
 export class CancelBookingDto {
@@ -78,9 +96,27 @@ export class ReviewBookingDto {
 }
 
 export class BookingQueryDto {
-  @ApiPropertyOptional({ enum: ['pending', 'accepted', 'in_progress', 'completed', 'cancelled'] })
+  @ApiPropertyOptional({
+    enum: [
+      'pending',
+      'accepted',
+      'in_progress',
+      'pending_completion',
+      'completed',
+      'disputed',
+      'cancelled',
+    ],
+  })
   @IsOptional()
-  @IsEnum(['pending', 'accepted', 'in_progress', 'completed', 'cancelled'])
+  @IsEnum([
+    'pending',
+    'accepted',
+    'in_progress',
+    'pending_completion',
+    'completed',
+    'disputed',
+    'cancelled',
+  ])
   status?: string;
 
   @ApiPropertyOptional({ example: 1, default: 1 })

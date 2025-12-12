@@ -196,6 +196,23 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
                   ),
                   Row(
                     children: [
+                      // Switch to Customer button
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: IconButton(
+                          onPressed: () {
+                            // Navigate to customer home
+                            context.go('/user/home');
+                          },
+                          tooltip: 'Chuyển sang Customer',
+                          icon: const Icon(Icons.person_outline,
+                              color: Colors.white, size: 24),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       IconButton(
                         onPressed: () {},
                         icon: Stack(

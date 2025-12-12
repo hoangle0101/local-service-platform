@@ -12,11 +12,13 @@ import '../../bloc/bookings/bookings_event_state.dart';
 class CreateBookingScreen extends StatefulWidget {
   final int serviceId;
   final ProviderService? service;
+  final int? providerId; // For direct booking
 
   const CreateBookingScreen({
     super.key,
     required this.serviceId,
     this.service,
+    this.providerId,
   });
 
   @override
@@ -116,12 +118,8 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
             // Show success dialog
             _showSuccessDialog(context, state);
           } else if (state is BookingsError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
-            );
+            // Show error dialog for better visibility
+            _showErrorDialog(context, state.message);
           }
         },
         builder: (context, state) {
@@ -185,7 +183,29 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
               style: const TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 16),
-            if (state.nearbyProviderIds.isEmpty)
+            if (state.isDirectBooking)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.person_pin, color: AppColors.primary),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Đã gửi yêu cầu đặt lịch đến provider. Vui lòng chờ xác nhận.',
+                        style: TextStyle(
+                            color: AppColors.primaryDark,
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (state.nearbyProviderIds.isEmpty)
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -246,6 +266,54 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
               foregroundColor: Colors.white,
             ),
             child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(BuildContext context, String errorMessage) {
+    // Extract meaningful message from error
+    String displayMessage = errorMessage;
+    if (errorMessage.contains('Failed to create booking:')) {
+      displayMessage =
+          errorMessage.replaceFirst('Failed to create booking:', '').trim();
+    }
+    if (displayMessage.contains('Exception:')) {
+      displayMessage = displayMessage.replaceFirst('Exception:', '').trim();
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child:
+                  const Icon(Icons.error_outline, color: Colors.red, size: 28),
+            ),
+            const SizedBox(width: 12),
+            const Text('Không thể đặt lịch', style: TextStyle(fontSize: 18)),
+          ],
+        ),
+        content: Text(
+          displayMessage,
+          style: const TextStyle(fontSize: 15, height: 1.4),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Đã hiểu'),
           ),
         ],
       ),
@@ -778,6 +846,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
             latitude: _latitude,
             longitude: _longitude,
             notes: _notesController.text.isEmpty ? null : _notesController.text,
+            providerId: widget.providerId, // Pass provider for direct booking
           ));
     }
   }

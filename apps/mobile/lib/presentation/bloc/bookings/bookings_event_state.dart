@@ -31,6 +31,7 @@ class CreateBookingEvent extends BookingsEvent {
   final double latitude;
   final double longitude;
   final String? notes;
+  final int? providerId; // For direct booking
 
   const CreateBookingEvent({
     required this.serviceId,
@@ -39,11 +40,19 @@ class CreateBookingEvent extends BookingsEvent {
     required this.latitude,
     required this.longitude,
     this.notes,
+    this.providerId,
   });
 
   @override
-  List<Object?> get props =>
-      [serviceId, scheduledAt, addressText, latitude, longitude, notes];
+  List<Object?> get props => [
+        serviceId,
+        scheduledAt,
+        addressText,
+        latitude,
+        longitude,
+        notes,
+        providerId
+      ];
 }
 
 class LoadBookingOffersEvent extends BookingsEvent {
@@ -159,15 +168,20 @@ class BookingCreated extends BookingsState {
   final String bookingId;
   final String bookingCode;
   final List<String> nearbyProviderIds;
+  final bool isDirectBooking;
+  final String? providerId;
 
   const BookingCreated({
     required this.bookingId,
     required this.bookingCode,
     required this.nearbyProviderIds,
+    this.isDirectBooking = false,
+    this.providerId,
   });
 
   @override
-  List<Object?> get props => [bookingId, bookingCode, nearbyProviderIds];
+  List<Object?> get props =>
+      [bookingId, bookingCode, nearbyProviderIds, isDirectBooking, providerId];
 }
 
 class BookingOffersLoaded extends BookingsState {
@@ -296,9 +310,12 @@ class Booking {
   final String? addressText;
   final String? estimatedPrice;
   final String? serviceName;
+  final String? categoryName;
   final String? providerName;
   final String? customerName;
   final int? distance; // Distance in meters from provider
+  final String? bookingType; // 'DIRECT' or 'GENERAL'
+  final bool isDirectBooking;
 
   Booking({
     required this.id,
@@ -308,9 +325,12 @@ class Booking {
     this.addressText,
     this.estimatedPrice,
     this.serviceName,
+    this.categoryName,
     this.providerName,
     this.customerName,
     this.distance,
+    this.bookingType,
+    this.isDirectBooking = false,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) {
@@ -324,10 +344,13 @@ class Booking {
       addressText: json['addressText'] as String?,
       estimatedPrice: json['estimatedPrice']?.toString(),
       serviceName: json['service']?['name'] ?? json['serviceName'] ?? 'Dịch vụ',
+      categoryName: json['categoryName'] as String?,
       providerName: json['provider']?['fullName'] ?? json['providerName'],
       customerName: json['customer']?['fullName'] ?? json['customerName'],
       distance:
           json['distance'] != null ? (json['distance'] as num).toInt() : null,
+      bookingType: json['bookingType'] as String?,
+      isDirectBooking: json['isDirectBooking'] == true,
     );
   }
 }

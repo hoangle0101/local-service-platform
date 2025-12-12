@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../bloc/auth/auth_bloc.dart';
+import '../../bloc/auth/auth_event.dart';
 import '../../bloc/categories/categories_bloc.dart';
 import '../../bloc/categories/categories_event_state.dart';
 import '../../bloc/services/services_bloc.dart';

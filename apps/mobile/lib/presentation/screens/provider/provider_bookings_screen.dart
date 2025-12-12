@@ -119,13 +119,15 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
           _buildMyRequestsTab(),
           // Tab 2: Global Requests (outside radius)
           _buildGlobalRequestsTab(),
-          // Tab 3: In Progress
+          // Tab 3: In Progress (includes accepted, confirmed, in_progress)
           BlocBuilder<BookingsBloc, BookingsState>(
             builder: (context, state) {
               if (state is BookingsLoaded) {
                 final inProgress = state.bookings
                     .where((b) =>
-                        b.status == 'confirmed' || b.status == 'in_progress')
+                        b.status == 'accepted' ||
+                        b.status == 'confirmed' ||
+                        b.status == 'in_progress')
                     .toList();
                 return _buildBookingsList(inProgress, 'in_progress');
               }
@@ -498,14 +500,15 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
               booking.addressText ?? '',
               style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
             ),
-            const SizedBox(height: 12),
-            if (booking.status == 'confirmed')
+            // Show Start button for both accepted and confirmed status
+            if (booking.status == 'accepted' || booking.status == 'confirmed')
               ElevatedButton.icon(
                 onPressed: () => _startService(booking),
                 icon: const Icon(Icons.play_arrow, size: 18),
-                label: const Text('Bắt đầu'),
+                label: const Text('Bắt đầu dịch vụ'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 40),
                 ),
               ),
@@ -516,6 +519,7 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
                 label: const Text('Hoàn thành'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 40),
                 ),
               ),
@@ -567,14 +571,24 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
   Future<void> _acceptRequest(Booking booking) async {
     try {
       final bookingId = int.tryParse(booking.id) ?? 0;
-      await _bookingsDataSource.acceptBookingRequest(bookingId);
+      final result = await _bookingsDataSource.acceptBookingRequest(bookingId);
+
+      // Check if this was a direct booking (auto-accepted)
+      final isDirectBooking = result['isDirectBooking'] == true;
+      final message = isDirectBooking
+          ? 'Đã chấp nhận đặt lịch! Booking chuyển sang tab Đang làm.'
+          : 'Đã gửi đề nghị thành công!';
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã gửi đề nghị thành công!'),
+        SnackBar(
+          content: Text(message),
           backgroundColor: Colors.green,
         ),
       );
+
+      // Reload all data including BLoC for "Đang làm" tab
       _loadAllData();
+      context.read<BookingsBloc>().add(const LoadProviderBookings());
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
