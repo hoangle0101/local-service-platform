@@ -673,7 +673,14 @@ export class BookingsService {
               },
             },
           },
-          review: true,
+          review: {
+            select: {
+              id: true,
+              rating: true,
+              comment: true,
+              createdAt: true,
+            },
+          },
         },
         skip: (page - 1) * limit,
         take: limit,
@@ -705,13 +712,6 @@ export class BookingsService {
             id: b.providerUser.id.toString(),
             fullName: b.providerUser.profile?.fullName,
             avatarUrl: b.providerUser.profile?.avatarUrl,
-          }
-          : null,
-        review: b.review
-          ? {
-            rating: b.review.rating,
-            comment: b.review.comment,
-            createdAt: b.review.createdAt,
           }
           : null,
       })),

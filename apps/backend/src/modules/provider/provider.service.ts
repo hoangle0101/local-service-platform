@@ -368,38 +368,59 @@ export class ProviderService {
 
   // GET /provider/statistics
   async getStatistics(userId: bigint) {
-    const [totalBookings, completedBookings, earnings, provider] =
-      await Promise.all([
-        // Total bookings
-        this.prisma.booking.count({
-          where: { providerId: userId },
-        }),
-        // Completed bookings
-        this.prisma.booking.count({
-          where: { providerId: userId, status: 'completed' },
-        }),
-        // Total earnings (completed bookings)
-        this.prisma.booking.aggregate({
-          where: {
-            providerId: userId,
-            status: 'completed',
-          },
-          _sum: {
-            providerEarning: true,
-          },
-        }),
-        // Provider profile
-        this.prisma.providerProfile.findUnique({
-          where: { userId },
-        }),
-      ]);
+    const [
+      totalBookings,
+      completedBookings,
+      pendingBookings,
+      earnings,
+      provider,
+    ] = await Promise.all([
+      // Total bookings
+      this.prisma.booking.count({
+        where: { providerId: userId },
+      }),
+      // Completed bookings
+      this.prisma.booking.count({
+        where: { providerId: userId, status: 'completed' },
+      }),
+      // Pending bookings (pending, accepted, in_progress)
+      this.prisma.booking.count({
+        where: {
+          providerId: userId,
+          status: { in: ['pending', 'accepted', 'in_progress'] },
+        },
+      }),
+      // Total earnings (completed bookings)
+      this.prisma.booking.aggregate({
+        where: {
+          providerId: userId,
+          status: 'completed',
+        },
+        _sum: {
+          providerEarning: true,
+        },
+      }),
+      // Provider profile
+      this.prisma.providerProfile.findUnique({
+        where: { userId },
+      }),
+    ]);
+
+    const totalEarningsValue = earnings._sum?.providerEarning
+      ? Number(earnings._sum.providerEarning)
+      : 0;
 
     return {
       totalBookings,
       completedBookings,
-      totalEarnings: earnings._sum?.providerEarning?.toString() || '0',
-      ratingAvg: provider?.ratingAvg.toString() || '0',
+      completedJobs: completedBookings, // Alias for frontend compatibility
+      pendingBookings,
+      pendingJobs: pendingBookings, // Alias for frontend compatibility
+      totalEarnings: totalEarningsValue,
+      rating: provider?.ratingAvg ? Number(provider.ratingAvg) : 0,
+      ratingAvg: provider?.ratingAvg?.toString() || '0',
       ratingCount: provider?.ratingCount || 0,
+      isAvailable: provider?.isAvailable ?? true,
     };
   }
 

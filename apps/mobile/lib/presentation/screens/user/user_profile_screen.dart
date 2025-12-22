@@ -2,21 +2,51 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/datasources/user_datasource.dart';
 import '../../bloc/auth/auth_bloc.dart';
+import '../../widgets/user_avatar.dart';
+import '../../widgets/profile_menu_item.dart';
+import '../../widgets/gradient_header.dart';
 
-class UserProfileScreen extends StatelessWidget {
+class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
+
+  @override
+  State<UserProfileScreen> createState() => _UserProfileScreenState();
+}
+
+class _UserProfileScreenState extends State<UserProfileScreen> {
+  final UserDataSource _userDataSource = UserDataSource();
+  String? _defaultAddress;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDefaultAddress();
+  }
+
+  Future<void> _loadDefaultAddress() async {
+    try {
+      final addresses = await _userDataSource.getAddresses();
+      if (addresses.isNotEmpty && mounted) {
+        // Find default address or use first one
+        final defaultAddr = addresses.firstWhere(
+          (a) => a['isDefault'] == true,
+          orElse: () => addresses.first,
+        );
+        setState(() {
+          _defaultAddress = defaultAddr['addressText'] as String?;
+        });
+      }
+    } catch (e) {
+      debugPrint('[UserProfile] Error loading addresses: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
-      appBar: AppBar(
-        title: const Text('Profile'),
-        backgroundColor: AppColors.white,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-      ),
+      backgroundColor: AppColors.backgroundSecondary,
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is Unauthenticated) {
@@ -25,199 +55,8 @@ class UserProfileScreen extends StatelessWidget {
         },
         child: BlocBuilder<AuthBloc, AuthState>(
           builder: (context, state) {
-            if (state is Authenticated) {
-              final user = state.user;
-              if (user == null) {
-                return const Center(
-                  child: Text('User data not available'),
-                );
-              }
-              return SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // Profile Header
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(24),
-                      decoration: const BoxDecoration(
-                        color: AppColors.white,
-                      ),
-                      child: Column(
-                        children: [
-                          CircleAvatar(
-                            radius: 50,
-                            backgroundColor: AppColors.primaryLight,
-                            child: Text(
-                              user.fullName.isNotEmpty
-                                  ? user.fullName[0].toUpperCase()
-                                  : 'U',
-                              style: const TextStyle(
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primaryDark,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            user.fullName,
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineSmall!
-                                .copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            user.phone,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium!
-                                .copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryLight,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              user.role.toUpperCase(),
-                              style: const TextStyle(
-                                color: AppColors.primaryDark,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Menu Items
-                    Container(
-                      color: AppColors.white,
-                      child: Column(
-                        children: [
-                          _buildMenuItem(
-                            context,
-                            icon: Icons.person_outline,
-                            title: 'Edit Profile',
-                            onTap: () {
-                              // TODO: Navigate to edit profile
-                            },
-                          ),
-                          _buildMenuItem(
-                            context,
-                            icon: Icons.location_on_outlined,
-                            title: 'Addresses',
-                            onTap: () {
-                              // TODO: Navigate to addresses
-                            },
-                          ),
-                          _buildMenuItem(
-                            context,
-                            icon: Icons.payment_outlined,
-                            title: 'Payment Methods',
-                            onTap: () {
-                              // TODO: Navigate to payment methods
-                            },
-                          ),
-                          _buildMenuItem(
-                            context,
-                            icon: Icons.notifications_outlined,
-                            title: 'Notifications',
-                            onTap: () {
-                              // TODO: Navigate to notifications
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Settings
-                    Container(
-                      color: AppColors.white,
-                      child: Column(
-                        children: [
-                          _buildMenuItem(
-                            context,
-                            icon: Icons.settings_outlined,
-                            title: 'Settings',
-                            onTap: () {
-                              // TODO: Navigate to settings
-                            },
-                          ),
-                          _buildMenuItem(
-                            context,
-                            icon: Icons.help_outline,
-                            title: 'Help & Support',
-                            onTap: () {
-                              // TODO: Navigate to help
-                            },
-                          ),
-                          _buildMenuItem(
-                            context,
-                            icon: Icons.info_outline,
-                            title: 'About',
-                            onTap: () {
-                              // TODO: Navigate to about
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Logout Button
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      child: ElevatedButton(
-                        onPressed: () {
-                          _showLogoutDialog(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.error,
-                          foregroundColor: AppColors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.logout),
-                            SizedBox(width: 8),
-                            Text(
-                              'Logout',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
-                  ],
-                ),
-              );
+            if (state is Authenticated && state.user != null) {
+              return _buildContent(context, state.user!);
             }
             return const Center(child: CircularProgressIndicator());
           },
@@ -226,17 +65,311 @@ class UserProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuItem(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      leading: Icon(icon, color: AppColors.primaryDark),
-      title: Text(title),
-      trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
-      onTap: onTap,
+  Widget _buildContent(BuildContext context, dynamic user) {
+    final profile = user.profile;
+    final avatarUrl = profile?.avatarUrl;
+    final bio = profile?.bio;
+
+    // Build full avatar URL
+    String? fullAvatarUrl;
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      fullAvatarUrl = avatarUrl.startsWith('http')
+          ? avatarUrl
+          : 'http://10.0.2.2:3000$avatarUrl';
+    }
+    debugPrint('[UserProfile] AvatarUrl from profile: $avatarUrl');
+    debugPrint('[UserProfile] Full avatar URL: $fullAvatarUrl');
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<AuthBloc>().add(ProfileFetchRequested());
+        await _loadDefaultAddress();
+      },
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(
+            child: GradientHeader(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+                child: Column(
+                  children: [
+                    // Top bar
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        HeaderActionButton(
+                          icon: Icons.arrow_back,
+                          onTap: () => context.pop(),
+                        ),
+                        HeaderActionButton(
+                          icon: Icons.edit_outlined,
+                          onTap: () async {
+                            await context.push('/user/edit-profile');
+                            // Reload data after returning
+                            if (mounted) {
+                              _loadDefaultAddress();
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Avatar
+                    UserAvatar(
+                      avatarUrl: fullAvatarUrl,
+                      fullName: user.fullName,
+                      size: 100,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Name
+                    Text(
+                      user.fullName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Phone
+                    _buildInfoRow(Icons.phone_outlined, user.phone),
+
+                    // Address (if available)
+                    if (_defaultAddress != null &&
+                        _defaultAddress!.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      _buildInfoRow(
+                          Icons.location_on_outlined, _defaultAddress!,
+                          maxLines: 2),
+                    ],
+
+                    const SizedBox(height: 12),
+
+                    // Role badge
+                    _buildRoleBadge(user.role),
+
+                    // Bio
+                    if (bio != null && bio.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        bio,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.85),
+                          fontSize: 14,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  _buildAccountCard(context),
+                  const SizedBox(height: 16),
+                  _buildSettingsCard(context),
+                  const SizedBox(height: 16),
+                  _buildLogoutButton(context),
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text, {int maxLines = 1}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: Colors.white.withOpacity(0.9), size: 16),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 14,
+              ),
+              maxLines: maxLines,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoleBadge(String role) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.star, color: Colors.amber, size: 16),
+          const SizedBox(width: 6),
+          Text(
+            role.toUpperCase(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccountCard(BuildContext context) {
+    return _buildCard([
+      ProfileMenuItem(
+        icon: Icons.person_outline,
+        iconColor: Colors.blue,
+        title: 'Chỉnh sửa hồ sơ',
+        subtitle: 'Cập nhật thông tin cá nhân',
+        onTap: () async {
+          await context.push('/user/edit-profile');
+          if (mounted) _loadDefaultAddress();
+        },
+      ),
+      ProfileMenuItem(
+        icon: Icons.location_on_outlined,
+        iconColor: Colors.green,
+        title: 'Địa chỉ',
+        subtitle: _defaultAddress ?? 'Chưa có địa chỉ',
+        onTap: () {},
+      ),
+      ProfileMenuItem(
+        icon: Icons.favorite_outline,
+        iconColor: Colors.red,
+        title: 'Yêu thích',
+        subtitle: 'Các dịch vụ đã lưu',
+        onTap: () => context.push('/user/favorites'),
+      ),
+      ProfileMenuItem(
+        icon: Icons.calendar_today_outlined,
+        iconColor: Colors.orange,
+        title: 'Lịch đặt',
+        subtitle: 'Xem lịch sử đặt dịch vụ',
+        onTap: () => context.push('/user/bookings'),
+      ),
+    ]);
+  }
+
+  Widget _buildSettingsCard(BuildContext context) {
+    return _buildCard([
+      ProfileMenuItem(
+        icon: Icons.notifications_outlined,
+        iconColor: Colors.purple,
+        title: 'Thông báo',
+        subtitle: 'Cài đặt thông báo',
+        onTap: () {},
+      ),
+      ProfileMenuItem(
+        icon: Icons.lock_outline,
+        iconColor: Colors.teal,
+        title: 'Bảo mật',
+        subtitle: 'Đổi mật khẩu',
+        onTap: () {},
+      ),
+      ProfileMenuItem(
+        icon: Icons.help_outline,
+        iconColor: Colors.indigo,
+        title: 'Trợ giúp',
+        subtitle: 'Hỗ trợ & FAQ',
+        onTap: () {},
+      ),
+    ]);
+  }
+
+  Widget _buildCard(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: children.expand((w) sync* {
+          if (children.indexOf(w) > 0) {
+            yield Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Divider(height: 1, color: Colors.grey.shade100),
+            );
+          }
+          yield w;
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildLogoutButton(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.red.shade400, Colors.red.shade600],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.red.withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showLogoutDialog(context),
+          borderRadius: BorderRadius.circular(16),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 18),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.logout, color: Colors.white, size: 22),
+                SizedBox(width: 10),
+                Text(
+                  'Đăng xuất',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -244,22 +377,21 @@ class UserProfileScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Đăng xuất'),
+        content: const Text('Bạn có chắc muốn đăng xuất?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
+            child: const Text('Hủy'),
           ),
           TextButton(
             onPressed: () {
               Navigator.of(dialogContext).pop();
               context.read<AuthBloc>().add(LogoutRequested());
             },
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.error,
-            ),
-            child: const Text('Logout'),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Đăng xuất'),
           ),
         ],
       ),

@@ -302,28 +302,6 @@ class BookingOffer {
   }
 }
 
-class BookingReview {
-  final int rating;
-  final String? comment;
-  final DateTime? createdAt;
-
-  BookingReview({
-    required this.rating,
-    this.comment,
-    this.createdAt,
-  });
-
-  factory BookingReview.fromJson(Map<String, dynamic> json) {
-    return BookingReview(
-      rating: (json['rating'] as num).toInt(),
-      comment: json['comment'] as String?,
-      createdAt: json['createdAt'] != null
-          ? DateTime.tryParse(json['createdAt'].toString())
-          : null,
-    );
-  }
-}
-
 class Booking {
   final String id;
   final String code;
@@ -338,6 +316,7 @@ class Booking {
   final int? distance; // Distance in meters from provider
   final String? bookingType; // 'DIRECT' or 'GENERAL'
   final bool isDirectBooking;
+  final bool hasReview;
   final BookingReview? review;
 
   Booking({
@@ -354,6 +333,7 @@ class Booking {
     this.distance,
     this.bookingType,
     this.isDirectBooking = false,
+    this.hasReview = false,
     this.review,
   });
 
@@ -375,8 +355,37 @@ class Booking {
           json['distance'] != null ? (json['distance'] as num).toInt() : null,
       bookingType: json['bookingType'] as String?,
       isDirectBooking: json['isDirectBooking'] == true,
+      hasReview: json['hasReview'] == true,
       review: json['review'] != null
-          ? BookingReview.fromJson(json['review'] as Map<String, dynamic>)
+          ? BookingReview.fromJson(json['review'])
+          : null,
+    );
+  }
+}
+
+/// Review info attached to a booking
+class BookingReview {
+  final String id;
+  final int rating;
+  final String? comment;
+  final DateTime? createdAt;
+
+  BookingReview({
+    required this.id,
+    required this.rating,
+    this.comment,
+    this.createdAt,
+  });
+
+  factory BookingReview.fromJson(Map<String, dynamic> json) {
+    return BookingReview(
+      id: json['id']?.toString() ?? '',
+      rating: json['rating'] is int
+          ? json['rating']
+          : int.tryParse(json['rating'].toString()) ?? 5,
+      comment: json['comment'] as String?,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString())
           : null,
     );
   }

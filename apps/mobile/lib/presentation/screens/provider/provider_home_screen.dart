@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/provider_datasource.dart';
-import '../../bloc/auth/auth_bloc.dart';
-import '../../providers/provider_provider.dart';
+import 'provider_my_reviews_screen.dart';
 
 // Safe parsing helpers
 int _safeInt(dynamic value, {int defaultValue = 0}) {
@@ -24,14 +21,14 @@ double _safeDouble(dynamic value, {double defaultValue = 0.0}) {
   return defaultValue;
 }
 
-class ProviderHomeScreen extends ConsumerStatefulWidget {
+class ProviderHomeScreen extends StatefulWidget {
   const ProviderHomeScreen({super.key});
 
   @override
-  ConsumerState<ProviderHomeScreen> createState() => _ProviderHomeScreenState();
+  State<ProviderHomeScreen> createState() => _ProviderHomeScreenState();
 }
 
-class _ProviderHomeScreenState extends ConsumerState<ProviderHomeScreen> {
+class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
   int _selectedIndex = 0;
   bool _isAvailable = true;
   Map<String, dynamic>? _statistics;
@@ -294,7 +291,7 @@ class _ProviderHomeScreenState extends ConsumerState<ProviderHomeScreen> {
                       child: Switch(
                         value: _isAvailable,
                         onChanged: (_) => _toggleAvailability(),
-                        activeThumbColor: Colors.green,
+                        activeColor: Colors.green,
                         activeTrackColor: Colors.green.shade200,
                         inactiveThumbColor: Colors.orange,
                         inactiveTrackColor: Colors.orange.shade200,
@@ -314,12 +311,7 @@ class _ProviderHomeScreenState extends ConsumerState<ProviderHomeScreen> {
     final totalEarnings = _safeDouble(_statistics?['totalEarnings']);
     final completedJobs = _safeInt(_statistics?['completedJobs']);
     final pendingJobs = _safeInt(_statistics?['pendingJobs']);
-
-    // Get user ID from auth bloc for fetching rating
-    final authBloc = context.read<AuthBloc>();
-    final authState = authBloc.state;
-    final userId =
-        (authState is Authenticated) ? int.parse(authState.user!.id) : null;
+    final rating = _safeDouble(_statistics?['rating']);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
@@ -374,41 +366,14 @@ class _ProviderHomeScreenState extends ConsumerState<ProviderHomeScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: userId != null
-                    ? ref.watch(providerRatingProvider(userId)).when(
-                          data: (rating) => _StatCard(
-                            icon: Icons.star,
-                            iconColor: Colors.amber,
-                            bgColor: Colors.amber.shade50,
-                            title: 'Đánh giá',
-                            value: rating.toStringAsFixed(1),
-                            subtitle: '/ 5.0 sao',
-                          ),
-                          loading: () => _StatCard(
-                            icon: Icons.star,
-                            iconColor: Colors.amber,
-                            bgColor: Colors.amber.shade50,
-                            title: 'Đánh giá',
-                            value: '...',
-                            subtitle: '/ 5.0 sao',
-                          ),
-                          error: (e, st) => _StatCard(
-                            icon: Icons.star,
-                            iconColor: Colors.amber,
-                            bgColor: Colors.amber.shade50,
-                            title: 'Đánh giá',
-                            value: '0.0',
-                            subtitle: '/ 5.0 sao',
-                          ),
-                        )
-                    : _StatCard(
-                        icon: Icons.star,
-                        iconColor: Colors.amber,
-                        bgColor: Colors.amber.shade50,
-                        title: 'Đánh giá',
-                        value: '0.0',
-                        subtitle: '/ 5.0 sao',
-                      ),
+                child: _StatCard(
+                  icon: Icons.star,
+                  iconColor: Colors.amber,
+                  bgColor: Colors.amber.shade50,
+                  title: 'Đánh giá',
+                  value: rating.toStringAsFixed(1),
+                  subtitle: '/ 5.0 sao',
+                ),
               ),
             ],
           ),
@@ -456,11 +421,15 @@ class _ProviderHomeScreenState extends ConsumerState<ProviderHomeScreen> {
             children: [
               Expanded(
                 child: _QuickActionCard(
-                  icon: Icons.bar_chart,
-                  title: 'Báo cáo',
-                  subtitle: 'Xem thống kê',
-                  color: Colors.purple,
-                  onTap: () {},
+                  icon: Icons.star_rounded,
+                  title: 'Đánh giá',
+                  subtitle: 'Xem phản hồi',
+                  color: Colors.amber,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const ProviderMyReviewsScreen(),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),

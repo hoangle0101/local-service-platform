@@ -14,11 +14,13 @@ import '../screens/user/user_home_screen.dart';
 import '../screens/user/user_profile_screen.dart';
 import '../screens/user/user_bookings_screen.dart';
 import '../screens/user/user_favorites_screen.dart';
+import '../screens/user/user_edit_profile_screen.dart';
 import '../screens/provider/provider_home_screen.dart';
 import '../screens/provider/provider_profile_screen.dart';
 import '../screens/provider/provider_services_screen.dart';
 import '../screens/provider/provider_bookings_screen.dart';
 import '../screens/provider/provider_edit_profile_screen.dart';
+import '../screens/provider/provider_my_reviews_screen.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -74,6 +76,10 @@ final router = GoRouter(
       path: '/user/favorites',
       builder: (context, state) => const UserFavoritesScreen(),
     ),
+    GoRoute(
+      path: '/user/edit-profile',
+      builder: (context, state) => const UserEditProfileScreen(),
+    ),
 
     // Provider Routes
     GoRoute(
@@ -95,6 +101,10 @@ final router = GoRouter(
     GoRoute(
       path: '/provider/profile/edit',
       builder: (context, state) => const ProviderEditProfileScreen(),
+    ),
+    GoRoute(
+      path: '/provider/reviews',
+      builder: (context, state) => const ProviderMyReviewsScreen(),
     ),
 
     // Service Routes

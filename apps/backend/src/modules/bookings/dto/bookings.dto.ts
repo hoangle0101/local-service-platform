@@ -84,6 +84,7 @@ export class CancelBookingDto {
 export class ReviewBookingDto {
   @ApiProperty({ example: 5 })
   @IsNotEmpty()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   @Max(5)
