@@ -291,14 +291,34 @@ class BookingsDataSource {
     }
   }
 
-  Future<void> reviewBooking(
+  Future<Map<String, dynamic>> reviewBooking(
       String bookingId, int rating, String comment) async {
     try {
-      await _dio.post('/bookings/$bookingId/review', data: {
+      print('[BookingsDataSource] Submitting review for booking $bookingId');
+      print('[BookingsDataSource] Rating: $rating, Comment: $comment');
+
+      final response = await _dio.post('/bookings/$bookingId/review', data: {
         'rating': rating,
         'comment': comment,
       });
+
+      print(
+          '[BookingsDataSource] Review submitted successfully: ${response.data}');
+
+      // Handle nested response format
+      final responseBody = response.data;
+      if (responseBody is Map && responseBody.containsKey('data')) {
+        return responseBody['data'] as Map<String, dynamic>;
+      }
+      return responseBody as Map<String, dynamic>;
+    } on DioException catch (e) {
+      print(
+          '[BookingsDataSource] DioException submitting review: ${e.message}');
+      print('[BookingsDataSource] Response data: ${e.response?.data}');
+      throw Exception(
+          'Failed to submit review: ${e.response?.data?['message'] ?? e.message}');
     } catch (e) {
+      print('[BookingsDataSource] Error submitting review: $e');
       throw Exception('Failed to submit review: $e');
     }
   }

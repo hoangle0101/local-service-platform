@@ -8,6 +8,7 @@ import '../bloc/services/services_bloc.dart';
 import '../bloc/services/services_event_state.dart';
 import '../bloc/auth/auth_bloc.dart';
 import '../bloc/auth/auth_event.dart';
+import 'reviews/provider_reviews_screen.dart';
 
 class ServiceDetailsScreen extends StatefulWidget {
   final int serviceId;
@@ -42,6 +43,19 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
   void dispose() {
     _servicesBloc.close();
     super.dispose();
+  }
+
+  void _openProviderReviews(BuildContext context, ProviderService service) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ProviderReviewsScreen(
+          providerId: service.providerUserId,
+          providerName: service.provider.displayName,
+          ratingAvg: service.provider.ratingAvg,
+          ratingCount: service.provider.ratingCount,
+        ),
+      ),
+    );
   }
 
   @override
@@ -275,18 +289,31 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.star, size: 16, color: Colors.amber),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${service.provider.ratingAvg} (${service.provider.ratingCount} reviews)',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                      ),
+                InkWell(
+                  onTap: () => _openProviderReviews(context, service),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.star, size: 16, color: Colors.amber),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${service.provider.ratingAvg} (${service.provider.ratingCount} đánh giá)',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.chevron_right,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),

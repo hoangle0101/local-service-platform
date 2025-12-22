@@ -4,6 +4,7 @@ import 'package:mobile/presentation/bloc/auth/auth_bloc.dart';
 import 'package:mobile/presentation/bloc/categories/categories_bloc.dart';
 import 'package:mobile/presentation/bloc/services/services_bloc.dart';
 import 'package:mobile/presentation/bloc/bookings/bookings_bloc.dart';
+import 'package:mobile/presentation/bloc/favorites/favorites_bloc.dart';
 import 'presentation/navigation/app_router.dart';
 import 'presentation/theme/app_theme.dart';
 
@@ -22,6 +23,9 @@ void main() {
         ),
         BlocProvider<BookingsBloc>(
           create: (_) => BookingsBloc(),
+        ),
+        BlocProvider<FavoritesBloc>(
+          create: (_) => FavoritesBloc()..add(LoadFavorites()),
         ),
       ],
       child: const MyApp(),

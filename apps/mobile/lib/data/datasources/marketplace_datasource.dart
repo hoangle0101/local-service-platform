@@ -104,7 +104,23 @@ class MarketplaceDataSource {
   Future<ProviderService> getServiceById(int serviceId) async {
     try {
       final response = await _dio.get('/marketplace/services/$serviceId');
-      return _providerServiceFromJson(response.data['data']);
+
+      // Handle nested response: {data: {providerUserId, ..., service: {...}, provider: {...}}}
+      // OR double nested: {data: {data: {...}}}
+      var data = response.data;
+
+      // Unwrap outer 'data' if present
+      if (data is Map && data.containsKey('data')) {
+        data = data['data'];
+      }
+      // Unwrap inner 'data' if present (double wrap case)
+      if (data is Map &&
+          data.containsKey('data') &&
+          !data.containsKey('service')) {
+        data = data['data'];
+      }
+
+      return _providerServiceFromJson(data);
     } catch (e) {
       throw Exception('Failed to load service details: $e');
     }

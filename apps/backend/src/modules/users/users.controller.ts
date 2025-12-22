@@ -1,8 +1,24 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { AddressDto, ChangePasswordDto, DeviceDto, FavoriteDto, UpdateProfileDto } from './dto/user.dto';
+import {
+  AddressDto,
+  ChangePasswordDto,
+  DeviceDto,
+  FavoriteDto,
+  UpdateProfileDto,
+} from './dto/user.dto';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Users')
@@ -26,7 +42,10 @@ export class UserController {
 
   @Patch('me/password')
   @ApiOperation({ summary: 'Change password' })
-  async changePassword(@CurrentUser() user: any, @Body() dto: ChangePasswordDto) {
+  async changePassword(
+    @CurrentUser() user: any,
+    @Body() dto: ChangePasswordDto,
+  ) {
     return this.usersService.changePassword(BigInt(user.userId), dto);
   }
 
@@ -44,8 +63,16 @@ export class UserController {
 
   @Patch('me/addresses/:id')
   @ApiOperation({ summary: 'Update address' })
-  async updateAddress(@CurrentUser() user: any, @Param('id') id: string, @Body() dto: AddressDto) {
-    return this.usersService.updateAddress(BigInt(user.userId), BigInt(id), dto);
+  async updateAddress(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() dto: AddressDto,
+  ) {
+    return this.usersService.updateAddress(
+      BigInt(user.userId),
+      BigInt(id),
+      dto,
+    );
   }
 
   @Delete('me/addresses/:id')
@@ -68,11 +95,17 @@ export class UserController {
 
   @Delete('me/favorites/:id')
   @ApiOperation({ summary: 'Remove favorite' })
-  async removeFavorite(@CurrentUser() user: any, @Param('id') id: string, @Query('type') type: string) {
-      if (!type) {
-          return { message: 'Please provide ?type=... query param' };
-      }
-      return this.usersService.removeFavoriteComposite(BigInt(user.userId), BigInt(id), type);
+  async removeFavorite(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Query('targetType') targetType: string,
+  ) {
+    const type = targetType || 'provider_service';
+    return this.usersService.removeFavoriteComposite(
+      BigInt(user.userId),
+      BigInt(id),
+      type,
+    );
   }
 
   @Get('me/notifications')

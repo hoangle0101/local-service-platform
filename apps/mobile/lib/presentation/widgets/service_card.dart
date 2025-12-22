@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/entities/entities.dart';
+import '../bloc/favorites/favorites_bloc.dart';
 import '../theme/app_colors.dart';
 import '../widgets/rating_display.dart';
+import '../widgets/favorite_button.dart';
 
 class ServiceCardWidget extends StatelessWidget {
   final ProviderService service;
@@ -116,10 +119,27 @@ class ServiceCardWidget extends StatelessWidget {
                       ),
                     ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.favorite_border),
-                    onPressed: () {
-                      // TODO: Add to favorites
+                  Builder(
+                    builder: (context) {
+                      try {
+                        final favoritesBloc = context.watch<FavoritesBloc>();
+                        final isFavorite = favoritesBloc.state.favoriteIds
+                            .contains(service.serviceId);
+                        return FavoriteButton(
+                          isFavorite: isFavorite,
+                          onToggle: () {
+                            context
+                                .read<FavoritesBloc>()
+                                .add(ToggleFavorite(service.serviceId));
+                          },
+                        );
+                      } catch (e) {
+                        // Fallback when bloc not available
+                        return FavoriteButton(
+                          isFavorite: false,
+                          onToggle: () {},
+                        );
+                      }
                     },
                   ),
                 ],

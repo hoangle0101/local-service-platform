@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/provider_datasource.dart';
+import 'provider_my_reviews_screen.dart';
 
 // Safe parsing helpers
 int _safeInt(dynamic value, {int defaultValue = 0}) {
@@ -420,11 +421,15 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
             children: [
               Expanded(
                 child: _QuickActionCard(
-                  icon: Icons.bar_chart,
-                  title: 'Báo cáo',
-                  subtitle: 'Xem thống kê',
-                  color: Colors.purple,
-                  onTap: () {},
+                  icon: Icons.star_rounded,
+                  title: 'Đánh giá',
+                  subtitle: 'Xem phản hồi',
+                  color: Colors.amber,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const ProviderMyReviewsScreen(),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),

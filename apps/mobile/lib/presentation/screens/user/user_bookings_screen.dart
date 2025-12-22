@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/bookings_datasource.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
+import '../../widgets/review_dialog.dart';
 
 class UserBookingsScreen extends StatefulWidget {
   const UserBookingsScreen({super.key});
@@ -444,12 +445,55 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
         ],
       );
     } else if (status == 'completed') {
+      // Check if already reviewed
+      if (booking.hasReview) {
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.success.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.success.withOpacity(0.3)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.check_circle,
+                  color: AppColors.success, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Đã đánh giá ${booking.review?.rating ?? 0}★',
+                style: const TextStyle(
+                  color: AppColors.success,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      // Not reviewed yet - show review button
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
-          onPressed: () => _showReviewDialog(booking.id),
-          icon: const Icon(Icons.star),
-          label: const Text('Leave Review'),
+          onPressed: () => _showReviewDialog(
+            booking.id,
+            serviceName: booking.serviceName,
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primaryDark,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          icon: const Icon(Icons.star_rounded),
+          label: const Text(
+            'Đánh giá dịch vụ',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
         ),
       );
     } else if (status == 'cancelled' || status == 'disputed') {
@@ -492,69 +536,19 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
     );
   }
 
-  void _showReviewDialog(String bookingId) {
-    int rating = 5;
-    final commentController = TextEditingController();
+  void _showReviewDialog(String bookingId, {String? serviceName}) {
+    final dataSource = BookingsDataSource();
 
-    showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Leave a Review'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('How was your experience?'),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (index) {
-                  return IconButton(
-                    icon: Icon(
-                      index < rating ? Icons.star : Icons.star_border,
-                      color: Colors.amber,
-                      size: 32,
-                    ),
-                    onPressed: () {
-                      setDialogState(() {
-                        rating = index + 1;
-                      });
-                    },
-                  );
-                }),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: commentController,
-                decoration: const InputDecoration(
-                  labelText: 'Comment (optional)',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                context.read<BookingsBloc>().add(
-                      ReviewBooking(
-                        bookingId,
-                        rating,
-                        commentController.text,
-                      ),
-                    );
-              },
-              child: const Text('Submit'),
-            ),
-          ],
-        ),
-      ),
+    ReviewDialog.show(
+      context,
+      bookingId: bookingId,
+      serviceName: serviceName,
+      onSubmit: (rating, comment) async {
+        await dataSource.reviewBooking(bookingId, rating, comment);
+        if (mounted) {
+          _refreshBookings();
+        }
+      },
     );
   }
 
