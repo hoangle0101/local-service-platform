@@ -402,20 +402,20 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
                     fontSize: 16,
                   ),
                 ),
-                if (widget.service!.provider != null) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.person, size: 14, color: Colors.grey.shade600),
-                      const SizedBox(width: 4),
-                      Text(
-                        widget.service!.provider!.displayName,
-                        style: TextStyle(
-                            color: Colors.grey.shade600, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ],
+                ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.person, size: 14, color: Colors.grey.shade600),
+                    const SizedBox(width: 4),
+                    Text(
+                      widget.service!.provider!.displayName,
+                      style: TextStyle(
+                          color: Colors.grey.shade600, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ],
               ],
             ),
           ),

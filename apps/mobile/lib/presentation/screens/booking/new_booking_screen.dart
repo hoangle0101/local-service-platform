@@ -48,7 +48,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
   void initState() {
     super.initState();
     // Load services
-    context.read<ServicesBloc>().add(LoadServices());
+    context.read<ServicesBloc>().add(const LoadServices());
   }
 
   @override
@@ -213,7 +213,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
                 Text('Error: ${state.message}'),
                 ElevatedButton(
                   onPressed: () =>
-                      context.read<ServicesBloc>().add(LoadServices()),
+                      context.read<ServicesBloc>().add(const LoadServices()),
                   child: const Text('Retry'),
                 ),
               ],

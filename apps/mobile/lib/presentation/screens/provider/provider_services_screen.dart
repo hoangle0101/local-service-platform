@@ -43,7 +43,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
     super.initState();
     _loadServices();
     context.read<CategoriesBloc>().add(LoadCategories());
-    context.read<ServicesBloc>().add(LoadServices());
+    context.read<ServicesBloc>().add(const LoadServices());
   }
 
   Future<void> _loadServices() async {
@@ -341,7 +341,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                   children: [
                     Text(
                       _formatPrice(price),
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: AppColors.primary,
@@ -643,7 +643,7 @@ class _AddServiceSheetState extends State<_AddServiceSheet> {
                       color: AppColors.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.add_circle, color: AppColors.primary),
+                    child: const Icon(Icons.add_circle, color: AppColors.primary),
                   ),
                   const SizedBox(width: 12),
                   const Text(
@@ -715,7 +715,7 @@ class _AddServiceSheetState extends State<_AddServiceSheet> {
                 decoration: InputDecoration(
                   hintText: 'Ví dụ: 150000',
                   prefixIcon:
-                      Icon(Icons.attach_money, color: AppColors.primary),
+                      const Icon(Icons.attach_money, color: AppColors.primary),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
                   filled: true,
@@ -723,8 +723,9 @@ class _AddServiceSheetState extends State<_AddServiceSheet> {
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Vui lòng nhập giá';
-                  if (double.tryParse(v.replaceAll(',', '')) == null)
+                  if (double.tryParse(v.replaceAll(',', '')) == null) {
                     return 'Giá không hợp lệ';
+                  }
                   return null;
                 },
               ),
@@ -778,7 +779,7 @@ class _AddServiceSheetState extends State<_AddServiceSheet> {
     required void Function(T?)? onChanged,
   }) {
     return DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       decoration: InputDecoration(
         hintText: hint,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -927,7 +928,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   hintText: 'Nhập giá mới',
-                  prefixIcon: Icon(Icons.attach_money, color: Colors.blue),
+                  prefixIcon: const Icon(Icons.attach_money, color: Colors.blue),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
                   filled: true,
@@ -935,8 +936,9 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Vui lòng nhập giá';
-                  if (double.tryParse(v.replaceAll(',', '')) == null)
+                  if (double.tryParse(v.replaceAll(',', '')) == null) {
                     return 'Giá không hợp lệ';
+                  }
                   return null;
                 },
               ),

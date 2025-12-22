@@ -15,7 +15,7 @@ import {
 
 @Injectable()
 export class BookingsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   // POST /bookings/estimate
   async estimateBooking(dto: EstimateDto) {
@@ -50,10 +50,10 @@ export class BookingsService {
       estimatedDuration: service.durationMinutes,
       provider: provider
         ? {
-            id: (provider as any).user_id.toString(),
-            displayName: (provider as any).display_name,
-            ratingAvg: (provider as any).rating_avg?.toString() || '0',
-          }
+          id: (provider as any).user_id.toString(),
+          displayName: (provider as any).display_name,
+          ratingAvg: (provider as any).rating_avg?.toString() || '0',
+        }
         : null,
     };
   }
@@ -617,7 +617,7 @@ export class BookingsService {
           pp.location::geography,
           COALESCE(pp.service_radius_m, 5000)
         )
-      ORDER BY distance ASC
+      ORDER BY ST_Distance(b.location::geography, pp.location::geography) ASC
       LIMIT 20
     `,
       providerId,
@@ -709,19 +709,10 @@ export class BookingsService {
         },
         provider: b.providerUser
           ? {
-              id: b.providerUser.id.toString(),
-              fullName: b.providerUser.profile?.fullName,
-              avatarUrl: b.providerUser.profile?.avatarUrl,
-            }
-          : null,
-        hasReview: !!b.review,
-        review: b.review
-          ? {
-              id: b.review.id.toString(),
-              rating: b.review.rating,
-              comment: b.review.comment,
-              createdAt: b.review.createdAt,
-            }
+            id: b.providerUser.id.toString(),
+            fullName: b.providerUser.profile?.fullName,
+            avatarUrl: b.providerUser.profile?.avatarUrl,
+          }
           : null,
       })),
       meta: {
@@ -803,11 +794,11 @@ export class BookingsService {
       },
       provider: b.providerUser
         ? {
-            id: b.providerUser.id.toString(),
-            phone: b.providerUser.phone,
-            fullName: b.providerUser.profile?.fullName,
-            avatarUrl: b.providerUser.profile?.avatarUrl,
-          }
+          id: b.providerUser.id.toString(),
+          phone: b.providerUser.phone,
+          fullName: b.providerUser.profile?.fullName,
+          avatarUrl: b.providerUser.profile?.avatarUrl,
+        }
         : null,
       timeline: b.bookingEvents.map((e: any) => ({
         status: e.newStatus,
@@ -817,10 +808,10 @@ export class BookingsService {
       })),
       review: b.review
         ? {
-            rating: b.review.rating,
-            comment: b.review.comment,
-            createdAt: b.review.createdAt,
-          }
+          rating: b.review.rating,
+          comment: b.review.comment,
+          createdAt: b.review.createdAt,
+        }
         : null,
     };
   }
@@ -1143,6 +1134,12 @@ export class BookingsService {
         where: { revieweeId: booking.providerId! },
         _avg: { rating: true },
         _count: { rating: true },
+      });
+
+      // Get provider user info for displayName
+      const providerUser = await tx.user.findUnique({
+        where: { id: booking.providerId! },
+        include: { profile: true },
       });
 
       await tx.providerProfile.update({
