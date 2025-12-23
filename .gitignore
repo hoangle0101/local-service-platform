@@ -21,3 +21,13 @@ build
 Thumbs.db
 apps/backend/public/uploads/1/1764152890159-3ig1xg.jpg
 apps/backend/docs/COMPLETION_REPORT.md
+.idea/copilot.data.migration.agent.xml
+.idea/copilot.data.migration.ask.xml
+.idea/caches/deviceStreaming.xml
+.idea/vcs.xml
+.idea/modules.xml
+.gitignore
+.idea/local-service-platform.iml
+.idea/copilot.data.migration.ask2agent.xml
+.idea/copilot.data.migration.edit.xml
+apps/mobile/windows/flutter/generated_plugins.cmake

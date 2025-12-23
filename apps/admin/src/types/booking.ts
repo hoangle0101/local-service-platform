@@ -1,0 +1,56 @@
+// Booking types matching backend responses
+
+export interface Booking {
+  id: string;
+  customerId: string;
+  providerId: string;
+  serviceId: number;
+  status: 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled' | 'disputed';
+  scheduledAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  actualPrice: string | number;
+  totalAmount: string | number;
+  notes: string | null;
+  cancellationReason: string | null;
+  customer: {
+    id: string;
+    phone: string;
+    email: string | null;
+    profile: {
+      fullName: string;
+      avatarUrl: string | null;
+    } | null;
+  };
+  provider: {
+    id: string;
+    businessName: string;
+    avatarUrl: string | null;
+    user: {
+      id: string;
+      phone: string;
+    };
+  };
+  service: {
+    id: number;
+    name: string;
+    category: {
+      name: string;
+    } | null;
+  };
+  payment: Payment | null;
+  dispute: Dispute | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BookingDetail extends Booking {
+  timeline: BookingTimeline[];
+}
+
+export interface BookingTimeline {
+  timestamp: string;
+  event: string;
+  description: string;
+}
