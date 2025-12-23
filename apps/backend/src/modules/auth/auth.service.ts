@@ -28,6 +28,15 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.password, salt);
 
     const user = await this.prisma.$transaction(async (tx) => {
+      // Get the customer role
+      const customerRole = await tx.role.findUnique({
+        where: { name: 'customer' },
+      });
+
+      if (!customerRole) {
+        throw new Error('Customer role not found. Please run database seed.');
+      }
+
       const newUser = await tx.user.create({
         data: {
           phone: normalizedPhone,
@@ -44,10 +53,20 @@ export class AuthService {
               fullName: dto.fullName,
             },
           },
+          userRoles: {
+            create: {
+              roleId: customerRole.id,
+            },
+          },
         },
         include: {
           wallet: true,
           profile: true,
+          userRoles: {
+            include: {
+              role: true,
+            },
+          },
         },
       });
       return newUser;

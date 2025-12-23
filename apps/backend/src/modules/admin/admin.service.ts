@@ -114,7 +114,7 @@ export class AdminService {
      * Returns key metrics: total revenue, active bookings, disputes, etc.
      */
     async getDashboard(query: AdminDashboardQueryDto) {
-        const startDate = query.startDate ? new Date(query.startDate) : new Date(new Date().setDate(new Date().getDate() - 30));
+        const startDate = query.startDate ? new Date(query.startDate) : new Date(new Date().setDate(new Date().getDate() - 90));
         const endDate = query.endDate ? new Date(query.endDate) : new Date();
 
         // Use Promise.all for parallel queries
@@ -128,10 +128,8 @@ export class AdminService {
             totalRevenue,
             recentActivity,
         ] = await Promise.all([
-            // Total users count
-            this.prisma.user.count({
-                where: { status: 'active' }
-            }),
+            // Total users count - Get ALL users
+            this.prisma.user.count(),
             // Active providers
             this.prisma.providerProfile.count({
                 where: {
@@ -185,7 +183,8 @@ export class AdminService {
         const completionRate = totalBookings > 0 ? Math.round((completedBookings / totalBookings) * 100) : 0;
 
         // Calculate average booking value
-        const totalRevenueAmount = totalRevenue._sum.actualPrice || new Decimal(0);
+        const totalRevenueResult = totalRevenue as unknown as { _sum: { actualPrice: Decimal | null } };
+        const totalRevenueAmount = totalRevenueResult._sum.actualPrice || new Decimal(0);
         const avgBookingValue = completedBookings > 0 ? totalRevenueAmount.div(completedBookings).toNumber() : 0;
 
         return {
@@ -364,8 +363,8 @@ export class AdminService {
             data: withdrawals.map(withdrawal => {
                 const user = userMap.get(withdrawal.walletUserId);
                 return {
-                    id: withdrawal.id,
-                    walletUserId: withdrawal.walletUserId,
+                    id: withdrawal.id.toString(),
+                    walletUserId: withdrawal.walletUserId.toString(),
                     amount: withdrawal.amount.toNumber(),
                     status: withdrawal.status,
                     createdAt: withdrawal.createdAt,
