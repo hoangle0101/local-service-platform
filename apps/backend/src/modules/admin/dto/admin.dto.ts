@@ -307,6 +307,20 @@ export class VerifyProviderDto {
 }
 
 /**
+ * DTO for manually verifying a user account
+ */
+export class VerifyUserDto {
+    @ApiProperty({ example: true, description: 'Whether the account is verified' })
+    @Type(() => Boolean)
+    isVerified: boolean;
+
+    @ApiPropertyOptional({ example: 'Manually verified by admin' })
+    @IsOptional()
+    @IsString()
+    adminNotes?: string;
+}
+
+/**
  * DTO for listing bookings from admin perspective
  */
 export class AdminBookingsQueryDto {

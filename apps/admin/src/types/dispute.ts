@@ -29,7 +29,7 @@ export interface Dispute {
     };
     provider: {
       id: string;
-      businessName: string;
+      displayName: string;
     };
   };
   reporter: {

@@ -16,7 +16,11 @@ import {
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { DashboardStats, ApiResponse } from '@/types/system';
+import { DashboardStats, ApiResponse, RevenueReport, UsersReport } from '@/types/system';
+import { RevenueChart } from '@/components/ui/revenue-chart';
+import { UserGrowthChart } from '@/components/ui/user-growth-chart';
+import { useState } from 'react';
+import { format, subDays } from 'date-fns';
 
 const container = {
   hidden: { opacity: 0 },
@@ -47,10 +51,12 @@ export default function DashboardPage() {
   const { data: statsResponse, isLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
-      const response = await api.get<ApiResponse<DashboardStats>>('/admin/dashboard');
+      const response = await api.get<ApiResponse<DashboardStats>>('/admin/dashboard', {
+        params: { detailed: true }
+      });
       return response.data;
     },
-    refetchInterval: 30000, // Refresh every 30s
+    refetchInterval: 30000,
   });
 
   const stats = statsResponse?.data;
@@ -90,9 +96,9 @@ export default function DashboardPage() {
       iconColor: 'text-orange-500',
     },
     {
-      title: 'Active Users',
+      title: 'Active Customers',
       value: stats?.overview.totalUsers.toString() || '0',
-      change: 'Total registered users',
+      change: 'Total registered customers',
       icon: Users,
       gradient: 'bg-gradient-to-br from-blue-50 to-indigo-50',
       iconColor: 'text-blue-500',
@@ -170,6 +176,41 @@ export default function DashboardPage() {
         />
       </div>
 
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Revenue Trend (Last 30 Days)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats?.charts?.revenue && stats.charts.revenue.length > 0 ? (
+              <RevenueChart data={stats.charts.revenue.map(d => ({ ...d, bookings: d.bookings || 0 }))} />
+            ) : stats?.charts?.revenue ? (
+              <div className="h-[300px] flex items-center justify-center text-zinc-400 text-sm">
+                No revenue data for this period
+              </div>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center bg-zinc-50 rounded animate-pulse" />
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">User Growth (Last 30 Days)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats?.charts?.users && stats.charts.users.length > 0 ? (
+              <UserGrowthChart data={stats.charts.users.map(u => ({ ...u, activeUsers: 0 }))} />
+            ) : stats?.charts?.users ? (
+              <div className="h-[300px] flex items-center justify-center text-zinc-400 text-sm">
+                No new users in this period
+              </div>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center bg-zinc-50 rounded animate-pulse" />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-1">
         <Card className="col-span-1">
           <CardHeader>
@@ -181,7 +222,7 @@ export default function DashboardPage() {
                 {stats.recentActivity.map((booking) => (
                   <div key={booking.id.toString()} className="flex items-center justify-between p-4 rounded-lg bg-zinc-50">
                     <div className="space-y-1">
-                      <p className="text-sm font-medium">Booking #{booking.id.toString().slice(0, 8)}</p>
+                      <p className="text-sm font-medium">Booking #{booking.id?.toString().slice(0, 8) || 'N/A'}</p>
                       <p className="text-sm text-zinc-600">Service: {booking.service}</p>
                       <p className="text-xs text-zinc-500">{new Date(booking.createdAt).toLocaleString('vi-VN')}</p>
                     </div>

@@ -16,6 +16,7 @@ import {
     AdminUsersQueryDto,
     AdminProvidersQueryDto,
     BanUserDto,
+    VerifyUserDto,
     VerifyProviderDto,
     AdminBookingsQueryDto,
     AdminPaymentsQueryDto,
@@ -161,6 +162,22 @@ export class AdminController {
         @Body() dto: BanUserDto
     ) {
         return this.adminService.banUser(BigInt(userId), BigInt(user.userId), dto);
+    }
+
+    /**
+     * Manually verify or unverify a user
+     */
+    @Patch('users/:id/verify')
+    @Roles('admin', 'super_admin')
+    @ApiOperation({ summary: 'Manually verify or unverify user' })
+    @ApiResponse({ status: 200, description: 'User verification status updated' })
+    @ApiResponse({ status: 404, description: 'User not found' })
+    async verifyUser(
+        @CurrentUser() user: JwtPayload,
+        @Param('id') userId: string,
+        @Body() dto: VerifyUserDto
+    ) {
+        return this.adminService.verifyUser(BigInt(userId), BigInt(user.userId), dto);
     }
 
     /**

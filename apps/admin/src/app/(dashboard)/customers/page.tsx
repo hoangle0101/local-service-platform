@@ -7,20 +7,20 @@ import { DataTable, Column } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Eye, Ban, CheckCircle } from 'lucide-react';
+import { Eye, Ban, CheckCircle, XCircle, ShieldCheck } from 'lucide-react';
 import { api } from '@/lib/api';
 import { User } from '@/types/user';
 import { ApiResponse, PaginatedResponse } from '@/types/system';
 import { toast } from 'sonner';
 
-export default function UsersPage() {
+export default function CustomersPage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [actionDialog, setActionDialog] = useState<{
     open: boolean;
-    action: 'ban' | 'unban' | null;
+    action: 'ban' | 'unban' | 'verify' | 'unverify' | null;
   }>({ open: false, action: null });
 
   const { data: response, isLoading, refetch } = useQuery({
@@ -31,22 +31,30 @@ export default function UsersPage() {
           page,
           limit: 20,
           search: searchQuery || undefined,
+          role: 'customer',
         },
       });
       return res.data.data;
     },
   });
 
-  const handleStatusChange = async (userId: string, action: 'ban' | 'unban') => {
+  const handleStatusChange = async (userId: string, action: 'ban' | 'unban' | 'verify' | 'unverify') => {
     try {
-      await api.patch(`/admin/users/${userId}/ban`, { 
-        action,
-        reason: action === 'ban' ? 'Banned by admin' : 'Unbanned by admin'
-      });
-      toast.success(`User ${action === 'ban' ? 'banned' : 'unbanned'} successfully`);
+      if (action === 'ban' || action === 'unban') {
+        await api.patch(`/admin/users/${userId}/ban`, { 
+          action,
+          reason: action === 'ban' ? 'Banned by admin' : 'Unbanned by admin'
+        });
+        toast.success(`User ${action === 'ban' ? 'banned' : 'unbanned'} successfully`);
+      } else {
+        await api.patch(`/admin/users/${userId}/verify`, { 
+          isVerified: action === 'verify' 
+        });
+        toast.success(`User ${action === 'verify' ? 'verified' : 'unverified'} successfully`);
+      }
       refetch();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || `Failed to ${action} user`);
+      toast.error(error.response?.data?.message || `Failed to perform action`);
     }
   };
 
@@ -115,7 +123,7 @@ export default function UsersPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => router.push(`/users/${user.id}`)}
+            onClick={() => router.push(`/customers/${user.id}`)}
           >
             <Eye className="h-4 w-4" />
           </Button>
@@ -127,6 +135,7 @@ export default function UsersPage() {
                 setSelectedUser(user);
                 setActionDialog({ open: true, action: 'ban' });
               }}
+              title="Ban User"
             >
               <Ban className="h-4 w-4 text-red-500" />
             </Button>
@@ -138,10 +147,36 @@ export default function UsersPage() {
                 setSelectedUser(user);
                 setActionDialog({ open: true, action: 'unban' });
               }}
+              title="Unban User"
             >
               <CheckCircle className="h-4 w-4 text-green-500" />
             </Button>
           ) : null}
+          {!user.isVerified ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedUser(user);
+                setActionDialog({ open: true, action: 'verify' });
+              }}
+              title="Verify Account"
+            >
+              <ShieldCheck className="h-4 w-4 text-blue-500" />
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedUser(user);
+                setActionDialog({ open: true, action: 'unverify' });
+              }}
+              title="Unverify Account"
+            >
+              <XCircle className="h-4 w-4 text-orange-500" />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -150,8 +185,8 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">Users Management</h2>
-        <p className="text-zinc-600">Manage all platform users</p>
+        <h2 className="text-3xl font-bold tracking-tight">Customers Management</h2>
+        <p className="text-zinc-600">Manage all platform customers</p>
       </div>
 
       <DataTable
@@ -171,20 +206,40 @@ export default function UsersPage() {
             : undefined
         }
         isLoading={isLoading}
-        emptyMessage="No users found"
+        emptyMessage="No customers found"
       />
 
       <ConfirmDialog
         open={actionDialog.open}
         onOpenChange={(open) => setActionDialog({ open, action: null })}
-        title={actionDialog.action === 'ban' ? 'Ban User' : 'Unban User'}
+        title={
+          actionDialog.action === 'ban' 
+            ? 'Ban User' 
+            : actionDialog.action === 'unban' 
+            ? 'Unban User'
+            : actionDialog.action === 'verify'
+            ? 'Verify Account'
+            : 'Unverify Account'
+        }
         description={
           actionDialog.action === 'ban'
             ? `Are you sure you want to ban user ${selectedUser?.phone}? They will not be able to access the platform.`
-            : `Are you sure you want to unban user ${selectedUser?.phone}?`
+            : actionDialog.action === 'unban'
+            ? `Are you sure you want to unban user ${selectedUser?.phone}?`
+            : actionDialog.action === 'verify'
+            ? `Manually verify account for ${selectedUser?.phone}?`
+            : `Remove verification status for ${selectedUser?.phone}?`
         }
-        confirmLabel={actionDialog.action === 'ban' ? 'Ban User' : 'Unban User'}
-        variant={actionDialog.action === 'ban' ? 'destructive' : 'default'}
+        confirmLabel={
+          actionDialog.action === 'ban' 
+            ? 'Ban User' 
+            : actionDialog.action === 'unban' 
+            ? 'Unban'
+            : actionDialog.action === 'verify'
+            ? 'Verify'
+            : 'Remove Verification'
+        }
+        variant={actionDialog.action === 'ban' || actionDialog.action === 'unverify' ? 'destructive' : 'default'}
         onConfirm={async () => {
           if (selectedUser && actionDialog.action) {
             await handleStatusChange(selectedUser.id, actionDialog.action);

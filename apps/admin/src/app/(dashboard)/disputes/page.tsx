@@ -37,7 +37,7 @@ export default function DisputesPage() {
       key: 'id',
       label: 'Dispute ID',
       render: (dispute) => (
-        <span className="font-mono text-sm">#{dispute.id.slice(0, 8)}</span>
+        <span className="font-mono text-sm">#{dispute.id?.toString().slice(0, 8) || 'N/A'}</span>
       ),
     },
     {
@@ -45,7 +45,7 @@ export default function DisputesPage() {
       label: 'Booking',
       render: (dispute) => (
         <div>
-          <div className="font-medium">#{dispute.bookingId.slice(0, 8)}</div>
+          <div className="font-medium">#{dispute.bookingId?.toString().slice(0, 8) || 'N/A'}</div>
           <div className="text-sm text-zinc-500">{dispute.booking?.service?.name}</div>
         </div>
       ),

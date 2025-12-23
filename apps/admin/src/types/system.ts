@@ -34,12 +34,16 @@ export interface DashboardStats {
     pendingPayouts: number;
   };
   recentActivity: Array<{
-    id: bigint;
+    id: string;
     service: string;
-    price: string;
+    price: number;
     status: string;
     createdAt: string;
   }>;
+  charts?: {
+    revenue: Array<{ date: string; revenue: number; bookings: number }>;
+    users: Array<{ date: string; newUsers: number }>;
+  };
 }
 
 // Announcements types

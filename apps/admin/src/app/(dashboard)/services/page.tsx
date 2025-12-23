@@ -17,17 +17,19 @@ export default function ServicesPage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [deleteDialog, setDeleteDialog] = useState(false);
 
   const { data: response, isLoading, refetch } = useQuery({
-    queryKey: ['admin-services', page, searchQuery],
+    queryKey: ['admin-services', page, searchQuery, statusFilter],
     queryFn: async () => {
       const res = await api.get<ApiResponse<PaginatedResponse<Service>>>('/services/search', {
         params: {
           page,
           limit: 20,
           search: searchQuery || undefined,
+          isActive: statusFilter === 'active' ? true : statusFilter === 'inactive' ? false : undefined,
         },
       });
       return res.data.data;
@@ -171,6 +173,30 @@ export default function ServicesPage() {
             Add Service
           </Button>
         </div>
+      </div>
+
+      <div className="flex gap-2">
+        <Button
+          variant={statusFilter === '' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setStatusFilter('')}
+        >
+          All
+        </Button>
+        <Button
+          variant={statusFilter === 'active' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setStatusFilter('active')}
+        >
+          Active
+        </Button>
+        <Button
+          variant={statusFilter === 'inactive' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setStatusFilter('inactive')}
+        >
+          Inactive
+        </Button>
       </div>
 
       <DataTable

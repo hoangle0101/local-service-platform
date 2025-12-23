@@ -5,12 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Phone, Mail, Calendar, User as UserIcon, Shield } from 'lucide-react';
+import { ArrowLeft, Calendar, User as UserIcon, Shield } from 'lucide-react';
 import { api } from '@/lib/api';
 import { UserDetail } from '@/types/user';
 import { ApiResponse } from '@/types/system';
 
-export default function UserDetailPage() {
+export default function CustomerDetailPage() {
   const params = useParams();
   const router = useRouter();
   const userId = params.id as string;
@@ -51,9 +51,9 @@ export default function UserDetailPage() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <p className="text-lg text-zinc-600">User not found</p>
-          <Button onClick={() => router.push('/users')} className="mt-4">
-            Back to Users
+          <p className="text-lg text-zinc-600">Customer not found</p>
+          <Button onClick={() => router.push('/customers')} className="mt-4">
+            Back to Customers
           </Button>
         </div>
       </div>
@@ -66,12 +66,12 @@ export default function UserDetailPage() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => router.push('/users')}
+          onClick={() => router.push('/customers')}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">User Details</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Customer Details</h2>
           <p className="text-zinc-600">#{user.id.slice(0, 8)}</p>
         </div>
       </div>
@@ -139,10 +139,17 @@ export default function UserDetailPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-zinc-600">Role</span>
-                <span className="capitalize text-sm px-2 py-1 rounded bg-zinc-100 font-medium">
-                  {user.role.replace('_', ' ')}
-                </span>
+                <span className="text-sm text-zinc-600">Roles</span>
+                <div className="flex gap-1 flex-wrap justify-end">
+                  {user.roles.map((role) => (
+                    <span 
+                      key={role}
+                      className="capitalize text-xs px-2 py-1 rounded bg-zinc-100 font-medium whitespace-nowrap"
+                    >
+                      {role.replace('_', ' ')}
+                    </span>
+                  ))}
+                </div>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-zinc-600">Status</span>

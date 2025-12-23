@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { ImageUpload } from '@/components/ui/image-upload';
 import { ArrowLeft } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Category } from '@/types/provider';
+import { ServiceCategory } from '@/types/provider';
 import { toast } from 'sonner';
 
 export default function NewServicePage() {
@@ -25,7 +25,7 @@ export default function NewServicePage() {
     isActive: true,
   });
 
-  const { data: categories } = useQuery<Category[]>({
+  const { data: categories } = useQuery<ServiceCategory[]>({
     queryKey: ['categories'],
     queryFn: async () => {
       const response = await api.get('/services/categories');
@@ -49,8 +49,8 @@ export default function NewServicePage() {
     }
   };
 
-  const flattenCategories = (categories: Category[]): Category[] => {
-    return categories.reduce((acc: Category[], category) => {
+  const flattenCategories = (categories: ServiceCategory[]): ServiceCategory[] => {
+    return categories.reduce((acc: ServiceCategory[], category) => {
       acc.push(category);
       if (category.children && category.children.length > 0) {
         acc.push(...flattenCategories(category.children));
