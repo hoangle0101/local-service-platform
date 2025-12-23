@@ -36,6 +36,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ProviderVerifiedGuard } from '../../common/guards/provider-verified.guard';
 
 // Multer configuration for avatar upload
 // Use process.cwd() to match static serving path in main.ts
@@ -140,7 +141,7 @@ export class ProviderController {
   }
 
   @Patch('me/availability')
-  @UseGuards(RolesGuard)
+  @UseGuards(RolesGuard, ProviderVerifiedGuard)
   @Roles('provider')
   @ApiOperation({ summary: 'Update availability status' })
   async updateAvailability(
@@ -159,7 +160,7 @@ export class ProviderController {
   }
 
   @Post('services')
-  @UseGuards(RolesGuard)
+  @UseGuards(RolesGuard, ProviderVerifiedGuard)
   @Roles('provider')
   @ApiOperation({ summary: 'Add service to provider' })
   async addService(@CurrentUser() user: any, @Body() dto: AddServiceDto) {
@@ -167,7 +168,7 @@ export class ProviderController {
   }
 
   @Patch('services/:serviceId')
-  @UseGuards(RolesGuard)
+  @UseGuards(RolesGuard, ProviderVerifiedGuard)
   @Roles('provider')
   @ApiOperation({ summary: 'Update provider service' })
   @ApiParam({ name: 'serviceId', example: 1 })

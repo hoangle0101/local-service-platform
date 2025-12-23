@@ -86,7 +86,7 @@ export default function ProviderDetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">{provider.businessName}</h2>
+            <h2 className="text-3xl font-bold tracking-tight">{provider.displayName}</h2>
             <p className="text-zinc-600">Provider #{provider.id.slice(0, 8)}</p>
           </div>
         </div>
@@ -112,9 +112,11 @@ export default function ProviderDetailPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {typeof provider.rating === 'string' 
-                ? parseFloat(provider.rating).toFixed(1)
-                : (provider.rating || 0).toFixed(1)
+              {typeof provider.rating === 'object' && provider.rating?.average
+                ? provider.rating.average.toFixed(1)
+                : typeof provider.rating === 'number'
+                ? provider.rating.toFixed(1)
+                : '0.0'
               }
             </div>
             <p className="text-xs text-zinc-600">

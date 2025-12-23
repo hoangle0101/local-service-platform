@@ -130,7 +130,7 @@ export default function BookingDetailPage() {
                 />
               )}
               <div>
-                <p className="font-medium">{booking.provider?.businessName}</p>
+                <p className="font-medium">{booking.provider?.displayName}</p>
                 <p className="text-sm text-zinc-600">
                   {booking.provider?.user?.phone}
                 </p>

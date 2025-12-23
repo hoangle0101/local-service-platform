@@ -19,6 +19,8 @@ export interface Provider {
     id: string;
     phone: string;
     email: string | null;
+    status: 'active' | 'inactive' | 'banned';
+    isVerified: boolean;
     profile: {
       fullName: string;
       avatarUrl: string | null;

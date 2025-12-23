@@ -66,7 +66,7 @@ export default function WithdrawalsPage() {
     {
       key: 'id',
       label: 'ID',
-      render: (req) => <span className="font-mono text-sm">#{req.id.slice(0, 8)}</span>,
+      render: (req) => <span className="font-mono text-sm">#{req.id?.toString().slice(0, 8) || 'N/A'}</span>,
     },
     {
       key: 'wallet',

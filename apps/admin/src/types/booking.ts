@@ -1,4 +1,6 @@
 // Booking types matching backend responses
+import { Dispute } from './dispute';
+import { Payment } from './payment';
 
 export interface Booking {
   id: string;
@@ -25,7 +27,7 @@ export interface Booking {
   };
   provider: {
     id: string;
-    businessName: string;
+    displayName: string;
     avatarUrl: string | null;
     user: {
       id: string;

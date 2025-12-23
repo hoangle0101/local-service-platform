@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Download, TrendingUp, Users, Briefcase } from 'lucide-react';
 import { api } from '@/lib/api';
 import { RevenueReport, ServicesReport, UsersReport, ApiResponse } from '@/types/system';
+import { RevenueChart } from '@/components/ui/revenue-chart';
+import { UserGrowthChart } from '@/components/ui/user-growth-chart';
+import { exportToCSV } from '@/lib/export';
 
 export default function ReportsPage() {
   const [dateRange] = useState({ start: '', end: '' });
@@ -73,7 +76,13 @@ export default function ReportsPage() {
           <h2 className="text-3xl font-bold tracking-tight">Reports & Analytics</h2>
           <p className="text-zinc-600">View detailed platform analytics</p>
         </div>
-        <Button variant="outline">
+        <Button 
+          variant="outline"
+          onClick={() => {
+            if (revenueData) exportToCSV(revenueData.timeSeriesData, 'revenue_report');
+            if (usersData) exportToCSV(usersData.timeSeriesData, 'users_report');
+          }}
+        >
           <Download className="h-4 w-4 mr-2" />
           Export All
         </Button>
@@ -91,7 +100,7 @@ export default function ReportsPage() {
           </TabsTrigger>
           <TabsTrigger value="users">
             <Users className="h-4 w-4 mr-2" />
-            Users
+            Customers
           </TabsTrigger>
         </TabsList>
 
@@ -149,17 +158,7 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
               {revenueData?.timeSeriesData && revenueData.timeSeriesData.length > 0 ? (
-                <div className="space-y-2">
-                  {revenueData.timeSeriesData.slice(0, 10).map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-zinc-50 rounded">
-                      <span className="text-sm font-medium">{new Date(item.date).toLocaleDateString('vi-VN')}</span>
-                      <div className="text-right">
-                        <div className="font-semibold">{formatCurrency(item.revenue)}</div>
-                        <div className="text-xs text-zinc-500">{item.bookings} bookings</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <RevenueChart data={revenueData.timeSeriesData} />
               ) : (
                 <div className="text-center text-zinc-500 py-8">No data available</div>
               )}
@@ -204,7 +203,7 @@ export default function ReportsPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -213,7 +212,7 @@ export default function ReportsPage() {
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">New Users</CardTitle>
+                <CardTitle className="text-sm font-medium">New Customers</CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -222,7 +221,7 @@ export default function ReportsPage() {
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+                <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -231,7 +230,7 @@ export default function ReportsPage() {
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Verified Users</CardTitle>
+                <CardTitle className="text-sm font-medium">Verified Customers</CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -242,23 +241,13 @@ export default function ReportsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>User Growth</CardTitle>
+              <CardTitle>Customer Growth</CardTitle>
             </CardHeader>
             <CardContent>
               {usersData?.timeSeriesData && usersData.timeSeriesData.length > 0 ? (
-                <div className="space-y-2">
-                  {usersData.timeSeriesData.slice(0, 10).map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-zinc-50 rounded">
-                      <span className="text-sm font-medium">{new Date(item.date).toLocaleDateString('vi-VN')}</span>
-                      <div className="text-right">
-                        <div className="font-semibold">+{item.newUsers} users</div>
-                        <div className="text-xs text-zinc-500">{item.activeUsers} active</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <UserGrowthChart data={usersData.timeSeriesData} />
               ) : (
-                <div className="text-center text-zinc-500 py-8">No user data available</div>
+                <div className="text-center text-zinc-500 py-8">No customer data available</div>
               )}
             </CardContent>
           </Card>

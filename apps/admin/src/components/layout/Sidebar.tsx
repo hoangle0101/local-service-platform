@@ -25,7 +25,7 @@ import { useRouter } from 'next/navigation';
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
-  { icon: Users, label: 'Users', href: '/users' },
+  { icon: Users, label: 'Customers', href: '/customers' },
   { icon: Briefcase, label: 'Providers', href: '/providers' },
   { icon: ShoppingBag, label: 'Services', href: '/services' },
   { icon: Calendar, label: 'Bookings', href: '/bookings' },

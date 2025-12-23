@@ -10,6 +10,7 @@ import { Eye, Calendar } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Booking } from '@/types/booking';
 import { ApiResponse, PaginatedResponse } from '@/types/system';
+import { exportToCSV } from '@/lib/export';
 
 export default function BookingsPage() {
   const router = useRouter();
@@ -46,7 +47,7 @@ export default function BookingsPage() {
       key: 'id',
       label: 'Booking ID',
       render: (booking) => (
-        <span className="font-mono text-sm">#{booking.id.slice(0, 8)}</span>
+        <span className="font-mono text-sm">#{booking.id?.toString().slice(0, 8) || 'N/A'}</span>
       ),
     },
     {
@@ -66,7 +67,7 @@ export default function BookingsPage() {
       label: 'Provider',
       render: (booking) => (
         <div>
-          <div className="font-medium">{booking.provider?.businessName}</div>
+          <div className="font-medium">{booking.provider?.displayName}</div>
           <div className="text-sm text-zinc-500">{booking.provider?.user?.phone}</div>
         </div>
       ),
@@ -124,7 +125,11 @@ export default function BookingsPage() {
           <h2 className="text-3xl font-bold tracking-tight">Bookings Management</h2>
           <p className="text-zinc-600">Monitor and manage all bookings</p>
         </div>
-        <Button variant="outline">
+        <Button 
+          variant="outline"
+          onClick={() => exportToCSV(response?.data || [], 'bookings_report')}
+          disabled={!response?.data?.length}
+        >
           <Calendar className="h-4 w-4 mr-2" />
           Export Report
         </Button>

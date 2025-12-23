@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -52,9 +52,16 @@ export function DataTable<T extends Record<string, any>>({
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onSearch?.(searchQuery);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery, onSearch]);
+
   const handleSearch = (value: string) => {
     setSearchQuery(value);
-    onSearch?.(value);
   };
 
   const handleSort = (columnKey: string) => {
