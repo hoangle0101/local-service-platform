@@ -25,6 +25,7 @@ enum BookingStatus {
   pending
   accepted
   in_progress
+  pending_completion
   completed
   cancelled
   disputed
@@ -239,6 +240,9 @@ model ProviderProfile {
   isAvailable        Boolean                               @default(true) @map("is_available")
   verificationStatus ProviderVerificationStatus            @default(unverified) @map("verification_status")
   location           Unsupported("geography(Point,4326)")?
+  address            String?                               @db.Text
+  latitude           Float?
+  longitude          Float?
   serviceRadiusM     Int                                   @default(5000) @map("service_radius_m")
   createdAt          DateTime                              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime                              @updatedAt @map("updated_at") @db.Timestamptz(6)

@@ -55,6 +55,11 @@ export class UsersService {
             serviceRadiusM: user.providerProfile.serviceRadiusM,
             verificationStatus: user.providerProfile.verificationStatus,
             isAvailable: user.providerProfile.isAvailable,
+            address: (user.providerProfile as any).address,
+            latitude: (user.providerProfile as any).latitude,
+            longitude: (user.providerProfile as any).longitude,
+            ratingAvg: user.providerProfile.ratingAvg?.toString() || '0',
+            ratingCount: user.providerProfile.ratingCount,
           }
         : null,
       wallet: user.wallet
@@ -175,7 +180,74 @@ export class UsersService {
   }
 
   async getFavorites(userId: bigint) {
-    return this.prisma.favorite.findMany({ where: { userId } });
+    const favorites = await this.prisma.favorite.findMany({
+      where: { userId, targetType: 'provider_service' },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Get full details for each favorite
+    const enrichedFavorites = await Promise.all(
+      favorites.map(async (fav) => {
+        try {
+          // targetId is the serviceId
+          const providerService = await this.prisma.providerService.findFirst({
+            where: {
+              serviceId: Number(fav.targetId),
+              deletedAt: null,
+            },
+            include: {
+              service: {
+                include: {
+                  category: true,
+                },
+              },
+              provider: {
+                include: {
+                  user: {
+                    select: {
+                      profile: {
+                        select: {
+                          avatarUrl: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          });
+
+          if (!providerService) return null;
+
+          return {
+            serviceId: providerService.serviceId,
+            targetId: fav.targetId.toString(),
+            createdAt: fav.createdAt,
+            service: {
+              id: providerService.service.id,
+              name: providerService.service.name,
+              description: providerService.service.description,
+              category: providerService.service.category?.name,
+            },
+            provider: {
+              userId: providerService.provider.userId.toString(),
+              displayName: providerService.provider.displayName,
+              avatarUrl: providerService.provider.user?.profile?.avatarUrl,
+              ratingAvg: Number(providerService.provider.ratingAvg) || 0,
+              ratingCount: providerService.provider.ratingCount,
+              isVerified:
+                providerService.provider.verificationStatus === 'verified',
+            },
+            price: Number(providerService.price),
+            currency: providerService.currency,
+          };
+        } catch (e) {
+          return null;
+        }
+      }),
+    );
+
+    return enrichedFavorites.filter((f) => f !== null);
   }
 
   async addFavorite(userId: bigint, dto: FavoriteDto) {

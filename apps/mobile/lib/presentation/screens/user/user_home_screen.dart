@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../bloc/auth/auth_bloc.dart';
+import '../../bloc/auth/auth_event.dart';
 import '../../bloc/categories/categories_bloc.dart';
 import '../../bloc/categories/categories_event_state.dart';
 import '../../bloc/services/services_bloc.dart';
@@ -24,7 +25,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     super.initState();
     // Load categories and services
     context.read<CategoriesBloc>().add(LoadCategories());
-    context.read<ServicesBloc>().add(LoadServices());
+    context.read<ServicesBloc>().add(const LoadServices());
   }
 
   void _onItemTapped(int index) {
@@ -93,11 +94,11 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                   prefixIcon: const Icon(Icons.search),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.borderLight),
+                    borderSide: const BorderSide(color: AppColors.borderLight),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.borderLight),
+                    borderSide: const BorderSide(color: AppColors.borderLight),
                   ),
                   filled: true,
                   fillColor: AppColors.backgroundSecondary,
@@ -114,7 +115,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
+                    gradient: const LinearGradient(
                       colors: [AppColors.primaryDark, AppColors.primary],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -143,10 +144,10 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                         ),
                       ),
                       const SizedBox(width: 16),
-                      Expanded(
+                      const Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
+                          children: [
                             Text(
                               'Book a Service',
                               style: TextStyle(

@@ -1,5 +1,22 @@
 import 'package:equatable/equatable.dart';
 
+// Helper functions for safe type parsing
+int _safeParseInt(dynamic value, {int defaultValue = 0}) {
+  if (value == null) return defaultValue;
+  if (value is int) return value;
+  if (value is double) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? defaultValue;
+  return defaultValue;
+}
+
+double _safeParseDouble(dynamic value, {double defaultValue = 0.0}) {
+  if (value == null) return defaultValue;
+  if (value is double) return value;
+  if (value is int) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? defaultValue;
+  return defaultValue;
+}
+
 class Category extends Equatable {
   final int id;
   final String code;
@@ -21,13 +38,15 @@ class Category extends Equatable {
 
   factory Category.fromJson(Map<String, dynamic> json) {
     return Category(
-      id: json['id'] as int,
-      code: json['code'] as String,
-      name: json['name'] as String,
-      slug: json['slug'] as String?,
-      description: json['description'] as String?,
-      iconUrl: json['icon_url'] as String? ?? json['iconUrl'] as String?,
-      parentId: json['parent_id'] as int? ?? json['parentId'] as int?,
+      id: _safeParseInt(json['id']),
+      code: (json['code'] ?? '').toString(),
+      name: (json['name'] ?? 'Category').toString(),
+      slug: json['slug']?.toString(),
+      description: json['description']?.toString(),
+      iconUrl: json['icon_url']?.toString() ?? json['iconUrl']?.toString(),
+      parentId: json['parent_id'] != null
+          ? _safeParseInt(json['parent_id'])
+          : (json['parentId'] != null ? _safeParseInt(json['parentId']) : null),
     );
   }
 
@@ -67,13 +86,16 @@ class Service extends Equatable {
 
   factory Service.fromJson(Map<String, dynamic> json) {
     return Service(
-      id: json['id'] as int,
-      name: json['name'] as String,
-      description: json['description'] as String?,
-      categoryId: json['category_id'] as int? ?? json['categoryId'] as int,
-      iconUrl: json['icon_url'] as String? ?? json['iconUrl'] as String?,
-      durationMinutes:
-          json['duration_minutes'] as int? ?? json['durationMinutes'] as int?,
+      id: _safeParseInt(json['id']),
+      name: (json['name'] ?? 'Service').toString(),
+      description: json['description']?.toString(),
+      categoryId: _safeParseInt(json['category_id'] ?? json['categoryId']),
+      iconUrl: json['icon_url']?.toString() ?? json['iconUrl']?.toString(),
+      durationMinutes: json['duration_minutes'] != null
+          ? _safeParseInt(json['duration_minutes'])
+          : (json['durationMinutes'] != null
+              ? _safeParseInt(json['durationMinutes'])
+              : null),
     );
   }
 
@@ -113,11 +135,35 @@ class ProviderService extends Equatable {
   });
 
   factory ProviderService.fromJson(Map<String, dynamic> json) {
+    // Parse serviceId - could be int or String from backend
+    int serviceId;
+    if (json['service_id'] != null) {
+      serviceId = json['service_id'] is int
+          ? json['service_id']
+          : int.parse(json['service_id'].toString());
+    } else {
+      serviceId = json['serviceId'] is int
+          ? json['serviceId']
+          : int.parse(json['serviceId'].toString());
+    }
+
+    // Parse providerUserId - could be int or String
+    String providerUserId =
+        (json['provider_user_id'] ?? json['providerUserId']).toString();
+
+    // Parse price - could be String or num
+    double price = 0.0;
+    final priceValue = json['price'];
+    if (priceValue != null) {
+      price = priceValue is num
+          ? priceValue.toDouble()
+          : double.tryParse(priceValue.toString()) ?? 0.0;
+    }
+
     return ProviderService(
-      serviceId: json['service_id'] as int? ?? json['serviceId'] as int,
-      providerUserId: json['provider_user_id'] as String? ??
-          json['providerUserId'] as String,
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      serviceId: serviceId,
+      providerUserId: providerUserId,
+      price: price,
       currency: json['currency'] as String? ?? 'VND',
       isActive: json['is_active'] as bool? ?? json['isActive'] as bool? ?? true,
       service: Service.fromJson(json['service'] as Map<String, dynamic>),
@@ -146,17 +192,41 @@ class ProviderInfo extends Equatable {
   });
 
   factory ProviderInfo.fromJson(Map<String, dynamic> json) {
+    // Parse userId - could be int or String
+    String userId = (json['user_id'] ?? json['userId']).toString();
+
+    // Parse displayName
+    String displayName =
+        (json['display_name'] ?? json['displayName'] ?? 'Provider').toString();
+
+    // Parse isVerified
+    bool isVerified =
+        json['is_verified'] as bool? ?? json['isVerified'] as bool? ?? false;
+
+    // Parse ratingAvg - could be String or num
+    double ratingAvg = 0.0;
+    final ratingValue = json['rating_avg'] ?? json['ratingAvg'];
+    if (ratingValue != null) {
+      ratingAvg = ratingValue is num
+          ? ratingValue.toDouble()
+          : double.tryParse(ratingValue.toString()) ?? 0.0;
+    }
+
+    // Parse ratingCount - could be String or int
+    int ratingCount = 0;
+    final countValue = json['rating_count'] ?? json['ratingCount'];
+    if (countValue != null) {
+      ratingCount = countValue is int
+          ? countValue
+          : int.tryParse(countValue.toString()) ?? 0;
+    }
+
     return ProviderInfo(
-      userId: json['user_id'] as String? ?? json['userId'] as String,
-      displayName:
-          json['display_name'] as String? ?? json['displayName'] as String,
-      isVerified:
-          json['is_verified'] as bool? ?? json['isVerified'] as bool? ?? false,
-      ratingAvg: (json['rating_avg'] as num?)?.toDouble() ??
-          (json['ratingAvg'] as num?)?.toDouble() ??
-          0.0,
-      ratingCount:
-          json['rating_count'] as int? ?? json['ratingCount'] as int? ?? 0,
+      userId: userId,
+      displayName: displayName,
+      isVerified: isVerified,
+      ratingAvg: ratingAvg,
+      ratingCount: ratingCount,
     );
   }
 

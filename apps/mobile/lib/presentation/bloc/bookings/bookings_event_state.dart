@@ -31,6 +31,7 @@ class CreateBookingEvent extends BookingsEvent {
   final double latitude;
   final double longitude;
   final String? notes;
+  final int? providerId; // For direct booking
 
   const CreateBookingEvent({
     required this.serviceId,
@@ -39,11 +40,19 @@ class CreateBookingEvent extends BookingsEvent {
     required this.latitude,
     required this.longitude,
     this.notes,
+    this.providerId,
   });
 
   @override
-  List<Object?> get props =>
-      [serviceId, scheduledAt, addressText, latitude, longitude, notes];
+  List<Object?> get props => [
+        serviceId,
+        scheduledAt,
+        addressText,
+        latitude,
+        longitude,
+        notes,
+        providerId
+      ];
 }
 
 class LoadBookingOffersEvent extends BookingsEvent {
@@ -159,15 +168,20 @@ class BookingCreated extends BookingsState {
   final String bookingId;
   final String bookingCode;
   final List<String> nearbyProviderIds;
+  final bool isDirectBooking;
+  final String? providerId;
 
   const BookingCreated({
     required this.bookingId,
     required this.bookingCode,
     required this.nearbyProviderIds,
+    this.isDirectBooking = false,
+    this.providerId,
   });
 
   @override
-  List<Object?> get props => [bookingId, bookingCode, nearbyProviderIds];
+  List<Object?> get props =>
+      [bookingId, bookingCode, nearbyProviderIds, isDirectBooking, providerId];
 }
 
 class BookingOffersLoaded extends BookingsState {
@@ -241,19 +255,33 @@ class BookingOffer {
   final int bookingId;
   final int providerId;
   final String providerName;
+  final String? providerAddress;
   final double? rating;
   final double price;
   final String status;
+  final int? distance; // Distance in meters from booking location
 
   BookingOffer({
     required this.id,
     required this.bookingId,
     required this.providerId,
     required this.providerName,
+    this.providerAddress,
     this.rating,
     required this.price,
     required this.status,
+    this.distance,
   });
+
+  /// Get formatted distance string (e.g., "1.5 km" or "500 m")
+  String? get formattedDistance {
+    if (distance == null) return null;
+    if (distance! < 1000) {
+      return '$distance m';
+    } else {
+      return '${(distance! / 1000).toStringAsFixed(1)} km';
+    }
+  }
 
   factory BookingOffer.fromJson(Map<String, dynamic> json) {
     return BookingOffer(
@@ -261,11 +289,15 @@ class BookingOffer {
       bookingId: int.parse(json['bookingId'].toString()),
       providerId: int.parse(json['providerId'].toString()),
       providerName: json['providerName'] ?? 'Unknown',
+      providerAddress: json['providerAddress'],
       rating: json['rating'] != null
           ? double.tryParse(json['rating'].toString())
           : null,
       price: double.parse(json['price'].toString()),
       status: json['status'],
+      distance: json['distance'] != null
+          ? int.tryParse(json['distance'].toString())
+          : null,
     );
   }
 }
@@ -274,23 +306,35 @@ class Booking {
   final String id;
   final String code;
   final String status;
-  final DateTime scheduledAt;
-  final String addressText;
-  final double? estimatedPrice;
-  final String serviceName;
+  final DateTime? scheduledAt;
+  final String? addressText;
+  final String? estimatedPrice;
+  final String? serviceName;
+  final String? categoryName;
   final String? providerName;
   final String? customerName;
+  final int? distance; // Distance in meters from provider
+  final String? bookingType; // 'DIRECT' or 'GENERAL'
+  final bool isDirectBooking;
+  final bool hasReview;
+  final BookingReview? review;
 
   Booking({
     required this.id,
     required this.code,
     required this.status,
-    required this.scheduledAt,
-    required this.addressText,
+    this.scheduledAt,
+    this.addressText,
     this.estimatedPrice,
-    required this.serviceName,
+    this.serviceName,
+    this.categoryName,
     this.providerName,
     this.customerName,
+    this.distance,
+    this.bookingType,
+    this.isDirectBooking = false,
+    this.hasReview = false,
+    this.review,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) {
@@ -299,16 +343,50 @@ class Booking {
       code: json['code'] ?? '',
       status: json['status'] ?? 'pending',
       scheduledAt: json['scheduledAt'] != null
-          ? DateTime.parse(json['scheduledAt'])
-          : DateTime.now(),
-      addressText: json['addressText'] ?? '',
-      estimatedPrice: json['estimatedPrice'] != null
-          ? double.tryParse(json['estimatedPrice'].toString())
+          ? DateTime.tryParse(json['scheduledAt'].toString())
           : null,
-      serviceName:
-          json['service']?['name'] ?? json['serviceName'] ?? 'Unknown Service',
+      addressText: json['addressText'] as String?,
+      estimatedPrice: json['estimatedPrice']?.toString(),
+      serviceName: json['service']?['name'] ?? json['serviceName'] ?? 'Dịch vụ',
+      categoryName: json['categoryName'] as String?,
       providerName: json['provider']?['fullName'] ?? json['providerName'],
       customerName: json['customer']?['fullName'] ?? json['customerName'],
+      distance:
+          json['distance'] != null ? (json['distance'] as num).toInt() : null,
+      bookingType: json['bookingType'] as String?,
+      isDirectBooking: json['isDirectBooking'] == true,
+      hasReview: json['hasReview'] == true,
+      review: json['review'] != null
+          ? BookingReview.fromJson(json['review'])
+          : null,
+    );
+  }
+}
+
+/// Review info attached to a booking
+class BookingReview {
+  final String id;
+  final int rating;
+  final String? comment;
+  final DateTime? createdAt;
+
+  BookingReview({
+    required this.id,
+    required this.rating,
+    this.comment,
+    this.createdAt,
+  });
+
+  factory BookingReview.fromJson(Map<String, dynamic> json) {
+    return BookingReview(
+      id: json['id']?.toString() ?? '',
+      rating: json['rating'] is int
+          ? json['rating']
+          : int.tryParse(json['rating'].toString()) ?? 5,
+      comment: json['comment'] as String?,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString())
+          : null,
     );
   }
 }

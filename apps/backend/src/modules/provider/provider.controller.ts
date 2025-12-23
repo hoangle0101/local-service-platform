@@ -8,8 +8,21 @@ import {
   Param,
   UseGuards,
   ParseIntPipe,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiParam,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
 import { ProviderService } from './provider.service';
 import {
   OnboardingDto,
@@ -23,6 +36,38 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+
+// Multer configuration for avatar upload
+// Use process.cwd() to match static serving path in main.ts
+const uploadPath = join(process.cwd(), 'uploads', 'avatars');
+const avatarStorage = diskStorage({
+  destination: (req, file, callback) => {
+    // Ensure directory exists
+    const fs = require('fs');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    console.log('[Multer] Saving avatar to:', uploadPath);
+    callback(null, uploadPath);
+  },
+  filename: (req, file, callback) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const ext = extname(file.originalname);
+    const filename = `avatar-${uniqueSuffix}${ext}`;
+    console.log('[Multer] Avatar filename:', filename);
+    callback(null, filename);
+  },
+});
+
+const imageFileFilter = (req: any, file: any, callback: any) => {
+  if (!file.mimetype.match(/\/(jpg|jpeg|png|gif|webp)$/)) {
+    return callback(
+      new BadRequestException('Only image files are allowed!'),
+      false,
+    );
+  }
+  callback(null, true);
+};
 
 @ApiTags('Provider')
 @Controller('provider')
@@ -54,6 +99,44 @@ export class ProviderController {
     @Body() dto: UpdateProviderProfileDto,
   ) {
     return this.providerService.updateProfile(BigInt(user.userId), dto);
+  }
+
+  @Post('me/avatar')
+  @UseGuards(RolesGuard)
+  @Roles('provider')
+  @UseInterceptors(
+    FileInterceptor('avatar', {
+      storage: avatarStorage,
+      fileFilter: imageFileFilter,
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB max
+      },
+    }),
+  )
+  @ApiOperation({ summary: 'Upload provider avatar' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        avatar: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  async uploadAvatar(
+    @CurrentUser() user: any,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+    return this.providerService.updateAvatar(
+      BigInt(user.userId),
+      `/uploads/avatars/${file.filename}`,
+    );
   }
 
   @Patch('me/availability')
@@ -93,7 +176,11 @@ export class ProviderController {
     @Param('serviceId', ParseIntPipe) serviceId: number,
     @Body() dto: UpdateProviderServiceDto,
   ) {
-    return this.providerService.updateService(BigInt(user.userId), serviceId, dto);
+    return this.providerService.updateService(
+      BigInt(user.userId),
+      serviceId,
+      dto,
+    );
   }
 
   @Delete('services/:serviceId')
@@ -120,7 +207,10 @@ export class ProviderController {
   @UseGuards(RolesGuard)
   @Roles('provider')
   @ApiOperation({ summary: 'Update provider location (GPS coordinates)' })
-  async updateLocation(@CurrentUser() user: any, @Body() dto: UpdateLocationDto) {
+  async updateLocation(
+    @CurrentUser() user: any,
+    @Body() dto: UpdateLocationDto,
+  ) {
     return this.providerService.updateLocation(
       BigInt(user.userId),
       dto.latitude,

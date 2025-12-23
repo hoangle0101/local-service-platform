@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'dart:async';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/entities/entities.dart';
+import '../../../data/datasources/track_asia_datasource.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../bloc/services/services_bloc.dart';
@@ -48,12 +50,19 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
 
   bool _isSubmitting = false;
 
+  // Track Asia autocomplete
+  final TrackAsiaDataSource _trackAsiaDataSource = TrackAsiaDataSource();
+  List<AddressPrediction> _addressPredictions = [];
+  Timer? _debounceTimer;
+  bool _showPredictions = false;
+  bool _isSearching = false;
+
   @override
   void initState() {
     super.initState();
     // Load categories and services
     context.read<CategoriesBloc>().add(LoadCategories());
-    context.read<ServicesBloc>().add(LoadServices());
+    context.read<ServicesBloc>().add(const LoadServices());
   }
 
   @override
@@ -65,7 +74,100 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
     _wardController.dispose();
     _streetController.dispose();
     _houseNumberController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
+  }
+
+  /// Search for addresses using Track Asia API
+  void _onAddressSearch(String query) {
+    _debounceTimer?.cancel();
+
+    if (query.length < 2) {
+      setState(() {
+        _addressPredictions = [];
+        _showPredictions = false;
+      });
+      return;
+    }
+
+    setState(() => _isSearching = true);
+
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+      try {
+        final predictions = await _trackAsiaDataSource.searchAddress(query);
+        if (mounted) {
+          setState(() {
+            _addressPredictions = predictions;
+            _showPredictions = predictions.isNotEmpty;
+            _isSearching = false;
+          });
+        }
+      } catch (e) {
+        print('[CompleteBooking] Search error: $e');
+        if (mounted) {
+          setState(() {
+            _isSearching = false;
+            _showPredictions = false;
+          });
+        }
+      }
+    });
+  }
+
+  /// Select an address prediction and fetch GPS coordinates
+  Future<void> _onPredictionSelected(AddressPrediction prediction) async {
+    setState(() {
+      _addressController.text = prediction.formattedAddress;
+      _showPredictions = false;
+      _addressPredictions = [];
+      _isLoadingLocation = true;
+    });
+
+    try {
+      final detail =
+          await _trackAsiaDataSource.getPlaceDetail(prediction.placeId);
+      if (detail != null && mounted) {
+        setState(() {
+          _latitude = detail.latitude;
+          _longitude = detail.longitude;
+          _isLoadingLocation = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                      'Đã lấy tọa độ: ${_latitude.toStringAsFixed(4)}, ${_longitude.toStringAsFixed(4)}'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        setState(() => _isLoadingLocation = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Không thể lấy tọa độ từ địa chỉ này'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingLocation = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   /// Geocode manual Vietnamese address to get GPS coordinates
@@ -370,7 +472,7 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
               border: Border.all(color: Colors.grey.shade300),
             ),
             child: DropdownButtonFormField<Category>(
-              value: _selectedCategory,
+              initialValue: _selectedCategory,
               decoration: const InputDecoration(
                 contentPadding:
                     EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -464,7 +566,7 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
                                 AppColors.primaryLight.withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(Icons.home_repair_service,
+                          child: const Icon(Icons.home_repair_service,
                               color: AppColors.primary),
                         ),
                         const SizedBox(width: 12),
@@ -499,7 +601,7 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
                             ),
                             Row(
                               children: [
-                                Icon(Icons.star, size: 14, color: Colors.amber),
+                                const Icon(Icons.star, size: 14, color: Colors.amber),
                                 Text(
                                   ' ${service.provider.ratingAvg.toStringAsFixed(1)}',
                                   style: const TextStyle(fontSize: 12),
@@ -705,61 +807,133 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
         ),
         const SizedBox(height: 12),
 
-        // GPS Option
+        // Track Asia Autocomplete or GPS Option
         if (!_useManualAddress) ...[
-          TextFormField(
-            controller: _addressController,
-            decoration: InputDecoration(
-              hintText: 'Địa chỉ sẽ tự động lấy từ GPS',
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey.shade300),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: _addressController,
+                onChanged: _onAddressSearch,
+                onTap: () {
+                  if (_addressController.text.length >= 2) {
+                    _onAddressSearch(_addressController.text);
+                  }
+                },
+                decoration: InputDecoration(
+                  hintText: 'Nhập địa chỉ để tìm kiếm...',
+                  helperText: 'Sử dụng Track Asia API cho địa chỉ Việt Nam',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _isSearching || _isLoadingLocation
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : _addressController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                setState(() {
+                                  _addressController.clear();
+                                  _addressPredictions = [];
+                                  _showPredictions = false;
+                                });
+                              },
+                            )
+                          : null,
+                ),
+                validator: (value) {
+                  if (!_useManualAddress && (value == null || value.isEmpty)) {
+                    return 'Vui lòng nhập địa chỉ';
+                  }
+                  return null;
+                },
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey.shade300),
-              ),
-              prefixIcon: const Icon(Icons.location_on_outlined),
-              suffixIcon: _isLoadingLocation
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+
+              // Autocomplete suggestions dropdown
+              if (_showPredictions && _addressPredictions.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
                       ),
-                    )
-                  : IconButton(
-                      icon: const Icon(Icons.my_location,
-                          color: AppColors.primary),
-                      onPressed: _getCurrentLocation,
-                    ),
-            ),
-            maxLines: 2,
-            validator: (value) {
-              if (!_useManualAddress && (value == null || value.isEmpty)) {
-                return 'Vui lòng lấy vị trí GPS';
-              }
-              return null;
-            },
+                    ],
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: EdgeInsets.zero,
+                    itemCount: _addressPredictions.length,
+                    separatorBuilder: (_, __) =>
+                        Divider(height: 1, color: Colors.grey.shade200),
+                    itemBuilder: (context, index) {
+                      final prediction = _addressPredictions[index];
+                      return ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.location_on,
+                            color: AppColors.primary, size: 20),
+                        title: Text(
+                          prediction.mainText.isNotEmpty
+                              ? prediction.mainText
+                              : prediction.description,
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          prediction.secondaryText,
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () => _onPredictionSelected(prediction),
+                      );
+                    },
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
-          ElevatedButton.icon(
-            onPressed: _isLoadingLocation ? null : _getCurrentLocation,
-            icon: const Icon(Icons.gps_fixed, size: 18),
-            label: Text(_isLoadingLocation
-                ? 'Đang lấy vị trí...'
-                : 'Lấy vị trí hiện tại'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 44),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _isLoadingLocation ? null : _getCurrentLocation,
+                  icon: const Icon(Icons.gps_fixed, size: 18),
+                  label: const Text('GPS hiện tại'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey.shade600,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(0, 44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ],
 

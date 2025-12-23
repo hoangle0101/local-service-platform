@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   OnboardingDto,
@@ -126,10 +130,57 @@ export class ProviderService {
 
   // PATCH /provider/me
   async updateProfile(userId: bigint, dto: UpdateProviderProfileDto) {
+    // Extract location fields (needs raw SQL update)
+    const { latitude, longitude, address, ...profileData } = dto;
+
+    // Update profile data via Prisma (only fields in Prisma schema)
     const updated = await this.prisma.providerProfile.update({
       where: { userId },
-      data: dto,
+      data: {
+        displayName: profileData.displayName,
+        bio: profileData.bio,
+        skills: profileData.skills,
+        serviceRadiusM: profileData.serviceRadiusM,
+      },
     });
+
+    // Update location and address via raw SQL (these fields may not be in Prisma types)
+    if (latitude != null && longitude != null) {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `
+          UPDATE provider_profiles
+          SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326),
+              address = COALESCE($3, address),
+              latitude = $2,
+              longitude = $1,
+              updated_at = NOW()
+          WHERE user_id = $4
+        `,
+          longitude,
+          latitude,
+          address || null,
+          userId,
+        );
+      } catch (e) {
+        console.error('[Provider] Failed to update location:', e);
+      }
+    } else if (address) {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `
+          UPDATE provider_profiles
+          SET address = $1,
+              updated_at = NOW()
+          WHERE user_id = $2
+        `,
+          address,
+          userId,
+        );
+      } catch (e) {
+        console.error('[Provider] Failed to update address:', e);
+      }
+    }
 
     return {
       userId: updated.userId.toString(),
@@ -137,6 +188,23 @@ export class ProviderService {
       bio: updated.bio,
       skills: updated.skills,
       serviceRadiusM: updated.serviceRadiusM,
+      address,
+      latitude,
+      longitude,
+    };
+  }
+
+  // POST /provider/me/avatar
+  async updateAvatar(userId: bigint, avatarUrl: string) {
+    // Update user profile with avatar URL
+    await this.prisma.userProfile.update({
+      where: { userId },
+      data: { avatarUrl },
+    });
+
+    return {
+      avatarUrl,
+      message: 'Avatar updated successfully',
     };
   }
 
@@ -255,7 +323,11 @@ export class ProviderService {
   }
 
   // PATCH /provider/services/:serviceId
-  async updateService(userId: bigint, serviceId: number, dto: UpdateProviderServiceDto) {
+  async updateService(
+    userId: bigint,
+    serviceId: number,
+    dto: UpdateProviderServiceDto,
+  ) {
     const updated = await this.prisma.providerService.update({
       where: {
         providerUserId_serviceId: {
@@ -296,7 +368,13 @@ export class ProviderService {
 
   // GET /provider/statistics
   async getStatistics(userId: bigint) {
-    const [totalBookings, completedBookings, earnings, provider] = await Promise.all([
+    const [
+      totalBookings,
+      completedBookings,
+      pendingBookings,
+      earnings,
+      provider,
+    ] = await Promise.all([
       // Total bookings
       this.prisma.booking.count({
         where: { providerId: userId },
@@ -304,6 +382,13 @@ export class ProviderService {
       // Completed bookings
       this.prisma.booking.count({
         where: { providerId: userId, status: 'completed' },
+      }),
+      // Pending bookings (pending, accepted, in_progress)
+      this.prisma.booking.count({
+        where: {
+          providerId: userId,
+          status: { in: ['pending', 'accepted', 'in_progress'] },
+        },
       }),
       // Total earnings (completed bookings)
       this.prisma.booking.aggregate({
@@ -321,17 +406,31 @@ export class ProviderService {
       }),
     ]);
 
+    const totalEarningsValue = earnings._sum?.providerEarning
+      ? Number(earnings._sum.providerEarning)
+      : 0;
+
     return {
       totalBookings,
       completedBookings,
-      totalEarnings: earnings._sum?.providerEarning?.toString() || '0',
-      ratingAvg: provider?.ratingAvg.toString() || '0',
+      completedJobs: completedBookings, // Alias for frontend compatibility
+      pendingBookings,
+      pendingJobs: pendingBookings, // Alias for frontend compatibility
+      totalEarnings: totalEarningsValue,
+      rating: provider?.ratingAvg ? Number(provider.ratingAvg) : 0,
+      ratingAvg: provider?.ratingAvg?.toString() || '0',
       ratingCount: provider?.ratingCount || 0,
+      isAvailable: provider?.isAvailable ?? true,
     };
   }
 
   // PATCH /provider/me/location
-  async updateLocation(userId: bigint, latitude: number, longitude: number, addressText?: string) {
+  async updateLocation(
+    userId: bigint,
+    latitude: number,
+    longitude: number,
+    addressText?: string,
+  ) {
     // Verify provider profile exists
     const provider = await this.prisma.providerProfile.findUnique({
       where: { userId },
@@ -343,11 +442,15 @@ export class ProviderService {
 
     // Validate coordinates
     if (latitude < -90 || latitude > 90) {
-      throw new BadRequestException('Invalid latitude. Must be between -90 and 90');
+      throw new BadRequestException(
+        'Invalid latitude. Must be between -90 and 90',
+      );
     }
 
     if (longitude < -180 || longitude > 180) {
-      throw new BadRequestException('Invalid longitude. Must be between -180 and 180');
+      throw new BadRequestException(
+        'Invalid longitude. Must be between -180 and 180',
+      );
     }
 
     // Update location using PostGIS

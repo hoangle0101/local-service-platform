@@ -2,19 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/entities/entities.dart';
+import '../../../data/datasources/track_asia_datasource.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 
 class CreateBookingScreen extends StatefulWidget {
   final int serviceId;
   final ProviderService? service;
+  final int? providerId; // For direct booking
 
   const CreateBookingScreen({
     super.key,
     required this.serviceId,
     this.service,
+    this.providerId,
   });
 
   @override
@@ -32,11 +36,69 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
   double _latitude = 21.0285;
   double _longitude = 105.8542;
 
+  // Track Asia API for address autocomplete
+  final TrackAsiaDataSource _trackAsiaDataSource = TrackAsiaDataSource();
+  List<AddressPrediction> _addressPredictions = [];
+  Timer? _debounceTimer;
+  bool _showPredictions = false;
+
   @override
   void dispose() {
     _addressController.dispose();
     _notesController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
+  }
+
+  /// Search for addresses using Track Asia API
+  void _onAddressSearch(String query) {
+    _debounceTimer?.cancel();
+
+    if (query.length < 3) {
+      setState(() {
+        _addressPredictions = [];
+        _showPredictions = false;
+      });
+      return;
+    }
+
+    _debounceTimer = Timer(const Duration(milliseconds: 400), () async {
+      try {
+        final predictions = await _trackAsiaDataSource.searchAddress(query);
+        if (mounted) {
+          setState(() {
+            _addressPredictions = predictions;
+            _showPredictions = predictions.isNotEmpty;
+          });
+        }
+      } catch (e) {
+        debugPrint('[CreateBooking] Address search error: $e');
+      }
+    });
+  }
+
+  /// Select an address from predictions
+  Future<void> _selectAddress(AddressPrediction prediction) async {
+    setState(() => _showPredictions = false);
+
+    try {
+      final detail =
+          await _trackAsiaDataSource.getPlaceDetail(prediction.placeId);
+      if (mounted && detail != null) {
+        // Use FullAddress for better display
+        final fullAddress = FullAddress.fromPlaceDetail(detail);
+        setState(() {
+          _addressController.text = fullAddress.displayText;
+          _latitude = fullAddress.latitude;
+          _longitude = fullAddress.longitude;
+        });
+      } else {
+        setState(() => _addressController.text = prediction.description);
+      }
+    } catch (e) {
+      debugPrint('[CreateBooking] Place detail error: $e');
+      setState(() => _addressController.text = prediction.description);
+    }
   }
 
   @override
@@ -56,12 +118,8 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
             // Show success dialog
             _showSuccessDialog(context, state);
           } else if (state is BookingsError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
-            );
+            // Show error dialog for better visibility
+            _showErrorDialog(context, state.message);
           }
         },
         builder: (context, state) {
@@ -125,7 +183,29 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
               style: const TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 16),
-            if (state.nearbyProviderIds.isEmpty)
+            if (state.isDirectBooking)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.person_pin, color: AppColors.primary),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Đã gửi yêu cầu đặt lịch đến provider. Vui lòng chờ xác nhận.',
+                        style: TextStyle(
+                            color: AppColors.primaryDark,
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (state.nearbyProviderIds.isEmpty)
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -186,6 +266,54 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
               foregroundColor: Colors.white,
             ),
             child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(BuildContext context, String errorMessage) {
+    // Extract meaningful message from error
+    String displayMessage = errorMessage;
+    if (errorMessage.contains('Failed to create booking:')) {
+      displayMessage =
+          errorMessage.replaceFirst('Failed to create booking:', '').trim();
+    }
+    if (displayMessage.contains('Exception:')) {
+      displayMessage = displayMessage.replaceFirst('Exception:', '').trim();
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child:
+                  const Icon(Icons.error_outline, color: Colors.red, size: 28),
+            ),
+            const SizedBox(width: 12),
+            const Text('Không thể đặt lịch', style: TextStyle(fontSize: 18)),
+          ],
+        ),
+        content: Text(
+          displayMessage,
+          style: const TextStyle(fontSize: 15, height: 1.4),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Đã hiểu'),
           ),
         ],
       ),
@@ -274,20 +402,20 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
                     fontSize: 16,
                   ),
                 ),
-                if (widget.service!.provider != null) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.person, size: 14, color: Colors.grey.shade600),
-                      const SizedBox(width: 4),
-                      Text(
-                        widget.service!.provider!.displayName,
-                        style: TextStyle(
-                            color: Colors.grey.shade600, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ],
+                ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.person, size: 14, color: Colors.grey.shade600),
+                    const SizedBox(width: 4),
+                    Text(
+                      widget.service!.provider!.displayName,
+                      style: TextStyle(
+                          color: Colors.grey.shade600, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ],
               ],
             ),
           ),
@@ -414,16 +542,23 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
             Icon(Icons.location_on, size: 20, color: AppColors.primary),
             SizedBox(width: 8),
             Text(
-              'Where do you need the service?',
+              'Địa điểm cần đến',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ],
         ),
+        const SizedBox(height: 4),
+        Text(
+          'Sử dụng Track Asia API để tìm địa chỉ chính xác',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
         const SizedBox(height: 12),
+
+        // Address input with autocomplete
         TextFormField(
           controller: _addressController,
           decoration: InputDecoration(
-            hintText: 'Enter your address',
+            hintText: 'Nhập địa chỉ để tìm kiếm...',
             prefixIcon: const Icon(Icons.location_on_outlined),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -433,28 +568,86 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
               onPressed: _getCurrentLocation,
             ),
           ),
+          onChanged: _onAddressSearch,
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Please enter your address';
+              return 'Vui lòng nhập địa chỉ';
             }
             return null;
           },
         ),
+
+        // Address predictions dropdown
+        if (_showPredictions && _addressPredictions.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 4),
+            constraints: const BoxConstraints(maxHeight: 180),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _addressPredictions.length,
+              itemBuilder: (context, index) {
+                final prediction = _addressPredictions[index];
+                return ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(
+                      Icons.location_on,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
+                  ),
+                  title: Text(
+                    prediction.mainText,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w500, fontSize: 14),
+                  ),
+                  subtitle: Text(
+                    prediction.secondaryText,
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  ),
+                  onTap: () => _selectAddress(prediction),
+                );
+              },
+            ),
+          ),
+
         const SizedBox(height: 8),
+
+        // GPS coordinates display
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: Colors.grey.shade100,
+            color: AppColors.primary.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
           ),
           child: Row(
             children: [
-              Icon(Icons.gps_fixed, size: 16, color: Colors.grey.shade600),
+              const Icon(Icons.gps_fixed, size: 16, color: AppColors.primary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'GPS: $_latitude, $_longitude',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  'Tọa độ: ${_latitude.toStringAsFixed(6)}, ${_longitude.toStringAsFixed(6)}',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
@@ -653,6 +846,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
             latitude: _latitude,
             longitude: _longitude,
             notes: _notesController.text.isEmpty ? null : _notesController.text,
+            providerId: widget.providerId, // Pass provider for direct booking
           ));
     }
   }

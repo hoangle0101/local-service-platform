@@ -33,7 +33,8 @@ export class UploadService {
     const ext = path.extname(file.originalname);
     const filename = `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
     const relativePath = path.join('uploads', userId.toString(), filename);
-    const fullPath = path.join(process.cwd(), 'public', relativePath);
+    // Save to uploads/ directory (same as what static server serves)
+    const fullPath = path.join(process.cwd(), relativePath);
 
     // Create directory if not exists
     const dir = path.dirname(fullPath);
