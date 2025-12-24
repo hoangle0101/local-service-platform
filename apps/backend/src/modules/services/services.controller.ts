@@ -25,7 +25,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 @ApiTags('Services & Categories')
 @Controller('services')
 export class ServicesController {
-  constructor(private servicesService: ServicesService) {}
+  constructor(private servicesService: ServicesService) { }
 
   // ==================== CATEGORY ENDPOINTS ====================
 

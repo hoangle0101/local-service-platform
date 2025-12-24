@@ -46,14 +46,14 @@ export default function PaymentsPage() {
       ),
     },
     {
-key: 'booking',
+      key: 'booking',
       label: 'Customer',
-      render: (payment) => (
+      render: (payment: any) => (
         <div>
           <div className="font-medium">
-            {payment.booking?.customer?.profile?.fullName || 'N/A'}
+            {payment.customerPhone || payment.booking?.customer?.profile?.fullName || 'N/A'}
           </div>
-          <div className="text-sm text-zinc-500">{payment.booking?.customer?.phone}</div>
+          <div className="text-sm text-zinc-500">{payment.customerEmail || payment.booking?.customer?.phone}</div>
         </div>
       ),
     },
@@ -86,7 +86,7 @@ key: 'booking',
       key: 'gatewayTransactionId',
       label: 'Transaction ID',
       render: (payment) => (
-        payment.gatewayTransactionId 
+        payment.gatewayTransactionId
           ? <span className="font-mono text-xs">{payment.gatewayTransactionId}</span>
           : <span className="text-zinc-400">—</span>
       ),
@@ -125,11 +125,11 @@ key: 'booking',
         pagination={
           response?.pagination
             ? {
-                page,
-                pageSize: response.pagination.limit,
-                total: response.pagination.total,
-                onPageChange: setPage,
-              }
+              page,
+              pageSize: response.pagination.limit,
+              total: response.pagination.total,
+              onPageChange: setPage,
+            }
             : undefined
         }
         isLoading={isLoading}

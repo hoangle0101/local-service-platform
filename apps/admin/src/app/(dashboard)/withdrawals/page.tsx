@@ -71,10 +71,10 @@ export default function WithdrawalsPage() {
     {
       key: 'wallet',
       label: 'User',
-      render: (req) => (
+      render: (req: any) => (
         <div>
-          <div className="font-medium">{req.wallet?.user?.profile?.fullName || 'N/A'}</div>
-          <div className="text-sm text-zinc-500">{req.wallet?.user?.phone}</div>
+          <div className="font-medium">{req.user?.fullName || req.wallet?.user?.profile?.fullName || 'N/A'}</div>
+          <div className="text-sm text-zinc-500">{req.user?.phone || req.wallet?.user?.phone}</div>
         </div>
       ),
     },
@@ -153,11 +153,11 @@ export default function WithdrawalsPage() {
         pagination={
           response?.pagination
             ? {
-                page,
-                pageSize: response.pagination.limit,
-                total: response.pagination.total,
-                onPageChange: setPage,
-              }
+              page,
+              pageSize: response.pagination.limit,
+              total: response.pagination.total,
+              onPageChange: setPage,
+            }
             : undefined
         }
         isLoading={isLoading}
