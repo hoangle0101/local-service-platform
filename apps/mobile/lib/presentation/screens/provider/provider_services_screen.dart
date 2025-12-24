@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/entities/entities.dart';
 import '../../../data/datasources/provider_datasource.dart';
@@ -343,11 +344,13 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                         ),
                       const SizedBox(height: 12),
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
                         children: [
                           Text(
                             _formatPrice(price),
                             style: const TextStyle(
-                              fontSize: 18,
+                              fontSize: 20,
                               fontWeight: FontWeight.w900,
                               color: AppColors.primary,
                               letterSpacing: -0.5,
@@ -464,12 +467,8 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
   }
 
   String _formatPrice(double price) {
-    if (price >= 1000000) {
-      return '${(price / 1000000).toStringAsFixed(1)}M';
-    } else if (price >= 1000) {
-      return '${(price / 1000).toStringAsFixed(0)}K';
-    }
-    return price.toStringAsFixed(0);
+    final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: '');
+    return formatter.format(price).trim();
   }
 
   Future<void> _toggleService(int serviceId, bool isActive) async {
@@ -664,10 +663,17 @@ class _AddServiceSheetState extends State<_AddServiceSheet> {
                       itemBuilder: (cat) => Text(cat.name,
                           style: const TextStyle(
                               fontWeight: FontWeight.w600, fontSize: 14)),
-                      onChanged: (cat) => setState(() {
-                        _selectedCategory = cat;
-                        _selectedService = null;
-                      }),
+                      onChanged: (cat) {
+                        if (cat != null) {
+                          setState(() {
+                            _selectedCategory = cat;
+                            _selectedService = null;
+                          });
+                          context
+                              .read<ServicesBloc>()
+                              .add(LoadGenericServices(categoryId: cat.id));
+                        }
+                      },
                     );
                   }
                   return const Center(
@@ -678,31 +684,32 @@ class _AddServiceSheetState extends State<_AddServiceSheet> {
               _buildLabel('Tên dịch vụ cụ thể'),
               BlocBuilder<ServicesBloc, ServicesState>(
                 builder: (context, state) {
-                  if (state is ServicesLoaded) {
-                    final Map<int, Service> uniqueServices = {};
-                    for (var ps in state.services) {
-                      if (_selectedCategory == null ||
-                          ps.service.categoryId == _selectedCategory!.id) {
-                        uniqueServices[ps.service.id] = ps.service;
-                      }
-                    }
-                    final services = uniqueServices.values.toList();
-
+                  if (state is GenericServicesLoaded) {
                     return _buildDropdown<Service>(
                       value: _selectedService,
-                      hint: _selectedCategory == null
-                          ? 'Vui lòng chọn danh mục trước'
-                          : 'Chọn một dịch vụ',
-                      items: services,
+                      hint: 'Chọn một dịch vụ cụ thể',
+                      items: state.services,
                       itemBuilder: (svc) => Text(svc.name,
                           style: const TextStyle(
                               fontWeight: FontWeight.w600, fontSize: 14)),
-                      onChanged: _selectedCategory == null
-                          ? null
-                          : (svc) => setState(() => _selectedService = svc),
+                      onChanged: (svc) =>
+                          setState(() => _selectedService = svc),
                     );
                   }
-                  return const SizedBox();
+                  if (state is ServicesLoading) {
+                    return const Center(
+                        child:
+                            LinearProgressIndicator(color: AppColors.primary));
+                  }
+                  return _buildDropdown<Service>(
+                    value: null,
+                    hint: _selectedCategory == null
+                        ? 'Vui lòng chọn danh mục trước'
+                        : 'Chọn một dịch vụ',
+                    items: [],
+                    itemBuilder: (svc) => const SizedBox(),
+                    onChanged: null,
+                  );
                 },
               ),
               const SizedBox(height: 24),

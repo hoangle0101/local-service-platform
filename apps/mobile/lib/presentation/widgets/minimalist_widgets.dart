@@ -56,6 +56,8 @@ class MinButton extends StatelessWidget {
   final bool isFullWidth;
   final IconData? icon;
   final bool isLoading;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
 
   const MinButton({
     super.key,
@@ -65,6 +67,8 @@ class MinButton extends StatelessWidget {
     this.isFullWidth = false,
     this.icon,
     this.isLoading = false,
+    this.backgroundColor,
+    this.foregroundColor,
   });
 
   @override
@@ -95,6 +99,8 @@ class MinButton extends StatelessWidget {
 
     final style = isPrimary
         ? ElevatedButton.styleFrom(
+            backgroundColor: backgroundColor,
+            foregroundColor: foregroundColor,
             minimumSize: isFullWidth ? const Size(double.infinity, 56) : null,
             elevation: 0,
             shape: RoundedRectangleBorder(
@@ -102,8 +108,9 @@ class MinButton extends StatelessWidget {
             ),
           )
         : OutlinedButton.styleFrom(
+            foregroundColor: foregroundColor,
             minimumSize: isFullWidth ? const Size(double.infinity, 56) : null,
-            side: const BorderSide(color: AppColors.divider),
+            side: BorderSide(color: backgroundColor ?? AppColors.divider),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),

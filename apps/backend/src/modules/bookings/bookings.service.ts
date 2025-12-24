@@ -306,7 +306,7 @@ export class BookingsService {
       throw new BadRequestException('Booking is not pending');
 
     // Check if provider offers this service
-    const providerService = await this.prisma.providerService.findUnique({
+    let providerService = await this.prisma.providerService.findUnique({
       where: {
         providerUserId_serviceId: {
           providerUserId: providerId,
@@ -318,8 +318,58 @@ export class BookingsService {
       },
     });
 
-    if (!providerService)
-      throw new ForbiddenException('You do not provide this service');
+    // If provider hasn't registered this exact service yet, check if they work in this CATEGORY
+    if (!providerService) {
+      console.log(
+        `[acceptBookingRequest] Provider ${providerId} doesn't offer service ${booking.serviceId}. Checking category competence...`,
+      );
+
+      // Get service and its category
+      const targetService = await this.prisma.service.findUnique({
+        where: { id: booking.serviceId },
+      });
+
+      if (!targetService) {
+        throw new NotFoundException('Service not found');
+      }
+
+      // Check if provider has ANY service in this category
+      const hasCategoryCompetence = await this.prisma.providerService.findFirst({
+        where: {
+          providerUserId: providerId,
+          service: { categoryId: targetService.categoryId },
+        },
+      });
+
+      if (!hasCategoryCompetence) {
+        throw new ForbiddenException(
+          'Bạn không có chuyên môn trong danh mục dịch vụ này. Vui lòng cập nhật hồ sơ thợ trước.',
+        );
+      }
+
+      // Auto-register sub-service since they already do this category
+      const offerPrice =
+        booking.estimatedPrice || targetService.basePrice || 0;
+
+      providerService = (await this.prisma.providerService.create({
+        data: {
+          providerUserId: providerId,
+          serviceId: booking.serviceId,
+          price: offerPrice,
+          isActive: true,
+        },
+        include: {
+          provider: true,
+        },
+      })) as any;
+    }
+
+    // At this point, providerService should exist (either originally or auto-created)
+    if (!providerService) {
+      throw new ForbiddenException(
+        'Không thể xác định dịch vụ của thợ. Vui lòng thử lại.',
+      );
+    }
 
     // DIRECT BOOKING: If this booking was specifically assigned to this provider
     // Accept it directly (no offer needed), update status to 'accepted'
@@ -355,6 +405,25 @@ export class BookingsService {
 
     // GENERAL BOOKING: Create offer for customer to choose
     console.log('[acceptBookingRequest] General booking - creating offer');
+
+    // Check if offer already exists to avoid unique constraint error
+    const existingOffer = await this.prisma.bookingOffer.findUnique({
+      where: {
+        bookingId_providerId: {
+          bookingId,
+          providerId,
+        },
+      },
+    });
+
+    if (existingOffer) {
+      return {
+        message: 'Bạn đã gửi báo giá cho đơn này rồi',
+        offerId: existingOffer.id.toString(),
+        bookingId: bookingId.toString(),
+        isExisting: true,
+      };
+    }
 
     const offerResult = await this.prisma.$queryRawUnsafe<any[]>(
       `
@@ -488,6 +557,8 @@ export class BookingsService {
         COALESCE(pp.display_name, up.full_name, 'Thợ') as provider_name,
         pp.rating_avg,
         pp.address as provider_address,
+        pp.latitude as provider_lat,
+        pp.longitude as provider_lng,
         CASE 
           WHEN b.location IS NOT NULL AND pp.location IS NOT NULL 
           THEN ST_Distance(b.location::geography, pp.location::geography)
@@ -519,6 +590,8 @@ export class BookingsService {
         price: o.price.toString(),
         status: o.status,
         distance: o.distance ? Math.round(o.distance) : null, // distance in meters
+        latitude: o.provider_lat,
+        longitude: o.provider_lng,
       })),
     };
   }
@@ -546,6 +619,8 @@ export class BookingsService {
           THEN ST_Distance(b.location::geography, pp.location::geography)
           ELSE NULL 
         END as distance,
+        ST_X(b.location::geometry) as longitude,
+        ST_Y(b.location::geometry) as latitude,
         CASE 
           WHEN b.provider_id = $1 THEN 'DIRECT'
           ELSE 'GENERAL'
@@ -615,14 +690,20 @@ export class BookingsService {
         categoryName: r.category_name,
         customerName: r.customer_name,
         distance: r.distance != null ? Math.round(r.distance) : null,
+        longitude: r.longitude,
+        latitude: r.latitude,
         bookingType: r.booking_type, // 'DIRECT' or 'GENERAL'
         isDirectBooking: r.provider_id != null,
       })),
     };
   }
 
-  // GET /provider/bookings/global - Bookings outside provider's radius but matching their services
-  async getGlobalRequests(providerId: bigint) {
+  // GET /provider/bookings/global - Bookings matching search or category competence
+  async getGlobalRequests(
+    providerId: bigint,
+    serviceId?: number,
+    categoryId?: number,
+  ) {
     const requests = await this.prisma.$queryRawUnsafe<any[]>(
       `
       SELECT DISTINCT
@@ -638,26 +719,35 @@ export class BookingsService {
           b.location::geography,
           pp.location::geography
         ) as distance,
+        ST_X(b.location::geometry) as longitude,
+        ST_Y(b.location::geometry) as latitude,
         pp.service_radius_m
       FROM bookings b
       JOIN services s ON b.service_id = s.id
       JOIN user_profiles up ON b.customer_id = up.user_id
-      JOIN provider_services ps ON ps.service_id = b.service_id AND ps.provider_user_id = $1
       JOIN provider_profiles pp ON pp.user_id = $1
       LEFT JOIN booking_offers bo ON bo.booking_id = b.id AND bo.provider_id = $1
       WHERE b.status = 'pending'
         AND b.provider_id IS NULL
         AND bo.id IS NULL
-        AND ps.is_active = true
-        AND NOT ST_DWithin(
-          b.location::geography,
-          pp.location::geography,
-          COALESCE(pp.service_radius_m, 5000)
+        AND (
+          -- Filter by specific selected Service or Category
+          ($2::int IS NOT NULL AND b.service_id = $2::int)
+          OR ($3::int IS NOT NULL AND $2::int IS NULL AND s.category_id = $3::int)
+          -- DEFAULT: Only show jobs in categories the provider already works in
+          OR ($2::int IS NULL AND $3::int IS NULL AND EXISTS (
+            SELECT 1 FROM provider_services ps2
+            JOIN services s2 ON ps2.service_id = s2.id
+            WHERE ps2.provider_user_id = $1
+              AND s2.category_id = s.category_id
+          ))
         )
       ORDER BY ST_Distance(b.location::geography, pp.location::geography) ASC
-      LIMIT 20
+      LIMIT 50
     `,
       providerId,
+      serviceId || null,
+      categoryId || null,
     );
 
     return {
@@ -671,6 +761,8 @@ export class BookingsService {
         serviceName: r.service_name,
         customerName: r.customer_name,
         distance: Math.round(r.distance),
+        longitude: r.longitude,
+        latitude: r.latitude,
         isOutsideRadius: true,
       })),
     };
@@ -718,6 +810,9 @@ export class BookingsService {
               createdAt: true,
             },
           },
+          _count: {
+            select: { bookingOffers: true },
+          },
         },
         skip: (page - 1) * limit,
         take: limit,
@@ -733,6 +828,8 @@ export class BookingsService {
         status: b.status,
         scheduledAt: b.scheduledAt,
         addressText: b.addressText,
+        latitude: b.location ? (b.location as any).y : null,
+        longitude: b.location ? (b.location as any).x : null,
         estimatedPrice: b.estimatedPrice?.toString(),
         actualPrice: b.actualPrice?.toString(),
         service: {
@@ -751,6 +848,7 @@ export class BookingsService {
               avatarUrl: b.providerUser.profile?.avatarUrl,
             }
           : null,
+        offersCount: b._count?.bookingOffers || 0,
       })),
       meta: {
         total,
@@ -789,6 +887,9 @@ export class BookingsService {
           orderBy: { createdAt: 'desc' },
         },
         review: true,
+        _count: {
+          select: { bookingOffers: true },
+        },
       },
     });
 
@@ -810,6 +911,8 @@ export class BookingsService {
       status: b.status,
       scheduledAt: b.scheduledAt,
       addressText: b.addressText,
+      latitude: b.location ? (b.location as any).y : null,
+      longitude: b.location ? (b.location as any).x : null,
       notes: b.notes,
       estimatedPrice: b.estimatedPrice?.toString(),
       actualPrice: b.actualPrice?.toString(),
@@ -850,6 +953,7 @@ export class BookingsService {
             createdAt: b.review.createdAt,
           }
         : null,
+      offersCount: b._count?.bookingOffers || 0,
     };
   }
 

@@ -28,6 +28,32 @@ class LoadServicesByCategory extends ServicesEvent {
   List<Object?> get props => [categoryId, limit];
 }
 
+class SearchNearbyProviders extends ServicesEvent {
+  final int serviceId;
+  final double latitude;
+  final double longitude;
+  final int limit;
+
+  const SearchNearbyProviders({
+    required this.serviceId,
+    required this.latitude,
+    required this.longitude,
+    this.limit = 20,
+  });
+
+  @override
+  List<Object?> get props => [serviceId, latitude, longitude, limit];
+}
+
+class LoadGenericServices extends ServicesEvent {
+  final int categoryId;
+
+  const LoadGenericServices({required this.categoryId});
+
+  @override
+  List<Object?> get props => [categoryId];
+}
+
 class LoadServiceDetails extends ServicesEvent {
   final int serviceId;
 
@@ -53,6 +79,15 @@ class ServicesLoaded extends ServicesState {
   final List<ProviderService> services;
 
   const ServicesLoaded(this.services);
+
+  @override
+  List<Object?> get props => [services];
+}
+
+class GenericServicesLoaded extends ServicesState {
+  final List<Service> services;
+
+  const GenericServicesLoaded(this.services);
 
   @override
   List<Object?> get props => [services];

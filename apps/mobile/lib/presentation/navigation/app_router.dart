@@ -27,6 +27,8 @@ import '../screens/provider/provider_complete_job_screen.dart';
 import '../screens/booking/invoice_screen.dart';
 import '../screens/provider/provider_shell_screen.dart';
 import '../screens/provider/provider_earnings_screen.dart';
+import '../screens/provider/provider_services_screen.dart';
+import '../screens/provider/job_market_screen.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -205,6 +207,14 @@ final router = GoRouter(
       builder: (context, state) => const ProviderWithdrawScreen(),
     ),
     GoRoute(
+      path: '/provider/services',
+      builder: (context, state) => const ProviderServicesScreen(),
+    ),
+    GoRoute(
+      path: '/provider/job-market',
+      builder: (context, state) => const JobMarketScreen(),
+    ),
+    GoRoute(
       path: '/provider/complete-job/:id',
       builder: (context, state) {
         final bookingId = state.pathParameters['id']!;
@@ -245,6 +255,7 @@ final router = GoRouter(
           serviceId: extra['serviceId'] as int,
           service: extra['service'] as ProviderService?,
           providerId: extra['providerId'] as int?, // For direct booking
+          genericServiceName: extra['genericServiceName'] as String?,
         );
       },
     ),

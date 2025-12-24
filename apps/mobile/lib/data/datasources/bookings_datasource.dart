@@ -307,10 +307,16 @@ class BookingsDataSource {
     }
   }
 
-  /// Get global booking requests (outside provider's registered radius)
-  Future<List<Booking>> getGlobalRequests() async {
+  /// Get global booking requests (optionally filtered by serviceId or categoryId)
+  Future<List<Booking>> getGlobalRequests(
+      {int? serviceId, int? categoryId}) async {
     try {
-      final response = await _dio.get('/provider/bookings/global');
+      final queryParams = <String, dynamic>{};
+      if (serviceId != null) queryParams['serviceId'] = serviceId;
+      if (categoryId != null) queryParams['categoryId'] = categoryId;
+
+      final response = await _dio.get('/provider/bookings/global',
+          queryParameters: queryParams);
 
       // Handle nested response format
       final responseBody = response.data;

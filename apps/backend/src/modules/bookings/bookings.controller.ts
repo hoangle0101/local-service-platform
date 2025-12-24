@@ -179,9 +179,17 @@ export class ProviderBookingsController {
   }
 
   @Get('global')
-  @ApiOperation({ summary: 'Get all pending booking requests outside radius' })
-  async getGlobalRequests(@CurrentUser() user: any) {
-    return this.bookingsService.getGlobalRequests(BigInt(user.userId));
+  @ApiOperation({ summary: 'Get all pending booking requests' })
+  async getGlobalRequests(
+    @CurrentUser() user: any,
+    @Query('serviceId') serviceId?: string,
+    @Query('categoryId') categoryId?: string,
+  ) {
+    return this.bookingsService.getGlobalRequests(
+      BigInt(user.userId),
+      serviceId ? parseInt(serviceId) : undefined,
+      categoryId ? parseInt(categoryId) : undefined,
+    );
   }
 
   @Post(':id/offer')

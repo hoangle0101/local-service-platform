@@ -406,6 +406,24 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () => context.push('/provider/job-market'),
+                  icon: const Icon(Icons.explore_rounded, color: Colors.white),
+                  label: const Text('TÌM VIỆC MỚI',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                          letterSpacing: 0.5)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    minimumSize: const Size(double.infinity, 56),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    elevation: 8,
+                    shadowColor: AppColors.primary.withOpacity(0.3),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
@@ -428,10 +446,11 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
                       child: ElevatedButton(
                         onPressed: () => context.push('/provider/profile'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
+                          backgroundColor: AppColors.white,
+                          foregroundColor: AppColors.textPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           elevation: 0,
+                          side: BorderSide(color: Colors.grey.shade300),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16)),
                         ),

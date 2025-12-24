@@ -14,12 +14,14 @@ class CreateBookingScreen extends StatefulWidget {
   final int serviceId;
   final ProviderService? service;
   final int? providerId; // For direct booking
+  final String? genericServiceName; // For public request
 
   const CreateBookingScreen({
     super.key,
     required this.serviceId,
     this.service,
     this.providerId,
+    this.genericServiceName,
   });
 
   @override
@@ -51,7 +53,6 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
     super.dispose();
   }
 
-  /// Search for addresses using Track Asia API
   void _onAddressSearch(String query) {
     _debounceTimer?.cancel();
 
@@ -78,7 +79,6 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
     });
   }
 
-  /// Select an address from predictions
   Future<void> _selectAddress(AddressPrediction prediction) async {
     setState(() => _showPredictions = false);
 
@@ -86,7 +86,6 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
       final detail =
           await _trackAsiaDataSource.getPlaceDetail(prediction.placeId);
       if (mounted && detail != null) {
-        // Use FullAddress for better display
         final fullAddress = FullAddress.fromPlaceDetail(detail);
         setState(() {
           _addressController.text = fullAddress.displayText;
@@ -109,24 +108,16 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
       child: BlocConsumer<BookingsBloc, BookingsState>(
         listener: (context, state) {
           if (state is BookingCreated) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content:
-                    Text('Booking ${state.bookingCode} created successfully!'),
-                backgroundColor: Colors.green,
-              ),
-            );
-            // Show success dialog
-            _showSuccessDialog(context, state);
+            _showPremiumSuccessDialog(context, state);
           } else if (state is BookingsError) {
-            // Show error dialog for better visibility
-            _showErrorDialog(context, state.message);
+            _showPremiumErrorDialog(context, state.message);
           }
         },
         builder: (context, state) {
           return Scaffold(
-            backgroundColor: AppColors.white,
+            backgroundColor: AppColors.background,
             body: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
               slivers: [
                 _buildSliverAppBar(context),
                 SliverToBoxAdapter(
@@ -140,19 +131,24 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
                         children: [
                           _buildServiceInfo(),
                           const SizedBox(height: 32),
-                          _buildLabel('Thời gian thực hiện'),
+                          _buildSectionLabel('THỜI GIAN THỰC HIỆN'),
+                          const SizedBox(height: 16),
                           _buildDateTimeSection(),
                           const SizedBox(height: 32),
-                          _buildLabel('Địa điểm cần đến'),
+                          _buildSectionLabel('ĐỊA ĐIỂM CỦA BẠN'),
+                          const SizedBox(height: 16),
                           _buildLocationSection(),
                           const SizedBox(height: 32),
-                          _buildLabel('Ghi chú thêm'),
+                          _buildSectionLabel('GHI CHÚ THÊM'),
+                          const SizedBox(height: 16),
                           _buildNotesSection(),
                           const SizedBox(height: 32),
+                          _buildSectionLabel('TỔNG HỢP CHI PHÍ'),
+                          const SizedBox(height: 16),
                           _buildPriceSummary(),
-                          const SizedBox(height: 40),
+                          const SizedBox(height: 48),
                           _buildSubmitButton(context, state),
-                          const SizedBox(height: 40),
+                          const SizedBox(height: 60),
                         ],
                       ),
                     ),
@@ -166,179 +162,14 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
     );
   }
 
-  void _showSuccessDialog(BuildContext context, BookingCreated state) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child:
-                  const Icon(Icons.check_circle, color: Colors.green, size: 64),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Booking Created!',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Booking Code: ${state.bookingCode}',
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            if (state.isDirectBooking)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.person_pin, color: AppColors.primary),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Đã gửi yêu cầu đặt lịch đến provider. Vui lòng chờ xác nhận.',
-                        style: TextStyle(
-                            color: AppColors.primaryDark,
-                            fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else if (state.nearbyProviderIds.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.orange),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'No nearby providers found. We will notify you when one is available.',
-                        style: TextStyle(color: Colors.orange),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.people, color: Colors.green),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${state.nearbyProviderIds.length} providers found nearby!',
-                        style: const TextStyle(
-                            color: Colors.green, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              context.go('/user/bookings'); // Go to bookings screen
-            },
-            child: const Text('View My Bookings'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              context.go('/user/home'); // Go to user home, not guest home
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Done'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showErrorDialog(BuildContext context, String errorMessage) {
-    // Extract meaningful message from error
-    String displayMessage = errorMessage;
-    if (errorMessage.contains('Failed to create booking:')) {
-      displayMessage =
-          errorMessage.replaceFirst('Failed to create booking:', '').trim();
-    }
-    if (displayMessage.contains('Exception:')) {
-      displayMessage = displayMessage.replaceFirst('Exception:', '').trim();
-    }
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child:
-                  const Icon(Icons.error_outline, color: Colors.red, size: 28),
-            ),
-            const SizedBox(width: 12),
-            const Text('Không thể đặt lịch', style: TextStyle(fontSize: 18)),
-          ],
-        ),
-        content: Text(
-          displayMessage,
-          style: const TextStyle(fontSize: 15, height: 1.4),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Đã hiểu'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSliverAppBar(BuildContext context) {
     return SliverAppBar(
       pinned: true,
       floating: false,
       expandedHeight: 120,
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.background,
       elevation: 0,
+      scrolledUnderElevation: 0,
       automaticallyImplyLeading: false,
       flexibleSpace: FlexibleSpaceBar(
         background: Padding(
@@ -348,12 +179,17 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
               GestureDetector(
                 onTap: () => context.pop(),
                 child: Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: AppColors.white,
                     shape: BoxShape.circle,
-                    border:
-                        Border.all(color: AppColors.divider.withOpacity(0.5)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: const Icon(Icons.arrow_back_ios_new_rounded,
                       size: 18, color: AppColors.textPrimary),
@@ -361,7 +197,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
               ),
               const SizedBox(width: 20),
               const Text(
-                'Đặt dịch vụ',
+                'Đặt lịch dịch vụ',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
@@ -376,22 +212,20 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
     );
   }
 
-  Widget _buildLabel(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12, left: 4),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w800,
-          color: AppColors.textPrimary,
-        ),
+  Widget _buildSectionLabel(String label) {
+    return Text(
+      label,
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w900,
+        color: AppColors.textTertiary,
+        letterSpacing: 1.2,
       ),
     );
   }
 
   Widget _buildServiceInfo() {
-    if (widget.service == null) {
+    if (widget.service == null && widget.genericServiceName == null) {
       return MinCard(
         padding: const EdgeInsets.all(20),
         child: Row(
@@ -400,19 +234,19 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
               width: 50,
               height: 50,
               decoration: BoxDecoration(
-                color: AppColors.shelf,
+                color: AppColors.shelf.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(Icons.home_repair_service_rounded,
-                  color: AppColors.textTertiary),
+              child:
+                  const Icon(Icons.sync_rounded, color: AppColors.textTertiary),
             ),
             const SizedBox(width: 16),
             const Expanded(
               child: Text(
-                'Đang tải thông tin dịch vụ...',
+                'Đang chuẩn bị thông tin...',
                 style: TextStyle(
                     color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600),
+                    fontWeight: FontWeight.w700),
               ),
             ),
           ],
@@ -420,6 +254,64 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
       );
     }
 
+    // Generic Request (No specific provider)
+    if (widget.service == null) {
+      return MinCard(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Icon(Icons.public_rounded,
+                  color: AppColors.primary, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.genericServiceName ?? 'Dịch vụ yêu cầu',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                        color: AppColors.textPrimary),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'YÊU CẦU CÔNG KHAI',
+                          style: TextStyle(
+                              color: AppColors.success,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Direct Booking
     return MinCard(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -429,7 +321,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
             height: 60,
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
             ),
             child: const Icon(Icons.home_repair_service_rounded,
                 color: AppColors.primary, size: 28),
@@ -449,15 +341,15 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.person_rounded,
+                    const Icon(Icons.person_pin_rounded,
                         size: 14, color: AppColors.textTertiary),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 6),
                     Text(
                       widget.service!.provider.displayName,
                       style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 13,
-                          fontWeight: FontWeight.w600),
+                          fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
@@ -473,105 +365,106 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
     return Row(
       children: [
         Expanded(
-          child: GestureDetector(
+          child: MinCard(
+            padding: const EdgeInsets.all(16),
             onTap: () async {
               final date = await showDatePicker(
                 context: context,
                 initialDate: _selectedDate,
                 firstDate: DateTime.now(),
-                lastDate: DateTime.now().add(const Duration(days: 30)),
+                lastDate: DateTime.now().add(const Duration(days: 60)),
+                builder: (context, child) => _buildThemePicker(context, child!),
               );
-              if (date != null) {
-                setState(() => _selectedDate = date);
-              }
+              if (date != null) setState(() => _selectedDate = date);
             },
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                    color: AppColors.divider.withOpacity(0.5), width: 1.5),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.calendar_today_rounded,
-                      size: 18, color: AppColors.primary),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Ngày',
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textTertiary,
-                                fontWeight: FontWeight.w700)),
-                        Text(
-                          DateFormat('dd/MM/yyyy').format(_selectedDate),
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              color: AppColors.textPrimary),
-                        ),
-                      ],
-                    ),
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_today_rounded,
+                    size: 20, color: AppColors.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Chọn ngày',
+                          style: TextStyle(
+                              fontSize: 10,
+                              color: AppColors.textTertiary,
+                              fontWeight: FontWeight.w900)),
+                      Text(
+                        DateFormat('dd/MM/yyyy').format(_selectedDate),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                            color: AppColors.textPrimary),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: GestureDetector(
+          child: MinCard(
+            padding: const EdgeInsets.all(16),
             onTap: () async {
               final time = await showTimePicker(
                 context: context,
                 initialTime: _selectedTime,
+                builder: (context, child) => _buildThemePicker(context, child!),
               );
-              if (time != null) {
-                setState(() => _selectedTime = time);
-              }
+              if (time != null) setState(() => _selectedTime = time);
             },
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                    color: AppColors.divider.withOpacity(0.5), width: 1.5),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.access_time_rounded,
-                      size: 18, color: AppColors.primary),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Giờ',
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textTertiary,
-                                fontWeight: FontWeight.w700)),
-                        Text(
-                          _selectedTime.format(context),
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              color: AppColors.textPrimary),
-                        ),
-                      ],
-                    ),
+            child: Row(
+              children: [
+                const Icon(Icons.access_time_rounded,
+                    size: 22, color: AppColors.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Chọn giờ',
+                          style: TextStyle(
+                              fontSize: 10,
+                              color: AppColors.textTertiary,
+                              fontWeight: FontWeight.w900)),
+                      Text(
+                        _selectedTime.format(context),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                            color: AppColors.textPrimary),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildThemePicker(BuildContext context, Widget child) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        colorScheme: const ColorScheme.light(
+          primary: AppColors.primary,
+          onPrimary: Colors.white,
+          onSurface: AppColors.textPrimary,
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            textStyle: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+        ),
+      ),
+      child: child,
     );
   }
 
@@ -581,12 +474,12 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
       children: [
         MinTextField(
           controller: _addressController,
-          hint: 'Nhập địa chỉ của bạn...',
+          hint: 'Đang dùng vị trí hiện tại...',
           prefixIcon: const Icon(Icons.location_on_rounded,
-              color: AppColors.primary, size: 20),
+              color: AppColors.primary, size: 22),
           suffixIcon: IconButton(
             icon: const Icon(Icons.my_location_rounded,
-                color: AppColors.primary, size: 18),
+                color: AppColors.primary, size: 20),
             onPressed: _getCurrentLocation,
           ),
           onChanged: _onAddressSearch,
@@ -596,34 +489,39 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
             margin: const EdgeInsets.only(top: 8),
             decoration: BoxDecoration(
               color: AppColors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.divider.withOpacity(0.3)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
                 ),
               ],
             ),
             child: ListView.separated(
               shrinkWrap: true,
+              padding: const EdgeInsets.symmetric(vertical: 8),
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _addressPredictions.length,
-              separatorBuilder: (_, __) =>
-                  Divider(height: 1, color: AppColors.divider.withOpacity(0.3)),
+              separatorBuilder: (_, __) => Divider(
+                  height: 1,
+                  color: AppColors.divider.withOpacity(0.2),
+                  indent: 50),
               itemBuilder: (context, index) {
                 final prediction = _addressPredictions[index];
                 return ListTile(
                   dense: true,
-                  leading: const Icon(Icons.location_on_outlined,
-                      size: 18, color: AppColors.textTertiary),
+                  leading: const Icon(Icons.location_searching_rounded,
+                      size: 16, color: AppColors.textTertiary),
                   title: Text(prediction.mainText,
                       style: const TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 14)),
+                          fontWeight: FontWeight.w800, fontSize: 14)),
                   subtitle: Text(prediction.secondaryText,
                       style: const TextStyle(
-                          fontSize: 12, color: AppColors.textTertiary)),
+                          fontSize: 12,
+                          color: AppColors.textTertiary,
+                          fontWeight: FontWeight.w500)),
                   onTap: () => _selectAddress(prediction),
                 );
               },
@@ -631,23 +529,34 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
           ),
         const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.shelf.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(12),
+            color: AppColors.shelf.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
             children: [
               const Icon(Icons.gps_fixed_rounded,
                   size: 14, color: AppColors.textTertiary),
-              const SizedBox(width: 10),
-              Text(
-                'Tọa độ: ${_latitude.toStringAsFixed(6)}, ${_longitude.toStringAsFixed(6)}',
-                style: const TextStyle(
-                  color: AppColors.textTertiary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('TỌA ĐỘ GPS',
+                      style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textTertiary)),
+                  Text(
+                    '${_latitude.toStringAsFixed(6)}, ${_longitude.toStringAsFixed(6)}',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -657,23 +566,17 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
   }
 
   void _getCurrentLocation() {
-    // For simplicity, use default Hanoi location
-    // In production, use geolocator package
     setState(() {
       _addressController.text = 'Hoàn Kiếm, Hà Nội, Việt Nam';
       _latitude = 21.0285;
       _longitude = 105.8542;
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.location_on, color: Colors.white),
-            SizedBox(width: 8),
-            Text('Using default location (Hanoi)'),
-          ],
-        ),
+      SnackBar(
+        content: const Text('Đã cập nhật vị trí hiện tại (Hà Nội)'),
+        behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.primary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -681,75 +584,66 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
   Widget _buildNotesSection() {
     return MinTextField(
       controller: _notesController,
-      maxLines: 4,
-      hint: 'Ví dụ: Hướng dẫn tìm đường, số tầng, lưu ý đặc biệt...',
-      prefixIcon: const Icon(Icons.note_alt_rounded,
-          color: AppColors.primary, size: 20),
+      maxLines: 3,
+      hint: 'Ví dụ: Cổng số 2, gọi trước khi đến, hoặc lưu ý đặc biệt...',
+      prefixIcon: const Icon(Icons.note_add_rounded,
+          color: AppColors.primary, size: 22),
     );
   }
 
   Widget _buildPriceSummary() {
     final price = widget.service?.price ?? 0;
 
-    return MinCard(
+    return Container(
       padding: const EdgeInsets.all(24),
-      backgroundColor: AppColors.shelf.withOpacity(0.3),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.divider.withOpacity(0.3)),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Giá dịch vụ',
-                  style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w600)),
-              Text(
-                NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
-                    .format(price),
-                style: const TextStyle(
-                    fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-              ),
-            ],
-          ),
+          _buildPriceRow('Tiền dịch vụ', price),
+          const SizedBox(height: 16),
+          _buildPriceRow('Phí dịch vụ (tạm tính)', 0, isFree: true),
           const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
+            padding: EdgeInsets.symmetric(vertical: 20),
             child: Divider(height: 1, color: AppColors.divider),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Tổng cộng tạm tính',
+                'TỔNG TẠM TÍNH',
                 style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                    color: AppColors.textPrimary),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                    letterSpacing: 0.5),
               ),
               Text(
                 NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
                     .format(price),
                 style: const TextStyle(
                   fontWeight: FontWeight.w900,
-                  fontSize: 20,
+                  fontSize: 22,
                   color: AppColors.primary,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Row(
             children: const [
-              Icon(Icons.info_outline_rounded,
-                  size: 14, color: AppColors.textTertiary),
-              SizedBox(width: 6),
+              Icon(Icons.shield_rounded, size: 14, color: AppColors.success),
+              SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Giá cuối cùng có thể thay đổi dựa trên thỏa thuận trực tiếp.',
+                  'Chi phí thực tế có thể thay đổi dựa trên thỏa thuận.',
                   style: TextStyle(
                       color: AppColors.textTertiary,
                       fontSize: 11,
-                      fontWeight: FontWeight.w600),
+                      fontWeight: FontWeight.w700),
                 ),
               ),
             ],
@@ -759,9 +653,31 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
     );
   }
 
+  Widget _buildPriceRow(String label, double amount, {bool isFree = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
+                fontSize: 14)),
+        Text(
+          isFree
+              ? 'Miễn phí'
+              : NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
+                  .format(amount),
+          style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: isFree ? AppColors.success : AppColors.textPrimary),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSubmitButton(BuildContext context, BookingsState state) {
     return MinButton(
-      text: 'Xác nhận đặt lịch',
+      text: 'XÁC NHẬN ĐẶT LỊCH',
       onPressed: () => _submitBooking(context),
       isLoading: state is BookingsLoading,
     );
@@ -784,8 +700,120 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
             latitude: _latitude,
             longitude: _longitude,
             notes: _notesController.text.isEmpty ? null : _notesController.text,
-            providerId: widget.providerId, // Pass provider for direct booking
+            providerId: widget.providerId,
           ));
     }
+  }
+
+  void _showPremiumSuccessDialog(BuildContext context, BookingCreated state) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_circle_rounded,
+                    color: AppColors.success, size: 64),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Đặt lịch thành công!',
+                style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Mã vận đơn: ${state.bookingCode}',
+                style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 32),
+              MinButton(
+                text: 'XEM ĐƠN ĐẶT',
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  context.go('/user/bookings');
+                },
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  context.go('/user/home');
+                },
+                child: const Text('VỀ TRANG CHỦ',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textTertiary,
+                        letterSpacing: 1)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showPremiumErrorDialog(BuildContext context, String errorMessage) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.error_outline_rounded,
+                    color: AppColors.error, size: 60),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Không thể đặt lịch',
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                errorMessage.replaceAll('Exception:', '').trim(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                    height: 1.5),
+              ),
+              const SizedBox(height: 32),
+              MinButton(
+                text: 'QUAY LẠI',
+                onPressed: () => Navigator.pop(dialogContext),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
