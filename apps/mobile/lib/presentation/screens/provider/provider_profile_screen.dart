@@ -94,17 +94,12 @@ class ProviderProfileScreen extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            GestureDetector(
-              onTap: () => context.pop(),
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.shelf,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.divider),
-                ),
-                child: const Icon(Icons.arrow_back_ios_new_rounded,
-                    size: 20, color: AppColors.textPrimary),
+            const Text(
+              'Hồ sơ',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
               ),
             ),
             GestureDetector(
@@ -264,6 +259,12 @@ class ProviderProfileScreen extends StatelessWidget {
             icon: Icons.account_balance_wallet_outlined,
             title: 'Ví của tôi',
             onTap: () {},
+          ),
+          _buildMenuDivider(),
+          _buildMenuRow(
+            icon: Icons.sync_rounded,
+            title: 'Chuyển sang Chế độ khách',
+            onTap: () => context.go('/user/home'),
           ),
         ],
       ),

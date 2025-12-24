@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/bookings_datasource.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
@@ -185,91 +184,91 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
     return SliverAppBar(
       pinned: true,
       floating: false,
-      expandedHeight: 140,
-      backgroundColor: AppColors.background,
+      expandedHeight: 160,
+      backgroundColor: AppColors.white,
       elevation: 0,
       automaticallyImplyLeading: false,
       flexibleSpace: FlexibleSpaceBar(
         background: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 48, 24, 0),
+          padding: const EdgeInsets.fromLTRB(24, 60, 24, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  GestureDetector(
-                    onTap: () => context.pop(),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.shelf,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.divider),
-                      ),
-                      child: const Icon(Icons.arrow_back_ios_new_rounded,
-                          size: 20, color: AppColors.textPrimary),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _refreshBookings,
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.shelf,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.divider),
-                      ),
-                      child: const Icon(Icons.refresh_rounded,
-                          size: 20, color: AppColors.textPrimary),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
+            children: const [
               Text(
                 'Lịch đặt của tôi',
-                style: Theme.of(context)
-                    .textTheme
-                    .displaySmall
-                    ?.copyWith(fontSize: 26, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -1,
+                ),
               ),
             ],
           ),
         ),
       ),
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(48),
+        preferredSize: const Size.fromHeight(60),
         child: Container(
           width: double.infinity,
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: AppColors.divider)),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            border: Border(
+                bottom: BorderSide(color: AppColors.divider.withOpacity(0.5))),
           ),
           child: TabBar(
             controller: _tabController,
             isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             labelColor: AppColors.primary,
             unselectedLabelColor: AppColors.textTertiary,
-            indicatorColor: AppColors.primary,
-            indicatorWeight: 3,
-            labelStyle:
-                const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+            indicatorSize: TabBarIndicatorSize.label,
+            indicator: const UnderlineTabIndicator(
+              borderSide: BorderSide(width: 3, color: AppColors.primary),
+              insets: EdgeInsets.symmetric(horizontal: 0),
+            ),
+            labelStyle: const TextStyle(
+                fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.2),
             unselectedLabelStyle:
-                const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
             tabs: [
-              Tab(text: 'Chờ x/n${pendingCount > 0 ? " ($pendingCount)" : ""}'),
-              Tab(
-                  text:
-                      'Đã nhận${acceptedCount > 0 ? " ($acceptedCount)" : ""}'),
-              Tab(
-                  text:
-                      'Hoàn thành${completedCount > 0 ? " ($completedCount)" : ""}'),
-              Tab(
-                  text:
-                      'Đã hủy${cancelledCount > 0 ? " ($cancelledCount)" : ""}'),
+              _buildTab('Chờ xác nhận', pendingCount),
+              _buildTab('Đã nhận', acceptedCount),
+              _buildTab('Hoàn thành', completedCount),
+              _buildTab('Đã hủy', cancelledCount),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTab(String label, int count) {
+    return Tab(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          if (count > 0) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                count.toString(),
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -333,23 +332,27 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
+              padding: const EdgeInsets.all(32),
+              decoration: const BoxDecoration(
                 color: AppColors.shelf,
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.calendar_today_rounded,
-                  size: 40, color: AppColors.textTertiary),
+                  size: 48, color: AppColors.textTertiary),
             ),
-            const SizedBox(height: 20),
-            Text(
-              'Trống',
-              style: Theme.of(context).textTheme.headlineSmall,
+            const SizedBox(height: 32),
+            const Text(
+              'Chưa có lịch đặt nào',
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary),
             ),
             const SizedBox(height: 8),
             const Text(
-              'Bạn chưa có lịch đặt nào ở mục này.',
-              style: TextStyle(color: AppColors.textSecondary),
+              'Tại mục này hiện chưa có thông tin gì.',
+              style: TextStyle(
+                  color: AppColors.textSecondary, fontWeight: FontWeight.w500),
             ),
           ],
         ),
@@ -372,55 +375,85 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
   Widget _buildBookingMinCard(Booking booking) {
     final currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
     final dateFormat = DateFormat('EEE, dd MMM yyyy • HH:mm');
+    final price = double.tryParse(booking.estimatedPrice ?? '0') ?? 0;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: MinCard(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.black.withOpacity(0.02),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Text(
-                    booking.serviceName ?? 'Dịch vụ',
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall
-                        ?.copyWith(fontSize: 18),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildMinStatusBadge(booking.status),
+                    Text(
+                      '#${booking.code}',
+                      style: const TextStyle(
+                          color: AppColors.textTertiary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5),
+                    ),
+                  ],
                 ),
-                _buildMinStatusBadge(booking.status),
+                const SizedBox(height: 20),
+                Text(
+                  booking.serviceName ?? 'Dịch vụ',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.5,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 16),
+                _buildInfoItem(
+                    Icons.calendar_today_rounded,
+                    booking.scheduledAt != null
+                        ? dateFormat.format(booking.scheduledAt!)
+                        : 'Chưa xác định'),
+                const SizedBox(height: 10),
+                _buildInfoItem(Icons.location_on_rounded,
+                    booking.addressText ?? 'Địa chỉ không xác định'),
+                if (booking.providerName != null) ...[
+                  const SizedBox(height: 10),
+                  _buildInfoItem(
+                      Icons.person_rounded, 'Đối tác: ${booking.providerName}'),
+                ],
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Mã: ${booking.code}',
-              style: const TextStyle(
-                  color: AppColors.textTertiary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: AppColors.shelf.withOpacity(0.5),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(24),
+                bottomRight: Radius.circular(24),
+              ),
+              border: Border(
+                  top: BorderSide(color: AppColors.divider.withOpacity(0.5))),
             ),
-            const SizedBox(height: 16),
-            _buildInfoItem(
-                Icons.access_time_rounded,
-                booking.scheduledAt != null
-                    ? dateFormat.format(booking.scheduledAt!)
-                    : 'Chưa xác định'),
-            const SizedBox(height: 10),
-            _buildInfoItem(
-                Icons.location_on_rounded, booking.addressText ?? 'N/A'),
-            if (booking.providerName != null) ...[
-              const SizedBox(height: 10),
-              _buildInfoItem(
-                  Icons.person_rounded, 'Đối tác: ${booking.providerName}'),
-            ],
-            const Divider(height: 32, color: AppColors.divider),
-            Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
@@ -429,14 +462,14 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
                     const Text('Tổng thanh toán',
                         style: TextStyle(
                             color: AppColors.textTertiary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700)),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.2)),
                     Text(
-                      currencyFormat.format(
-                          double.tryParse(booking.estimatedPrice ?? '0') ?? 0),
+                      currencyFormat.format(price).replaceAll(',00', ''),
                       style: const TextStyle(
                           color: AppColors.primary,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w900,
                           fontSize: 16),
                     ),
                   ],
@@ -444,8 +477,8 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
                 _buildActionButtons(booking),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

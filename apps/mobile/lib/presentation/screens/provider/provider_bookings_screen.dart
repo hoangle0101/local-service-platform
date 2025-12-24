@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/bookings_datasource.dart';
 import '../../bloc/auth/auth_bloc.dart';
@@ -125,76 +124,68 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
   }
 
   Widget _buildSliverAppBar(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
     return SliverAppBar(
       pinned: true,
       floating: false,
-      expandedHeight: 140,
-      backgroundColor: AppColors.background,
+      expandedHeight: 240,
+      backgroundColor: AppColors.white,
       elevation: 0,
       automaticallyImplyLeading: false,
       flexibleSpace: FlexibleSpaceBar(
         background: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 48, 24, 0),
+          padding: EdgeInsets.fromLTRB(24, topPadding + 40, 24, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  GestureDetector(
-                    onTap: () => context.pop(),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.shelf,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.divider),
-                      ),
-                      child: const Icon(Icons.arrow_back_ios_new_rounded,
-                          size: 20, color: AppColors.textPrimary),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _loadAllData,
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.shelf,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.divider),
-                      ),
-                      child: const Icon(Icons.refresh_rounded,
-                          size: 20, color: AppColors.textPrimary),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
+            children: const [
               Text(
                 'Công việc của tôi',
-                style: Theme.of(context)
-                    .textTheme
-                    .displaySmall
-                    ?.copyWith(fontSize: 26, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.8,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Theo dõi và quản lý các yêu cầu của khách hàng gửi đến bạn',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                  height: 1.4,
+                ),
               ),
             ],
           ),
         ),
       ),
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(48),
+        preferredSize: const Size.fromHeight(64),
         child: Container(
           width: double.infinity,
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: AppColors.divider)),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            border: Border(
+                bottom: BorderSide(
+                    color: AppColors.divider.withOpacity(0.3), width: 1)),
           ),
           child: TabBar(
             controller: _tabController,
             isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            padding: const EdgeInsets.only(
+                left: 8), // Aligns with the 24px container padding
             labelColor: AppColors.primary,
             unselectedLabelColor: AppColors.textTertiary,
-            indicatorColor: AppColors.primary,
-            indicatorWeight: 3,
+            indicator: const UnderlineTabIndicator(
+              borderSide: BorderSide(color: AppColors.primary, width: 4),
+              insets: EdgeInsets.zero,
+            ),
+            indicatorSize: TabBarIndicatorSize.label,
+            labelPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             labelStyle:
                 const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
             unselectedLabelStyle:
@@ -218,19 +209,19 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
         children: [
           Text(label),
           if (count > 0) ...[
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 count.toString(),
                 style: const TextStyle(
-                  color: AppColors.primary,
+                  color: Colors.white,
                   fontSize: 10,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ),
@@ -255,7 +246,7 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
         isGlobal
             ? 'Chúng tôi sẽ báo khi có khách hàng cần bạn.'
             : 'Hãy kiên nhẫn, công việc sẽ sớm đến.',
-        isGlobal ? Icons.public_rounded : Icons.work_outline_rounded,
+        Icons.work_outline_rounded,
       );
     }
 
@@ -286,8 +277,10 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
           .toList();
 
       if (inProgress.isEmpty) {
-        return _buildEmptyState('Trống',
-            'Bạn chưa có công việc đang thực hiện.', Icons.run_circle_outlined);
+        return _buildEmptyState(
+            'Trống',
+            'Bạn chưa có công việc đang thực hiện.',
+            Icons.work_history_rounded);
       }
 
       return RefreshIndicator(
@@ -423,10 +416,11 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
                 Expanded(
                   child: Text(
                     booking.serviceName ?? 'Dịch vụ',
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall
-                        ?.copyWith(fontSize: 18),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ),
                 _buildMinStatusBadge(booking.status),
@@ -545,19 +539,35 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(
-                color: AppColors.shelf, shape: BoxShape.circle),
-            child: Icon(icon, size: 40, color: AppColors.textTertiary),
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: AppColors.shelf.withOpacity(0.5),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon,
+                size: 64, color: AppColors.textTertiary.withOpacity(0.3)),
           ),
-          const SizedBox(height: 20),
-          Text(title, style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 24),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 48),
-            child: Text(subtitle,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textSecondary)),
+            child: Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
           ),
         ],
       ),

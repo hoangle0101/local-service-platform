@@ -8,7 +8,7 @@ class MinCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
   final VoidCallback? onTap;
-  final Color? color;
+  final Color? backgroundColor;
   final double? borderRadius;
   final BorderSide? border;
 
@@ -17,7 +17,7 @@ class MinCard extends StatelessWidget {
     required this.child,
     this.padding,
     this.onTap,
-    this.color,
+    this.backgroundColor,
     this.borderRadius,
     this.border,
   });
@@ -27,10 +27,10 @@ class MinCard extends StatelessWidget {
     Widget content = Container(
       padding: padding ?? const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: color ?? AppColors.white,
+        color: backgroundColor ?? AppColors.white,
         borderRadius: BorderRadius.circular(borderRadius ?? 24),
         border: Border.all(
-          color: border?.color ?? AppColors.borderLight,
+          color: border?.color ?? AppColors.divider.withOpacity(0.5),
           width: border?.width ?? 1,
         ),
       ),
@@ -45,7 +45,7 @@ class MinCard extends StatelessWidget {
       );
     }
 
-    return child;
+    return content;
   }
 }
 
@@ -80,21 +80,33 @@ class MinButton extends StatelessWidget {
           )
         : Row(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[
                 Icon(icon, size: 20),
                 const SizedBox(width: 8),
               ],
-              Text(text),
+              Text(
+                text,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
             ],
           );
 
     final style = isPrimary
         ? ElevatedButton.styleFrom(
             minimumSize: isFullWidth ? const Size(double.infinity, 56) : null,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
           )
         : OutlinedButton.styleFrom(
             minimumSize: isFullWidth ? const Size(double.infinity, 56) : null,
+            side: const BorderSide(color: AppColors.divider),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
           );
 
     return isPrimary
@@ -129,14 +141,15 @@ class MinBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color ?? AppColors.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: textColor ?? AppColors.primary,
-              fontWeight: FontWeight.w600,
-            ),
+        style: TextStyle(
+          color: textColor ?? AppColors.primary,
+          fontWeight: FontWeight.w800,
+          fontSize: 11,
+        ),
       ),
     );
   }
@@ -151,6 +164,11 @@ class MinTextField extends StatelessWidget {
   final Widget? prefixIcon;
   final Widget? suffixIcon;
   final String? Function(String?)? validator;
+  final int maxLines;
+  final TextAlign textAlign;
+  final TextStyle? style;
+  final TextStyle? labelStyle;
+  final Function(String)? onChanged;
 
   const MinTextField({
     super.key,
@@ -162,6 +180,11 @@ class MinTextField extends StatelessWidget {
     this.prefixIcon,
     this.suffixIcon,
     this.validator,
+    this.maxLines = 1,
+    this.textAlign = TextAlign.start,
+    this.style,
+    this.labelStyle,
+    this.onChanged,
   });
 
   @override
@@ -172,22 +195,37 @@ class MinTextField extends StatelessWidget {
         if (label != null) ...[
           Text(
             label!,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
+            style: labelStyle ??
+                const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
                 ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
         ],
         TextFormField(
           controller: controller,
           obscureText: obscureText,
           keyboardType: keyboardType,
           validator: validator,
+          maxLines: maxLines,
+          textAlign: textAlign,
+          onChanged: onChanged,
+          style: style ??
+              const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: prefixIcon,
             suffixIcon: suffixIcon,
+            hintStyle: TextStyle(
+              color: AppColors.textTertiary.withOpacity(0.5),
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],

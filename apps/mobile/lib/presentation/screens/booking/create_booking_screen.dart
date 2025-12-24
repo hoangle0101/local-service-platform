@@ -8,6 +8,7 @@ import '../../../core/entities/entities.dart';
 import '../../../data/datasources/track_asia_datasource.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
+import '../../widgets/minimalist_widgets.dart';
 
 class CreateBookingScreen extends StatefulWidget {
   final int serviceId;
@@ -124,30 +125,41 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
         },
         builder: (context, state) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Book Service'),
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.black,
-              elevation: 0,
+            backgroundColor: AppColors.white,
+            body: CustomScrollView(
+              slivers: [
+                _buildSliverAppBar(context),
+                SliverToBoxAdapter(
+                  child: Form(
+                    key: _formKey,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildServiceInfo(),
+                          const SizedBox(height: 32),
+                          _buildLabel('Thời gian thực hiện'),
+                          _buildDateTimeSection(),
+                          const SizedBox(height: 32),
+                          _buildLabel('Địa điểm cần đến'),
+                          _buildLocationSection(),
+                          const SizedBox(height: 32),
+                          _buildLabel('Ghi chú thêm'),
+                          _buildNotesSection(),
+                          const SizedBox(height: 32),
+                          _buildPriceSummary(),
+                          const SizedBox(height: 40),
+                          _buildSubmitButton(context, state),
+                          const SizedBox(height: 40),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            body: Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  _buildServiceInfo(),
-                  const SizedBox(height: 24),
-                  _buildDateTimeSection(),
-                  const SizedBox(height: 24),
-                  _buildLocationSection(),
-                  const SizedBox(height: 24),
-                  _buildNotesSection(),
-                  const SizedBox(height: 24),
-                  _buildPriceSummary(),
-                ],
-              ),
-            ),
-            bottomNavigationBar: _buildBottomBar(context, state),
           );
         },
       ),
@@ -320,42 +332,87 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
     );
   }
 
+  Widget _buildSliverAppBar(BuildContext context) {
+    return SliverAppBar(
+      pinned: true,
+      floating: false,
+      expandedHeight: 120,
+      backgroundColor: AppColors.white,
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      flexibleSpace: FlexibleSpaceBar(
+        background: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 64, 24, 0),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () => context.pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    shape: BoxShape.circle,
+                    border:
+                        Border.all(color: AppColors.divider.withOpacity(0.5)),
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded,
+                      size: 18, color: AppColors.textPrimary),
+                ),
+              ),
+              const SizedBox(width: 20),
+              const Text(
+                'Đặt dịch vụ',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, left: 4),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textPrimary,
+        ),
+      ),
+    );
+  }
+
   Widget _buildServiceInfo() {
     if (widget.service == null) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(12),
-        ),
+      return MinCard(
+        padding: const EdgeInsets.all(20),
         child: Row(
           children: [
             Container(
-              width: 60,
-              height: 60,
+              width: 50,
+              height: 50,
               decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(12),
+                color: AppColors.shelf,
+                borderRadius: BorderRadius.circular(16),
               ),
-              child:
-                  Icon(Icons.home_repair_service, color: Colors.grey.shade400),
+              child: const Icon(Icons.home_repair_service_rounded,
+                  color: AppColors.textTertiary),
             ),
             const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Service #${widget.serviceId}',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Loading service details...',
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                ],
+            const Expanded(
+              child: Text(
+                'Đang tải thông tin dịch vụ...',
+                style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -363,13 +420,8 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
       );
     }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.primaryLight.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primaryLight),
-      ),
+    return MinCard(
+      padding: const EdgeInsets.all(20),
       child: Row(
         children: [
           Container(
@@ -377,10 +429,10 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
             height: 60,
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
             ),
-            child:
-                const Icon(Icons.home_repair_service, color: AppColors.primary),
+            child: const Icon(Icons.home_repair_service_rounded,
+                color: AppColors.primary, size: 28),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -390,32 +442,25 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
                 Text(
                   widget.service!.service.name,
                   style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                      color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
-                      .format(widget.service!.price),
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                Row(
+                  children: [
+                    const Icon(Icons.person_rounded,
+                        size: 14, color: AppColors.textTertiary),
+                    const SizedBox(width: 4),
+                    Text(
+                      widget.service!.provider.displayName,
+                      style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ],
                 ),
-                ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.person, size: 14, color: Colors.grey.shade600),
-                      const SizedBox(width: 4),
-                      Text(
-                        widget.service!.provider.displayName,
-                        style: TextStyle(
-                            color: Colors.grey.shade600, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ],
               ],
             ),
           ),
@@ -425,109 +470,106 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
   }
 
   Widget _buildDateTimeSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
-        const Row(
-          children: [
-            Icon(Icons.calendar_today, size: 20, color: AppColors.primary),
-            SizedBox(width: 8),
-            Text(
-              'When do you need the service?',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        Expanded(
+          child: GestureDetector(
+            onTap: () async {
+              final date = await showDatePicker(
+                context: context,
+                initialDate: _selectedDate,
+                firstDate: DateTime.now(),
+                lastDate: DateTime.now().add(const Duration(days: 30)),
+              );
+              if (date != null) {
+                setState(() => _selectedDate = date);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                    color: AppColors.divider.withOpacity(0.5), width: 1.5),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.calendar_today_rounded,
+                      size: 18, color: AppColors.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Ngày',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textTertiary,
+                                fontWeight: FontWeight.w700)),
+                        Text(
+                          DateFormat('dd/MM/yyyy').format(_selectedDate),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              color: AppColors.textPrimary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
+          ),
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: InkWell(
-                onTap: () async {
-                  final date = await showDatePicker(
-                    context: context,
-                    initialDate: _selectedDate,
-                    firstDate: DateTime.now(),
-                    lastDate: DateTime.now().add(const Duration(days: 30)),
-                  );
-                  if (date != null) {
-                    setState(() => _selectedDate = date);
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.calendar_today,
-                          size: 20, color: Colors.grey.shade600),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Date',
+        const SizedBox(width: 12),
+        Expanded(
+          child: GestureDetector(
+            onTap: () async {
+              final time = await showTimePicker(
+                context: context,
+                initialTime: _selectedTime,
+              );
+              if (time != null) {
+                setState(() => _selectedTime = time);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                    color: AppColors.divider.withOpacity(0.5), width: 1.5),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.access_time_rounded,
+                      size: 18, color: AppColors.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Giờ',
                             style: TextStyle(
-                                fontSize: 12, color: Colors.grey.shade600),
-                          ),
-                          Text(
-                            DateFormat('EEE, dd MMM yyyy')
-                                .format(_selectedDate),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ],
+                                fontSize: 11,
+                                color: AppColors.textTertiary,
+                                fontWeight: FontWeight.w700)),
+                        Text(
+                          _selectedTime.format(context),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              color: AppColors.textPrimary),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: InkWell(
-                onTap: () async {
-                  final time = await showTimePicker(
-                    context: context,
-                    initialTime: _selectedTime,
-                  );
-                  if (time != null) {
-                    setState(() => _selectedTime = time);
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.access_time,
-                          size: 20, color: Colors.grey.shade600),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Time',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey.shade600),
-                          ),
-                          Text(
-                            _selectedTime.format(context),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ],
     );
@@ -537,117 +579,74 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
-          children: [
-            Icon(Icons.location_on, size: 20, color: AppColors.primary),
-            SizedBox(width: 8),
-            Text(
-              'Địa điểm cần đến',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Sử dụng Track Asia API để tìm địa chỉ chính xác',
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-        ),
-        const SizedBox(height: 12),
-
-        // Address input with autocomplete
-        TextFormField(
+        MinTextField(
           controller: _addressController,
-          decoration: InputDecoration(
-            hintText: 'Nhập địa chỉ để tìm kiếm...',
-            prefixIcon: const Icon(Icons.location_on_outlined),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            suffixIcon: IconButton(
-              icon: const Icon(Icons.my_location, color: AppColors.primary),
-              onPressed: _getCurrentLocation,
-            ),
+          hint: 'Nhập địa chỉ của bạn...',
+          prefixIcon: const Icon(Icons.location_on_rounded,
+              color: AppColors.primary, size: 20),
+          suffixIcon: IconButton(
+            icon: const Icon(Icons.my_location_rounded,
+                color: AppColors.primary, size: 18),
+            onPressed: _getCurrentLocation,
           ),
           onChanged: _onAddressSearch,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Vui lòng nhập địa chỉ';
-            }
-            return null;
-          },
         ),
-
-        // Address predictions dropdown
         if (_showPredictions && _addressPredictions.isNotEmpty)
           Container(
-            margin: const EdgeInsets.only(top: 4),
-            constraints: const BoxConstraints(maxHeight: 180),
+            margin: const EdgeInsets.only(top: 8),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.divider.withOpacity(0.5)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
-            child: ListView.builder(
+            child: ListView.separated(
               shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
               itemCount: _addressPredictions.length,
+              separatorBuilder: (_, __) =>
+                  Divider(height: 1, color: AppColors.divider.withOpacity(0.3)),
               itemBuilder: (context, index) {
                 final prediction = _addressPredictions[index];
                 return ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Icon(
-                      Icons.location_on,
-                      color: AppColors.primary,
-                      size: 18,
-                    ),
-                  ),
-                  title: Text(
-                    prediction.mainText,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w500, fontSize: 14),
-                  ),
-                  subtitle: Text(
-                    prediction.secondaryText,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                  ),
+                  dense: true,
+                  leading: const Icon(Icons.location_on_outlined,
+                      size: 18, color: AppColors.textTertiary),
+                  title: Text(prediction.mainText,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 14)),
+                  subtitle: Text(prediction.secondaryText,
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.textTertiary)),
                   onTap: () => _selectAddress(prediction),
                 );
               },
             ),
           ),
-
-        const SizedBox(height: 8),
-
-        // GPS coordinates display
+        const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+            color: AppColors.shelf.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
-              const Icon(Icons.gps_fixed, size: 16, color: AppColors.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Tọa độ: ${_latitude.toStringAsFixed(6)}, ${_longitude.toStringAsFixed(6)}',
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
+              const Icon(Icons.gps_fixed_rounded,
+                  size: 14, color: AppColors.textTertiary),
+              const SizedBox(width: 10),
+              Text(
+                'Tọa độ: ${_latitude.toStringAsFixed(6)}, ${_longitude.toStringAsFixed(6)}',
+                style: const TextStyle(
+                  color: AppColors.textTertiary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -680,152 +679,91 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
   }
 
   Widget _buildNotesSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Icon(Icons.note_alt, size: 20, color: AppColors.primary),
-            const SizedBox(width: 8),
-            const Text(
-              'Additional Notes',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const Spacer(),
-            Text(
-              '(Optional)',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _notesController,
-          maxLines: 3,
-          decoration: InputDecoration(
-            hintText: 'Any specific instructions or requirements...',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-      ],
+    return MinTextField(
+      controller: _notesController,
+      maxLines: 4,
+      hint: 'Ví dụ: Hướng dẫn tìm đường, số tầng, lưu ý đặc biệt...',
+      prefixIcon: const Icon(Icons.note_alt_rounded,
+          color: AppColors.primary, size: 20),
     );
   }
 
   Widget _buildPriceSummary() {
     final price = widget.service?.price ?? 0;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return MinCard(
+      padding: const EdgeInsets.all(24),
+      backgroundColor: AppColors.shelf.withOpacity(0.3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Price Summary',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Service Price'),
+              const Text('Giá dịch vụ',
+                  style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600)),
               Text(
                 NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
                     .format(price),
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800, color: AppColors.textPrimary),
               ),
             ],
           ),
-          const Divider(height: 24),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Divider(height: 1, color: AppColors.divider),
+          ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Est. Total',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                'Tổng cộng tạm tính',
+                style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: AppColors.textPrimary),
               ),
               Text(
                 NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
                     .format(price),
                 style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 20,
                   color: AppColors.primary,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            '* Final price may vary based on provider offers',
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+          const SizedBox(height: 12),
+          Row(
+            children: const [
+              Icon(Icons.info_outline_rounded,
+                  size: 14, color: AppColors.textTertiary),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Giá cuối cùng có thể thay đổi dựa trên thỏa thuận trực tiếp.',
+                  style: TextStyle(
+                      color: AppColors.textTertiary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBottomBar(BuildContext context, BookingsState state) {
-    final isLoading = state is BookingsLoading;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: ElevatedButton(
-          onPressed: isLoading ? null : () => _submitBooking(context),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: isLoading
-              ? const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Text('Finding Providers...'),
-                  ],
-                )
-              : const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.search),
-                    SizedBox(width: 8),
-                    Text(
-                      'Find Providers',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-        ),
-      ),
+  Widget _buildSubmitButton(BuildContext context, BookingsState state) {
+    return MinButton(
+      text: 'Xác nhận đặt lịch',
+      onPressed: () => _submitBooking(context),
+      isLoading: state is BookingsLoading,
     );
   }
 

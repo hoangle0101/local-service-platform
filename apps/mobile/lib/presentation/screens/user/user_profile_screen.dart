@@ -120,7 +120,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   Widget _buildSliverAppBar(BuildContext context) {
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+      padding: const EdgeInsets.fromLTRB(24, 64, 24, 16),
       sliver: SliverToBoxAdapter(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -130,12 +130,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               child: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.shelf,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.divider),
+                  color: AppColors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.divider.withOpacity(0.5)),
                 ),
                 child: const Icon(Icons.arrow_back_ios_new_rounded,
-                    size: 20, color: AppColors.textPrimary),
+                    size: 18, color: AppColors.textPrimary),
               ),
             ),
             GestureDetector(
@@ -147,15 +147,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryDark,
+                  color: AppColors.primary,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Text(
                   'Sửa hồ sơ',
                   style: TextStyle(
-                      color: Colors.white,
+                      color: AppColors.white,
                       fontSize: 13,
-                      fontWeight: FontWeight.w700),
+                      fontWeight: FontWeight.w800),
                 ),
               ),
             ),
@@ -172,10 +172,17 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       children: [
         Row(
           children: [
-            UserAvatar(
-              avatarUrl: avatarUrl,
-              fullName: user.fullName,
-              size: 80,
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                    color: AppColors.primary.withOpacity(0.1), width: 4),
+              ),
+              child: UserAvatar(
+                avatarUrl: avatarUrl,
+                fullName: user.fullName,
+                size: 80,
+              ),
             ),
             const SizedBox(width: 20),
             Expanded(
@@ -184,27 +191,39 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 children: [
                   Text(
                     user.fullName,
-                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                        ),
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -1,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.phone_rounded,
-                          size: 14, color: AppColors.textTertiary),
-                      const SizedBox(width: 6),
-                      Text(
-                        user.phone,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                      ),
-                    ],
+                  const SizedBox(height: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.shelf,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.phone_iphone_rounded,
+                            size: 14, color: AppColors.textTertiary),
+                        const SizedBox(width: 6),
+                        Text(
+                          user.phone,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -212,28 +231,58 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ],
         ),
         if (_defaultAddress != null) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppColors.shelf,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.divider),
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.black.withOpacity(0.02),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
             child: Row(
               children: [
-                const Icon(Icons.location_on_rounded,
-                    size: 18, color: AppColors.primary),
-                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.location_on_rounded,
+                      size: 18, color: AppColors.primary),
+                ),
+                const SizedBox(width: 16),
                 Expanded(
-                  child: Text(
-                    _defaultAddress!,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w600,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Địa chỉ mặc định',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textTertiary,
+                          letterSpacing: 0.5,
                         ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _defaultAddress!,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -325,12 +374,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }) {
     return ListTile(
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       leading: Container(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: AppColors.shelf,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(icon, color: AppColors.textPrimary, size: 20),
       ),
@@ -338,25 +387,25 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         title,
         style: const TextStyle(
           fontSize: 15,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
         ),
       ),
       trailing: const Icon(Icons.chevron_right_rounded,
-          color: AppColors.textTertiary, size: 20),
+          color: AppColors.textTertiary, size: 22),
     );
   }
 
   Widget _buildMenuDivider() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Divider(height: 1, color: AppColors.divider),
+      child: Divider(height: 1, color: AppColors.divider.withOpacity(0.5)),
     );
   }
 
   Widget _buildLogoutButton(BuildContext context) {
     return MinButton(
-      text: 'Đăng xuất',
+      text: 'Đăng xuất tài khoản',
       isPrimary: false,
       onPressed: () => _showLogoutDialog(context),
     );
@@ -366,39 +415,63 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.white,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: const Text(
           'Đăng xuất',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-        content: const Text('Bạn có chắc chắn muốn đăng xuất khỏi ứng dụng?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Hủy bỏ',
-                style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w700)),
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            color: AppColors.textPrimary,
           ),
-          GestureDetector(
-            onTap: () {
-              Navigator.of(dialogContext).pop();
-              context.read<AuthBloc>().add(LogoutRequested());
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.error.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+        ),
+        content: const Text(
+          'Bạn có chắc chắn muốn đăng xuất khỏi ứng dụng và kết thúc phiên làm việc này?',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 15,
+            height: 1.5,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: MinButton(
+                  text: 'Hủy',
+                  isPrimary: false,
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                ),
               ),
-              child: const Text(
-                'Đăng xuất',
-                style: TextStyle(
-                    color: AppColors.error, fontWeight: FontWeight.w800),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.of(dialogContext).pop();
+                    context.read<AuthBloc>().add(LogoutRequested());
+                  },
+                  child: Container(
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Đăng xuất',
+                        style: TextStyle(
+                            color: AppColors.error,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),

@@ -4,11 +4,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/user_datasource.dart';
 import '../../../data/datasources/track_asia_datasource.dart';
 import '../../bloc/auth/auth_bloc.dart';
 import '../../widgets/address_input_widget.dart';
+import '../../widgets/minimalist_widgets.dart';
 
 class UserEditProfileScreen extends StatefulWidget {
   const UserEditProfileScreen({super.key});
@@ -72,7 +74,7 @@ class _UserEditProfileScreenState extends State<UserEditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundSecondary,
+      backgroundColor: AppColors.white,
       body: CustomScrollView(
         slivers: [
           _buildHeader(),
@@ -103,284 +105,198 @@ class _UserEditProfileScreenState extends State<UserEditProfileScreen> {
 
   Widget _buildHeader() {
     return SliverAppBar(
-      expandedHeight: 140,
       pinned: true,
-      backgroundColor: AppColors.primaryDark,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-        onPressed: () => context.pop(),
-      ),
+      floating: false,
+      expandedHeight: 120,
+      backgroundColor: AppColors.white,
+      elevation: 0,
+      automaticallyImplyLeading: false,
       flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppColors.primaryDark, AppColors.accent],
-            ),
+        background: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 64, 24, 0),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () => context.pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    shape: BoxShape.circle,
+                    border:
+                        Border.all(color: AppColors.divider.withOpacity(0.5)),
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded,
+                      size: 18, color: AppColors.textPrimary),
+                ),
+              ),
+              const SizedBox(width: 20),
+              const Text(
+                'Sửa hồ sơ',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvatarSection() {
+    return Column(
+      children: [
+        Center(
           child: Stack(
             children: [
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: AppColors.primary.withOpacity(0.1), width: 4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.08),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: _selectedImage != null
+                      ? Image.file(
+                          File(_selectedImage!.path),
+                          fit: BoxFit.cover,
+                        )
+                      : (_fullAvatarUrl != null)
+                          ? Image.network(
+                              _fullAvatarUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  _buildAvatarPlaceholder(),
+                            )
+                          : _buildAvatarPlaceholder(),
+                ),
+              ),
               Positioned(
-                top: -40,
-                right: -40,
-                child: Container(
-                  width: 150,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.1),
+                bottom: 0,
+                right: 0,
+                child: GestureDetector(
+                  onTap: _showImagePicker,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.white, width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.camera_alt_rounded,
+                        color: Colors.white, size: 18),
                   ),
                 ),
               ),
             ],
           ),
         ),
-        title: const Text(
-          'Chỉnh sửa hồ sơ',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        const SizedBox(height: 16),
+        Text(
+          'Thay đổi ảnh đại diện',
+          style: TextStyle(
+            color: AppColors.textTertiary,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        centerTitle: true,
-      ),
-    );
-  }
-
-  Widget _buildAvatarSection() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          GestureDetector(
-            onTap: _showImagePicker,
-            child: Stack(
-              children: [
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.primary.withOpacity(0.2),
-                        AppColors.accent.withOpacity(0.2),
-                      ],
-                    ),
-                  ),
-                  child: ClipOval(
-                    child: _selectedImage != null
-                        ? Image.file(
-                            File(_selectedImage!.path),
-                            fit: BoxFit.cover,
-                            width: 120,
-                            height: 120,
-                          )
-                        : (_fullAvatarUrl != null)
-                            ? Image.network(
-                                _fullAvatarUrl!,
-                                fit: BoxFit.cover,
-                                width: 120,
-                                height: 120,
-                                errorBuilder: (_, __, ___) =>
-                                    _buildAvatarPlaceholder(),
-                              )
-                            : _buildAvatarPlaceholder(),
-                  ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.camera_alt,
-                        color: Colors.white, size: 20),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Nhấn để thay đổi ảnh',
-            style: TextStyle(
-                color: AppColors.primary, fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
+      ],
     );
   }
 
   Widget _buildAvatarPlaceholder() {
     return Container(
-      width: 120,
-      height: 120,
-      color: AppColors.primaryLight,
-      child: Icon(Icons.person, size: 60, color: AppColors.primaryDark),
+      color: AppColors.shelf,
+      child: const Icon(Icons.person_rounded,
+          size: 60, color: AppColors.textTertiary),
     );
   }
 
   Widget _buildInfoCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+    return MinCard(
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionHeader(
-              Icons.person_outline, Colors.blue, 'Thông tin cá nhân'),
-          Divider(height: 1, color: Colors.grey.shade200),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                _buildTextField(
-                  controller: _fullNameController,
-                  label: 'Họ và tên',
-                  hint: 'Nhập họ và tên của bạn',
-                  icon: Icons.badge_outlined,
-                  validator: (v) =>
-                      v?.isEmpty ?? true ? 'Vui lòng nhập tên' : null,
-                ),
-                const SizedBox(height: 20),
-                _buildTextField(
-                  controller: _bioController,
-                  label: 'Giới thiệu',
-                  hint: 'Mô tả ngắn về bạn',
-                  icon: Icons.description_outlined,
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 20),
-                _buildGenderSelector(),
-                const SizedBox(height: 20),
-                _buildDatePicker(),
-              ],
-            ),
+          _buildLabel('Họ và tên'),
+          MinTextField(
+            controller: _fullNameController,
+            hint: 'Nhập họ và tên của bạn',
+            prefixIcon: const Icon(Icons.badge_outlined,
+                size: 20, color: AppColors.primary),
           ),
+          const SizedBox(height: 24),
+          _buildLabel('Giới thiệu'),
+          MinTextField(
+            controller: _bioController,
+            hint: 'Mô tả ngắn về bạn',
+            prefixIcon: const Icon(Icons.description_outlined,
+                size: 20, color: AppColors.primary),
+            maxLines: 3,
+          ),
+          const SizedBox(height: 24),
+          _buildGenderSelector(),
+          const SizedBox(height: 24),
+          _buildDatePicker(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, left: 4),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+        ),
       ),
     );
   }
 
   Widget _buildAddressCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+    return MinCard(
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionHeader(
-              Icons.location_on_outlined, Colors.green, 'Địa chỉ'),
-          Divider(height: 1, color: Colors.grey.shade200),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: AddressInputWidget(
-              label: 'Địa chỉ của bạn',
-              hint: 'Nhập địa chỉ để tìm kiếm...',
-              showGpsButton: true,
-              showCoordinates: false,
-              onAddressSelected: (address) {
-                setState(() {
-                  _selectedAddress = address.displayText;
-                });
-              },
-            ),
+          _buildLabel('Địa chỉ của bạn'),
+          AddressInputWidget(
+            label: '',
+            hint: 'Nhập địa chỉ để tìm kiếm...',
+            showGpsButton: true,
+            showCoordinates: false,
+            onAddressSelected: (address) {
+              setState(() {
+                _selectedAddress = address.displayText;
+              });
+            },
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSectionHeader(IconData icon, Color color, String title) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Text(title,
-              style:
-                  const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    int maxLines = 1,
-    String? Function(String?)? validator,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label,
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade800)),
-        const SizedBox(height: 10),
-        TextFormField(
-          controller: controller,
-          maxLines: maxLines,
-          validator: validator,
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey.shade400),
-            prefixIcon: Icon(icon, color: AppColors.primary),
-            filled: true,
-            fillColor: Colors.grey.shade50,
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide.none),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: AppColors.primary, width: 2),
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -388,38 +304,45 @@ class _UserEditProfileScreenState extends State<UserEditProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Giới tính',
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade800)),
-        const SizedBox(height: 10),
+        _buildLabel('Giới tính'),
         Row(
           children: _genderOptions.map((gender) {
             final isSelected = _selectedGender == gender;
             return Expanded(
               child: Padding(
-                padding: const EdgeInsets.only(right: 12),
+                padding: const EdgeInsets.only(right: 8),
                 child: GestureDetector(
                   onTap: () => setState(() => _selectedGender = gender),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
-                      color:
-                          isSelected ? AppColors.primary : Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(14),
+                      color: isSelected ? AppColors.primary : AppColors.white,
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                          color: isSelected
-                              ? AppColors.primary
-                              : Colors.grey.shade200),
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.divider.withOpacity(0.5),
+                        width: 1.5,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: AppColors.primary.withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              )
+                            ]
+                          : null,
                     ),
                     child: Center(
                       child: Text(
                         gender,
                         style: TextStyle(
-                          color:
-                              isSelected ? Colors.white : Colors.grey.shade700,
-                          fontWeight: FontWeight.w600,
+                          color: isSelected
+                              ? Colors.white
+                              : AppColors.textSecondary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
                         ),
                       ),
                     ),
@@ -437,32 +360,32 @@ class _UserEditProfileScreenState extends State<UserEditProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Ngày sinh',
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade800)),
-        const SizedBox(height: 10),
+        _buildLabel('Ngày sinh'),
         GestureDetector(
           onTap: _selectDate,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(14)),
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color: AppColors.divider.withOpacity(0.5), width: 1.5),
+            ),
             child: Row(
               children: [
-                Icon(Icons.calendar_today_outlined, color: AppColors.primary),
-                const SizedBox(width: 12),
+                const Icon(Icons.calendar_today_rounded,
+                    color: AppColors.primary, size: 20),
+                const SizedBox(width: 14),
                 Text(
                   _birthDate != null
-                      ? '${_birthDate!.day}/${_birthDate!.month}/${_birthDate!.year}'
+                      ? DateFormat('dd/MM/yyyy').format(_birthDate!)
                       : 'Chọn ngày sinh',
                   style: TextStyle(
                     color: _birthDate != null
-                        ? Colors.grey.shade800
-                        : Colors.grey.shade400,
+                        ? AppColors.textPrimary
+                        : AppColors.textTertiary.withOpacity(0.5),
                     fontSize: 15,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -474,35 +397,10 @@ class _UserEditProfileScreenState extends State<UserEditProfileScreen> {
   }
 
   Widget _buildSaveButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _isSaving ? null : _saveProfile,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryDark,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 4,
-        ),
-        child: _isSaving
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.white))
-            : const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.check_circle_outline, size: 22),
-                  SizedBox(width: 10),
-                  Text('Lưu thay đổi',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ],
-              ),
-      ),
+    return MinButton(
+      text: 'Lưu thay đổi',
+      onPressed: _saveProfile,
+      isLoading: _isSaving,
     );
   }
 
@@ -514,9 +412,9 @@ class _UserEditProfileScreenState extends State<UserEditProfileScreen> {
       builder: (ctx) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
         ),
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -524,20 +422,27 @@ class _UserEditProfileScreenState extends State<UserEditProfileScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2)),
+                color: AppColors.divider.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-            const SizedBox(height: 24),
-            const Text('Chọn ảnh đại diện',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
+            const Text(
+              'Chọn ảnh đại diện',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 32),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildImageOption(Icons.camera_alt, 'Camera', Colors.blue,
-                    () => _pickImage(ImageSource.camera)),
-                _buildImageOption(Icons.photo_library, 'Thư viện', Colors.green,
-                    () => _pickImage(ImageSource.gallery)),
+                _buildImageOption(Icons.camera_alt_rounded, 'Máy ảnh',
+                    AppColors.primary, () => _pickImage(ImageSource.camera)),
+                _buildImageOption(Icons.photo_library_rounded, 'Thư viện',
+                    AppColors.accent, () => _pickImage(ImageSource.gallery)),
               ],
             ),
             const SizedBox(height: 16),
@@ -559,13 +464,20 @@ class _UserEditProfileScreenState extends State<UserEditProfileScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-                color: color.withOpacity(0.1), shape: BoxShape.circle),
-            child: Icon(icon, color: color, size: 32),
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(icon, color: color, size: 30),
           ),
           const SizedBox(height: 12),
-          Text(label,
-              style: TextStyle(
-                  fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              color: AppColors.textPrimary,
+            ),
+          ),
         ],
       ),
     );
@@ -636,14 +548,14 @@ class _UserEditProfileScreenState extends State<UserEditProfileScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
+            content: Row(
+              children: const [
+                Icon(Icons.check_circle_rounded, color: Colors.white),
                 SizedBox(width: 12),
                 Text('Cập nhật hồ sơ thành công!'),
               ],
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
             behavior: SnackBarBehavior.floating,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
