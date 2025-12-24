@@ -53,29 +53,29 @@ export default function BookingsPage() {
     {
       key: 'customer',
       label: 'Customer',
-      render: (booking) => (
+      render: (booking: any) => (
         <div>
           <div className="font-medium">
-            {booking.customer?.profile?.fullName || 'N/A'}
+            {booking.customerName || booking.customer?.profile?.fullName || 'N/A'}
           </div>
-          <div className="text-sm text-zinc-500">{booking.customer?.phone}</div>
+          <div className="text-sm text-zinc-500">{booking.customerPhone || booking.customer?.phone}</div>
         </div>
       ),
     },
     {
       key: 'provider',
       label: 'Provider',
-      render: (booking) => (
+      render: (booking: any) => (
         <div>
-          <div className="font-medium">{booking.provider?.displayName}</div>
-          <div className="text-sm text-zinc-500">{booking.provider?.user?.phone}</div>
+          <div className="font-medium">{booking.providerName || booking.provider?.displayName || 'N/A'}</div>
+          <div className="text-sm text-zinc-500">{booking.providerPhone || booking.provider?.user?.phone}</div>
         </div>
       ),
     },
     {
       key: 'service',
       label: 'Service',
-      render: (booking) => booking.service?.name || 'N/A',
+      render: (booking: any) => booking.serviceName || booking.service?.name || 'N/A',
     },
     {
       key: 'scheduledAt',
@@ -91,8 +91,8 @@ export default function BookingsPage() {
       key: 'totalAmount',
       label: 'Amount',
       sortable: true,
-      render: (booking) => (
-        <span className="font-medium">{formatCurrency(booking.totalAmount)}</span>
+      render: (booking: any) => (
+        <span className="font-medium">{formatCurrency(booking.actualPrice || booking.estimatedPrice || booking.totalAmount || 0)}</span>
       ),
     },
     {
@@ -125,7 +125,7 @@ export default function BookingsPage() {
           <h2 className="text-3xl font-bold tracking-tight">Bookings Management</h2>
           <p className="text-zinc-600">Monitor and manage all bookings</p>
         </div>
-        <Button 
+        <Button
           variant="outline"
           onClick={() => exportToCSV(response?.data || [], 'bookings_report')}
           disabled={!response?.data?.length}
@@ -165,11 +165,11 @@ export default function BookingsPage() {
         pagination={
           response?.pagination
             ? {
-                page,
-                pageSize: response.pagination.limit,
-                total: response.pagination.total,
-                onPageChange: setPage,
-              }
+              page,
+              pageSize: response.pagination.limit,
+              total: response.pagination.total,
+              onPageChange: setPage,
+            }
             : undefined
         }
         isLoading={isLoading}

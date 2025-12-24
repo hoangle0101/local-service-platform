@@ -43,22 +43,22 @@ export default function DisputesPage() {
     {
       key: 'booking',
       label: 'Booking',
-      render: (dispute) => (
+      render: (dispute: any) => (
         <div>
           <div className="font-medium">#{dispute.bookingId?.toString().slice(0, 8) || 'N/A'}</div>
-          <div className="text-sm text-zinc-500">{dispute.booking?.service?.name}</div>
+          <div className="text-sm text-zinc-500">{dispute.booking?.serviceName || dispute.booking?.service?.name || 'N/A'}</div>
         </div>
       ),
     },
     {
       key: 'reporter',
       label: 'Reporter',
-      render: (dispute) => (
+      render: (dispute: any) => (
         <div>
           <div className="font-medium">
-            {dispute.reporter?.profile?.fullName || 'N/A'}
+            {dispute.reporter?.profile?.fullName || dispute.booking?.customerPhone || 'N/A'}
           </div>
-          <div className="text-sm text-zinc-500">{dispute.reporter?.phone}</div>
+          <div className="text-sm text-zinc-500">{dispute.reporter?.phone || dispute.booking?.customerPhone}</div>
         </div>
       ),
     },
@@ -144,11 +144,11 @@ export default function DisputesPage() {
         pagination={
           response?.pagination
             ? {
-                page,
-                pageSize: response.pagination.limit,
-                total: response.pagination.total,
-                onPageChange: setPage,
-              }
+              page,
+              pageSize: response.pagination.limit,
+              total: response.pagination.total,
+              onPageChange: setPage,
+            }
             : undefined
         }
         isLoading={isLoading}

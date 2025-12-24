@@ -41,14 +41,14 @@ export default function CustomersPage() {
   const handleStatusChange = async (userId: string, action: 'ban' | 'unban' | 'verify' | 'unverify') => {
     try {
       if (action === 'ban' || action === 'unban') {
-        await api.patch(`/admin/users/${userId}/ban`, { 
+        await api.patch(`/admin/users/${userId}/ban`, {
           action,
           reason: action === 'ban' ? 'Banned by admin' : 'Unbanned by admin'
         });
         toast.success(`User ${action === 'ban' ? 'banned' : 'unbanned'} successfully`);
       } else {
-        await api.patch(`/admin/users/${userId}/verify`, { 
-          isVerified: action === 'verify' 
+        await api.patch(`/admin/users/${userId}/verify`, {
+          isVerified: action === 'verify'
         });
         toast.success(`User ${action === 'verify' ? 'verified' : 'unverified'} successfully`);
       }
@@ -79,8 +79,8 @@ export default function CustomersPage() {
     {
       key: 'profile',
       label: 'Full Name',
-      render: (user) => (
-        <span>{user.profile?.fullName || <span className="text-zinc-400">Not set</span>}</span>
+      render: (user: any) => (
+        <span>{user.fullName || user.profile?.fullName || <span className="text-zinc-400">Not set</span>}</span>
       ),
     },
     {
@@ -88,8 +88,8 @@ export default function CustomersPage() {
       label: 'Role',
       render: (user) => (
         <span className="capitalize text-sm px-2 py-1 rounded bg-zinc-100 font-medium">
-          {user.roles && user.roles.length > 0 
-            ? user.roles[0].replace('_', ' ') 
+          {user.roles && user.roles.length > 0
+            ? user.roles[0].replace('_', ' ')
             : 'No Role'}
         </span>
       ),
@@ -198,11 +198,11 @@ export default function CustomersPage() {
         pagination={
           response?.pagination
             ? {
-                page,
-                pageSize: response.pagination.limit,
-                total: response.pagination.total,
-                onPageChange: setPage,
-              }
+              page,
+              pageSize: response.pagination.limit,
+              total: response.pagination.total,
+              onPageChange: setPage,
+            }
             : undefined
         }
         isLoading={isLoading}
@@ -213,31 +213,31 @@ export default function CustomersPage() {
         open={actionDialog.open}
         onOpenChange={(open) => setActionDialog({ open, action: null })}
         title={
-          actionDialog.action === 'ban' 
-            ? 'Ban User' 
-            : actionDialog.action === 'unban' 
-            ? 'Unban User'
-            : actionDialog.action === 'verify'
-            ? 'Verify Account'
-            : 'Unverify Account'
+          actionDialog.action === 'ban'
+            ? 'Ban User'
+            : actionDialog.action === 'unban'
+              ? 'Unban User'
+              : actionDialog.action === 'verify'
+                ? 'Verify Account'
+                : 'Unverify Account'
         }
         description={
           actionDialog.action === 'ban'
             ? `Are you sure you want to ban user ${selectedUser?.phone}? They will not be able to access the platform.`
             : actionDialog.action === 'unban'
-            ? `Are you sure you want to unban user ${selectedUser?.phone}?`
-            : actionDialog.action === 'verify'
-            ? `Manually verify account for ${selectedUser?.phone}?`
-            : `Remove verification status for ${selectedUser?.phone}?`
+              ? `Are you sure you want to unban user ${selectedUser?.phone}?`
+              : actionDialog.action === 'verify'
+                ? `Manually verify account for ${selectedUser?.phone}?`
+                : `Remove verification status for ${selectedUser?.phone}?`
         }
         confirmLabel={
-          actionDialog.action === 'ban' 
-            ? 'Ban User' 
-            : actionDialog.action === 'unban' 
-            ? 'Unban'
-            : actionDialog.action === 'verify'
-            ? 'Verify'
-            : 'Remove Verification'
+          actionDialog.action === 'ban'
+            ? 'Ban User'
+            : actionDialog.action === 'unban'
+              ? 'Unban'
+              : actionDialog.action === 'verify'
+                ? 'Verify'
+                : 'Remove Verification'
         }
         variant={actionDialog.action === 'ban' || actionDialog.action === 'unverify' ? 'destructive' : 'default'}
         onConfirm={async () => {
