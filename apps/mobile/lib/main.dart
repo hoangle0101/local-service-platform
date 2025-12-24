@@ -8,12 +8,14 @@ import 'package:mobile/presentation/bloc/favorites/favorites_bloc.dart';
 import 'presentation/navigation/app_router.dart';
 import 'presentation/theme/app_theme.dart';
 
+import 'core/services/socket_service.dart';
+
 void main() {
   runApp(
     MultiBlocProvider(
       providers: [
         BlocProvider<AuthBloc>(
-          create: (_) => AuthBloc(),
+          create: (_) => AuthBloc()..add(AuthCheckRequested()),
         ),
         BlocProvider<CategoriesBloc>(
           create: (_) => CategoriesBloc(),
@@ -28,7 +30,16 @@ void main() {
           create: (_) => FavoritesBloc()..add(LoadFavorites()),
         ),
       ],
-      child: const MyApp(),
+      child: BlocListener<AuthBloc, AuthState>(
+        listener: (context, state) {
+          if (state is Authenticated) {
+            SocketService().connect(state.tokens.accessToken);
+          } else if (state is Unauthenticated) {
+            SocketService().disconnect();
+          }
+        },
+        child: const MyApp(),
+      ),
     ),
   );
 }

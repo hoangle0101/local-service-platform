@@ -7,6 +7,7 @@ import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../widgets/minimalist_widgets.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:go_router/go_router.dart';
 
 class ProviderBookingsScreen extends StatefulWidget {
   const ProviderBookingsScreen({super.key});
@@ -522,8 +523,7 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
               child: MinButton(
                 text: 'Chỉ đường',
                 isPrimary: false,
-                onPressed: () =>
-                    _openMap(booking.latitude!, booking.longitude!),
+                onPressed: () => _openNavigation(booking),
                 icon: Icons.map_rounded,
               ),
             ),
@@ -549,8 +549,7 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
               child: MinButton(
                 text: 'Chỉ đường',
                 isPrimary: false,
-                onPressed: () =>
-                    _openMap(booking.latitude!, booking.longitude!),
+                onPressed: () => _openNavigation(booking),
                 icon: Icons.map_rounded,
               ),
             ),
@@ -616,24 +615,75 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
     try {
       final bookingId = int.tryParse(booking.id) ?? 0;
       await _bookingsDataSource.acceptBookingRequest(bookingId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Đã gửi báo giá/nhận việc thành công!'),
+              backgroundColor: AppColors.success),
+        );
+      }
       _loadAllData();
     } catch (e) {
-      // Handled by snackbar in bloc if applicable, or add a local one
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Không thể nhận việc: $e'),
+              backgroundColor: AppColors.error),
+        );
+      }
     }
   }
 
   Future<void> _startService(Booking booking) async {
     try {
       await _bookingsDataSource.startService(booking.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Đã bắt đầu dịch vụ!'),
+              backgroundColor: AppColors.success),
+        );
+      }
       _loadAllData();
-    } catch (e) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
   }
 
   Future<void> _completeService(Booking booking) async {
     try {
       await _bookingsDataSource.completeService(booking.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Đã hoàn thành dịch vụ! Chờ khách xác nhận.'),
+              backgroundColor: AppColors.success),
+        );
+      }
       _loadAllData();
-    } catch (e) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  /// Opens in-app navigation screen with route to customer
+  void _openNavigation(Booking booking) {
+    if (booking.latitude == null || booking.longitude == null) return;
+
+    context.push('/provider/navigation', extra: {
+      'lat': booking.latitude,
+      'lng': booking.longitude,
+      'address': booking.addressText,
+      'customerName': booking.customerName,
+    });
   }
 
   Future<void> _openMap(double lat, double lng) async {

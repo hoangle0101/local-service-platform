@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/bookings_datasource.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
@@ -343,7 +344,14 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
                       ),
                     ],
                   ),
-                  _buildActionButtons(booking),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      reverse: true,
+                      child: _buildActionButtons(booking),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -426,6 +434,20 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
   Widget _buildActionButtons(Booking booking) {
     final status = booking.status.toLowerCase();
 
+    // Chat button for active bookings
+    Widget? chatButton;
+    if (['accepted', 'confirmed', 'in_progress', 'pending_completion']
+        .contains(status)) {
+      chatButton = _buildActionButton(
+        'Nhắn tin',
+        () => context.push(
+          '/chat/${booking.id}',
+          extra: booking.providerName,
+        ),
+        isPrimary: false,
+      );
+    }
+
     if (status == 'pending') {
       final offersText = booking.offersCount > 0
           ? 'Xem ${booking.offersCount} báo giá'
@@ -439,10 +461,21 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
           _buildActionButton(offersText, () => _showOffersDialog(booking.id)),
         ],
       );
+    } else if (['accepted', 'confirmed', 'in_progress'].contains(status)) {
+      // Active bookings - show chat button
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (chatButton != null) ...[chatButton, const SizedBox(width: 8)],
+          _buildActionButton('Hủy', () => _showCancelDialog(booking.id),
+              isPrimary: false, isError: true),
+        ],
+      );
     } else if (status == 'pending_completion') {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (chatButton != null) ...[chatButton, const SizedBox(width: 8)],
           _buildActionButton('Khiếu nại', () => _showDisputeDialog(booking.id),
               isError: true),
           const SizedBox(width: 8),
@@ -635,9 +668,12 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
   Future<void> _confirmCompletion(String bookingId) async {
     try {
       await BookingsDataSource().confirmCompletion(bookingId);
+      _showSnackBar('Đã xác nhận hoàn thành dịch vụ!', isError: false);
       _refreshBookings();
       _showReviewDialog(bookingId);
-    } catch (e) {}
+    } catch (e) {
+      _showSnackBar('Lỗi: $e', isError: true);
+    }
   }
 
   void _showSnackBar(String message, {required bool isError}) {

@@ -18,13 +18,17 @@ import { CreateConversationDto, SendMessageDto } from './dto/conversation.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayload } from '../../common/interfaces/jwt-payload.interface';
+import { ChatGateway } from './chat.gateway';
 
 @ApiTags('Conversations')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('conversations')
 export class ConversationsController {
-    constructor(private conversationsService: ConversationsService) { }
+    constructor(
+        private conversationsService: ConversationsService,
+        private chatGateway: ChatGateway
+    ) { }
 
     @Get()
     @ApiOperation({ summary: 'List conversations' })
@@ -60,11 +64,25 @@ export class ConversationsController {
         @Param('id') id: string,
         @Body() dto: SendMessageDto,
     ) {
-        return this.conversationsService.sendMessage(
+        const message = await this.conversationsService.sendMessage(
             BigInt(user.userId),
             BigInt(id),
             dto,
         );
+
+        if (message) {
+            // Emit real-time event
+            this.chatGateway.emitNewMessage(id, {
+                id: message.id.toString(),
+                conversationId: id,
+                senderId: message.senderId.toString(),
+                body: message.body,
+                createdAt: message.createdAt,
+                sender: (message as any).sender
+            });
+        }
+
+        return message;
     }
 
     @Patch(':id/read')

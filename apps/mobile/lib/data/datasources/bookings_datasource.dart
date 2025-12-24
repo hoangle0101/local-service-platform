@@ -339,6 +339,60 @@ class BookingsDataSource {
     }
   }
 
+  /// Get the active booking for provider (accepted, in_progress, or pending_completion)
+  /// Returns null if no active booking
+  Future<Booking?> getActiveBooking() async {
+    try {
+      print('[BookingsDataSource] getActiveBooking called');
+
+      // Get all bookings (for both customer and provider roles)
+      final response = await _dio.get('/bookings');
+
+      print('[BookingsDataSource] getActiveBooking response: ${response.data}');
+
+      final responseBody = response.data;
+      List<dynamic> bookingsData = [];
+
+      if (responseBody is Map<String, dynamic>) {
+        if (responseBody.containsKey('data') && responseBody['data'] is Map) {
+          final data = responseBody['data'] as Map<String, dynamic>;
+          bookingsData = data['bookings'] as List? ?? [];
+        } else if (responseBody.containsKey('bookings')) {
+          bookingsData = responseBody['bookings'] as List? ?? [];
+        }
+      }
+
+      print(
+          '[BookingsDataSource] Total bookings found: ${bookingsData.length}');
+
+      // Find an active booking (accepted, confirmed, in_progress, pending_completion)
+      const activeStatuses = [
+        'in_progress',
+        'pending_completion',
+        'accepted',
+        'confirmed'
+      ];
+
+      for (final bookingJson in bookingsData) {
+        final status = bookingJson['status'] as String?;
+        print(
+            '[BookingsDataSource] Checking booking: id=${bookingJson['id']}, status=$status');
+
+        if (status != null && activeStatuses.contains(status)) {
+          print(
+              '[BookingsDataSource] Found active booking: id=${bookingJson['id']}, status=$status');
+          return Booking.fromJson(bookingJson as Map<String, dynamic>);
+        }
+      }
+
+      print('[BookingsDataSource] No active booking found');
+      return null;
+    } catch (e) {
+      print('[BookingsDataSource] getActiveBooking error: $e');
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>> acceptBookingRequest(int bookingId) async {
     try {
       final response = await _dio.post('/provider/bookings/$bookingId/offer');

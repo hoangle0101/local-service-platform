@@ -186,7 +186,20 @@ export class ConversationsService {
                 },
             });
 
-            return message;
+            // Fetch message with sender info
+            const fullMessage = await tx.message.findUnique({
+                where: { id: message.id },
+                include: {
+                    sender: {
+                        select: {
+                            id: true,
+                            profile: { select: { fullName: true, avatarUrl: true } },
+                        },
+                    },
+                },
+            });
+
+            return fullMessage;
         });
     }
 
