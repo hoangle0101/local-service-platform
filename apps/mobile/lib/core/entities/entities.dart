@@ -74,6 +74,7 @@ class Service extends Equatable {
   final int categoryId;
   final String? iconUrl;
   final int? durationMinutes;
+  final double basePrice;
 
   const Service({
     required this.id,
@@ -82,6 +83,7 @@ class Service extends Equatable {
     required this.categoryId,
     this.iconUrl,
     this.durationMinutes,
+    this.basePrice = 0.0,
   });
 
   factory Service.fromJson(Map<String, dynamic> json) {
@@ -96,6 +98,7 @@ class Service extends Equatable {
           : (json['durationMinutes'] != null
               ? _safeParseInt(json['durationMinutes'])
               : null),
+      basePrice: _safeParseDouble(json['base_price'] ?? json['basePrice']),
     );
   }
 
@@ -107,78 +110,68 @@ class Service extends Equatable {
       'category_id': categoryId,
       'icon_url': iconUrl,
       'duration_minutes': durationMinutes,
+      'base_price': basePrice,
     };
   }
 
   @override
   List<Object?> get props =>
-      [id, name, description, categoryId, iconUrl, durationMinutes];
+      [id, name, description, categoryId, iconUrl, durationMinutes, basePrice];
 }
 
 class ProviderService extends Equatable {
+  final int id; // Added 'id' field
   final int serviceId;
   final String providerUserId;
   final double price;
-  final String currency;
-  final bool isActive;
   final Service service;
   final ProviderInfo provider;
+  final bool isActive; // Changed from required to optional with default
+  final double? distance; // Added 'distance' field
 
   const ProviderService({
+    required this.id,
     required this.serviceId,
     required this.providerUserId,
     required this.price,
-    required this.currency,
-    required this.isActive,
     required this.service,
     required this.provider,
+    this.isActive = true,
+    this.distance,
   });
 
   factory ProviderService.fromJson(Map<String, dynamic> json) {
-    // Parse serviceId - could be int or String from backend
-    int serviceId;
-    if (json['service_id'] != null) {
-      serviceId = json['service_id'] is int
-          ? json['service_id']
-          : int.parse(json['service_id'].toString());
-    } else {
-      serviceId = json['serviceId'] is int
-          ? json['serviceId']
-          : int.parse(json['serviceId'].toString());
-    }
-
-    // Parse providerUserId - could be int or String
-    String providerUserId =
-        (json['provider_user_id'] ?? json['providerUserId']).toString();
-
-    // Parse price - could be String or num
-    double price = 0.0;
-    final priceValue = json['price'];
-    if (priceValue != null) {
-      price = priceValue is num
-          ? priceValue.toDouble()
-          : double.tryParse(priceValue.toString()) ?? 0.0;
-    }
-
     return ProviderService(
-      serviceId: serviceId,
-      providerUserId: providerUserId,
-      price: price,
-      currency: json['currency'] as String? ?? 'VND',
-      isActive: json['is_active'] as bool? ?? json['isActive'] as bool? ?? true,
+      id: _safeParseInt(json['id']),
+      providerUserId:
+          (json['providerUserId'] ?? json['provider_user_id']).toString(),
+      serviceId: _safeParseInt(json['serviceId'] ?? json['service_id']),
+      price: _safeParseDouble(json['price']),
       service: Service.fromJson(json['service'] as Map<String, dynamic>),
       provider: ProviderInfo.fromJson(json['provider'] as Map<String, dynamic>),
+      isActive: json['isActive'] as bool? ?? json['is_active'] as bool? ?? true,
+      distance: _safeParseDouble(json['distance']),
     );
   }
 
   @override
-  List<Object?> get props =>
-      [serviceId, providerUserId, price, currency, isActive, service, provider];
+  List<Object?> get props => [
+        id,
+        serviceId,
+        providerUserId,
+        price,
+        isActive,
+        service,
+        provider,
+        distance
+      ];
 }
 
 class ProviderInfo extends Equatable {
   final String userId;
   final String displayName;
+  final String? avatarUrl;
+  final double? rating;
   final bool isVerified;
   final String verificationStatus;
   final double ratingAvg;
@@ -187,55 +180,31 @@ class ProviderInfo extends Equatable {
   const ProviderInfo({
     required this.userId,
     required this.displayName,
-    required this.isVerified,
-    required this.verificationStatus,
-    required this.ratingAvg,
-    required this.ratingCount,
+    this.avatarUrl,
+    this.rating,
+    this.isVerified = false,
+    this.verificationStatus = 'unverified',
+    this.ratingAvg = 0.0,
+    this.ratingCount = 0,
   });
 
   factory ProviderInfo.fromJson(Map<String, dynamic> json) {
-    // Parse userId - could be int or String
-    String userId = (json['user_id'] ?? json['userId']).toString();
-
-    // Parse displayName
-    String displayName =
-        (json['display_name'] ?? json['displayName'] ?? 'Provider').toString();
-
-    // Parse isVerified
-    bool isVerified =
-        json['is_verified'] as bool? ?? json['isVerified'] as bool? ?? false;
-
-    // Parse verificationStatus
-    String verificationStatus = (json['verification_status'] ??
-            json['verificationStatus'] ??
-            'unverified')
-        .toString();
-
-    // Parse ratingAvg - could be String or num
-    double ratingAvg = 0.0;
-    final ratingValue = json['rating_avg'] ?? json['ratingAvg'];
-    if (ratingValue != null) {
-      ratingAvg = ratingValue is num
-          ? ratingValue.toDouble()
-          : double.tryParse(ratingValue.toString()) ?? 0.0;
-    }
-
-    // Parse ratingCount - could be String or int
-    int ratingCount = 0;
-    final countValue = json['rating_count'] ?? json['ratingCount'];
-    if (countValue != null) {
-      ratingCount = countValue is int
-          ? countValue
-          : int.tryParse(countValue.toString()) ?? 0;
-    }
-
     return ProviderInfo(
-      userId: userId,
-      displayName: displayName,
-      isVerified: isVerified,
-      verificationStatus: verificationStatus,
-      ratingAvg: ratingAvg,
-      ratingCount: ratingCount,
+      userId: (json['user_id'] ?? json['userId'] ?? '').toString(),
+      displayName:
+          (json['display_name'] ?? json['displayName'] ?? 'Min Thợ').toString(),
+      avatarUrl:
+          json['avatar_url']?.toString() ?? json['avatarUrl']?.toString(),
+      rating: _safeParseDouble(
+          json['rating'] ?? json['rating_avg'] ?? json['ratingAvg']),
+      isVerified:
+          json['is_verified'] as bool? ?? json['isVerified'] as bool? ?? false,
+      verificationStatus: (json['verification_status'] ??
+              json['verificationStatus'] ??
+              'unverified')
+          .toString(),
+      ratingAvg: _safeParseDouble(json['rating_avg'] ?? json['ratingAvg']),
+      ratingCount: _safeParseInt(json['rating_count'] ?? json['ratingCount']),
     );
   }
 
@@ -243,6 +212,8 @@ class ProviderInfo extends Equatable {
   List<Object?> get props => [
         userId,
         displayName,
+        avatarUrl,
+        rating,
         isVerified,
         verificationStatus,
         ratingAvg,

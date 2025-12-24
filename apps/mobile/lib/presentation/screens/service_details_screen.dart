@@ -71,21 +71,48 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
         builder: (context, state) {
           if (state is ServicesLoading) {
             return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+              backgroundColor: AppColors.background,
+              body: Center(
+                  child: CircularProgressIndicator(color: AppColors.primary)),
             );
           } else if (state is ServiceDetailsLoaded) {
             _service = state.service;
             return _buildContent(state.service);
           } else if (state is ServicesError) {
             return Scaffold(
-              appBar: AppBar(),
+              backgroundColor: AppColors.background,
+              appBar: AppBar(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                      color: AppColors.textPrimary),
+                  onPressed: () => context.pop(),
+                ),
+              ),
               body: Center(
-                child: Text('Error: ${state.message}'),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline_rounded,
+                        size: 64, color: AppColors.error),
+                    const SizedBox(height: 16),
+                    Text('Lỗi: ${state.message}',
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 24),
+                    MinButton(
+                      text: 'Thử lại',
+                      onPressed: () => _servicesBloc
+                          .add(LoadServiceDetails(widget.serviceId)),
+                    ),
+                  ],
+                ),
               ),
             );
           }
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            body: Center(
+                child: CircularProgressIndicator(color: AppColors.primary)),
           );
         },
       ),
@@ -96,22 +123,26 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
     final currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: AppColors.background,
       body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
         slivers: [
           _buildSliverAppBar(context, service),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildHeader(context, service, currencyFormat),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
+                  _buildSectionLabel('DỊCH VỤ ĐƯỢC CUNG CẤP BỞI'),
+                  const SizedBox(height: 16),
                   _buildProviderInfo(context, service),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
+                  _buildSectionLabel('MÔ TẢ CHI TIẾT'),
+                  const SizedBox(height: 16),
                   _buildDescription(context, service),
-                  const SizedBox(height: 100), // Space for bottom button
                 ],
               ),
             ),
@@ -124,25 +155,64 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
 
   Widget _buildSliverAppBar(BuildContext context, ProviderService service) {
     return SliverAppBar(
-      expandedHeight: 300.0,
+      expandedHeight: 350.0,
       floating: false,
       pinned: true,
       backgroundColor: AppColors.white,
       elevation: 0,
+      scrolledUnderElevation: 0,
+      automaticallyImplyLeading: false,
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           fit: StackFit.expand,
           children: [
-            _buildPlaceholderImage(),
-            // Subtle Gradient overlay for top control visibility
+            _buildServiceImage(),
+            // Gradient overlays for premium look
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
-                  end: Alignment.center,
+                  end: Alignment.bottomCenter,
                   colors: [
-                    AppColors.black.withOpacity(0.2),
+                    Colors.black.withOpacity(0.3),
                     Colors.transparent,
+                    Colors.black.withOpacity(0.4),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 24,
+              left: 24,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.star_rounded,
+                        size: 16, color: Colors.orange),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${service.provider.ratingAvg}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '(${service.provider.ratingCount})',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -155,13 +225,13 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
         child: GestureDetector(
           onTap: () => context.pop(),
           child: Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: AppColors.white.withOpacity(0.9),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.black.withOpacity(0.1),
+                  color: Colors.black.withOpacity(0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -177,19 +247,19 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
           child: Padding(
             padding: const EdgeInsets.only(right: 20),
             child: Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: AppColors.white.withOpacity(0.9),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.black.withOpacity(0.1),
+                    color: Colors.black.withOpacity(0.1),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: const Icon(Icons.share_rounded,
+              child: const Icon(Icons.favorite_outline_rounded,
                   color: AppColors.textPrimary, size: 18),
             ),
           ),
@@ -198,13 +268,26 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
     );
   }
 
-  Widget _buildPlaceholderImage() {
+  Widget _buildServiceImage() {
     return Container(
       decoration: const BoxDecoration(
-        gradient: AppColors.primaryGradient,
+        color: AppColors.shelf,
       ),
       child: const Center(
-        child: Icon(Icons.image, size: 64, color: Colors.white),
+        child: Icon(Icons.home_repair_service_rounded,
+            size: 80, color: AppColors.textTertiary),
+      ),
+    );
+  }
+
+  Widget _buildSectionLabel(String label) {
+    return Text(
+      label,
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w900,
+        color: AppColors.textTertiary,
+        letterSpacing: 1.5,
       ),
     );
   }
@@ -221,10 +304,11 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
               child: Text(
                 service.service.name,
                 style: const TextStyle(
-                  fontSize: 28,
+                  fontSize: 32,
                   fontWeight: FontWeight.w900,
                   color: AppColors.textPrimary,
-                  letterSpacing: -1,
+                  letterSpacing: -1.5,
+                  height: 1.1,
                 ),
               ),
             ),
@@ -233,19 +317,19 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(100),
               ),
               child: Row(
                 children: [
                   const Icon(Icons.access_time_filled_rounded,
                       size: 16, color: AppColors.primary),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
                   Text(
                     '${service.service.durationMinutes ?? 60} p',
                     style: const TextStyle(
                       color: AppColors.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],
@@ -253,14 +337,14 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         Text(
           currencyFormat.format(service.price).replaceAll(',00', ''),
           style: const TextStyle(
             color: AppColors.primary,
-            fontSize: 24,
+            fontSize: 28,
             fontWeight: FontWeight.w900,
-            letterSpacing: -0.5,
+            letterSpacing: -1,
           ),
         ),
       ],
@@ -268,34 +352,22 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
   }
 
   Widget _buildProviderInfo(BuildContext context, ProviderService service) {
-    return Container(
+    return MinCard(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.black.withOpacity(0.03),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
       child: Row(
         children: [
           Container(
-            width: 56,
-            height: 56,
+            width: 64,
+            height: 64,
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(20),
             ),
             child: Center(
               child: Text(
                 service.provider.displayName.substring(0, 1).toUpperCase(),
                 style: const TextStyle(
-                  fontSize: 22,
+                  fontSize: 24,
                   fontWeight: FontWeight.w900,
                   color: AppColors.primary,
                 ),
@@ -313,8 +385,8 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
                       child: Text(
                         service.provider.displayName,
                         style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
                           color: AppColors.textPrimary,
                         ),
                         maxLines: 1,
@@ -322,50 +394,45 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
                       ),
                     ),
                     if (service.provider.isVerified) ...[
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 6),
                       const Icon(Icons.verified_rounded,
                           size: 16, color: AppColors.primary),
                     ],
                   ],
                 ),
-                const SizedBox(height: 6),
-                InkWell(
+                const SizedBox(height: 4),
+                GestureDetector(
                   onTap: () => _openProviderReviews(context, service),
                   child: Row(
                     children: [
-                      const Icon(Icons.star_rounded,
-                          size: 16, color: Colors.orange),
+                      const Text(
+                        'Xem tất cả đánh giá',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
                       const SizedBox(width: 4),
-                      Text(
-                        '${service.provider.ratingAvg} ',
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                        ),
-                      ),
-                      Text(
-                        '(${service.provider.ratingCount} đánh giá)',
-                        style: const TextStyle(
-                          color: AppColors.textTertiary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded,
+                          size: 10, color: AppColors.textTertiary),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.shelf,
-              borderRadius: BorderRadius.circular(14),
+          GestureDetector(
+            onTap: () {}, // Future chat implementation
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.shelf.withOpacity(0.5),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.chat_bubble_rounded,
+                  color: AppColors.primary, size: 22),
             ),
-            child: const Icon(Icons.chat_bubble_rounded,
-                color: AppColors.primary, size: 20),
           ),
         ],
       ),
@@ -373,30 +440,24 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
   }
 
   Widget _buildDescription(BuildContext context, ProviderService service) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Mô tả dịch vụ',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w900,
-            color: AppColors.textPrimary,
-            letterSpacing: -0.5,
-          ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.divider.withOpacity(0.3)),
+      ),
+      child: Text(
+        service.service.description ??
+            'Thông tin chi tiết về dịch vụ này hiện đang được cập nhật bởi nhà cung cấp.',
+        style: const TextStyle(
+          color: AppColors.textSecondary,
+          height: 1.7,
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
         ),
-        const SizedBox(height: 16),
-        Text(
-          service.service.description ??
-              'Thông tin chi tiết về dịch vụ này hiện đang được cập nhật.',
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            height: 1.6,
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -412,13 +473,14 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
         currentUserId != null && service.providerUserId == currentUserId;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
       decoration: BoxDecoration(
         color: AppColors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.black.withOpacity(0.05),
-            blurRadius: 20,
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 30,
             offset: const Offset(0, -10),
           ),
         ],
@@ -432,51 +494,51 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Tổng thanh toán',
+                    'TỔNG CỘNG TẠM TÍNH',
                     style: TextStyle(
                       color: AppColors.textTertiary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.2,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.1,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Text(
                     currencyFormat.format(service.price).replaceAll(',00', ''),
                     style: const TextStyle(
-                      color: AppColors.primary,
+                      color: AppColors.textPrimary,
                       fontWeight: FontWeight.w900,
-                      fontSize: 22,
-                      letterSpacing: -0.8,
+                      fontSize: 24,
+                      letterSpacing: -1,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 24),
             Expanded(
               flex: 1,
               child: isOwnService
                   ? Container(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      height: 56,
                       decoration: BoxDecoration(
-                        color: AppColors.shelf,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.divider),
+                        color: AppColors.shelf.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(100),
                       ),
                       child: const Center(
                         child: Text(
-                          'Của bạn',
+                          'DỊCH VỤ CỦA BẠN',
                           style: TextStyle(
-                            color: AppColors.textTertiary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ),
                     )
                   : MinButton(
-                      text: 'Đặt ngay',
+                      text: 'Đặt lịch ngay',
                       onPressed: () {
                         context.push(
                           '/booking/create',

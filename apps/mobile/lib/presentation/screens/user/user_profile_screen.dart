@@ -29,7 +29,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     try {
       final addresses = await _userDataSource.getAddresses();
       if (addresses.isNotEmpty && mounted) {
-        // Find default address or use first one
         final defaultAddr = addresses.firstWhere(
           (a) => a['isDefault'] == true,
           orElse: () => addresses.first,
@@ -58,7 +57,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             if (state is Authenticated && state.user != null) {
               return _buildContent(context, state.user!);
             }
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+                child: CircularProgressIndicator(color: AppColors.primary));
           },
         ),
       ),
@@ -69,7 +69,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     final profile = user.profile;
     final avatarUrl = profile?.avatarUrl;
 
-    // Build full avatar URL
     String? fullAvatarUrl;
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
       fullAvatarUrl = avatarUrl.startsWith('http')
@@ -99,11 +98,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   const SizedBox(height: 32),
                   _buildVerificationBanner(user),
                   const SizedBox(height: 32),
-                  _buildSectionLabel('Tài khoản'),
+                  _buildSectionLabel('DỊCH VỤ CỦA TÔI'),
+                  const SizedBox(height: 16),
+                  _buildServiceActionsCard(context),
+                  const SizedBox(height: 32),
+                  _buildSectionLabel('TÀI KHOẢN'),
                   const SizedBox(height: 16),
                   _buildAccountCard(context),
                   const SizedBox(height: 32),
-                  _buildSectionLabel('Cài đặt'),
+                  _buildSectionLabel('TIỆN ÍCH'),
                   const SizedBox(height: 16),
                   _buildSettingsCard(context),
                   const SizedBox(height: 48),
@@ -128,11 +131,17 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             GestureDetector(
               onTap: () => context.pop(),
               child: Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: AppColors.white,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: const Icon(Icons.arrow_back_ios_new_rounded,
                     size: 18, color: AppColors.textPrimary),
@@ -140,22 +149,35 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             ),
             GestureDetector(
               onTap: () async {
-                await context.push('/user/edit-profile');
+                await context.push('/user/profile/edit');
                 if (mounted) _loadDefaultAddress();
               },
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(
                   color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(100),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                child: const Text(
-                  'Sửa hồ sơ',
-                  style: TextStyle(
-                      color: AppColors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800),
+                child: Row(
+                  children: const [
+                    Icon(Icons.edit_rounded, color: Colors.white, size: 16),
+                    SizedBox(width: 8),
+                    Text(
+                      'Sửa hồ sơ',
+                      style: TextStyle(
+                          color: AppColors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -176,15 +198,22 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                    color: AppColors.primary.withOpacity(0.1), width: 4),
+                    color: AppColors.primary.withOpacity(0.1), width: 6),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.05),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
               child: UserAvatar(
                 avatarUrl: avatarUrl,
                 fullName: user.fullName,
-                size: 80,
+                size: 90,
               ),
             ),
-            const SizedBox(width: 20),
+            const SizedBox(width: 24),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -195,31 +224,31 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       fontSize: 28,
                       fontWeight: FontWeight.w900,
                       color: AppColors.textPrimary,
-                      letterSpacing: -1,
+                      letterSpacing: -1.2,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: AppColors.shelf,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(100),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(Icons.phone_iphone_rounded,
-                            size: 14, color: AppColors.textTertiary),
+                            size: 12, color: AppColors.textTertiary),
                         const SizedBox(width: 6),
                         Text(
                           user.phone,
                           style: const TextStyle(
                             color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
                           ),
                         ),
                       ],
@@ -231,31 +260,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ],
         ),
         if (_defaultAddress != null) ...[
-          const SizedBox(height: 24),
-          Container(
+          const SizedBox(height: 32),
+          MinCard(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppColors.divider.withOpacity(0.5)),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.black.withOpacity(0.02),
-                  blurRadius: 15,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.location_on_rounded,
-                      size: 18, color: AppColors.primary),
+                      size: 20, color: AppColors.primary),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -263,12 +280,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Địa chỉ mặc định',
+                        'ĐỊA CHỈ MẶC ĐỊNH',
                         style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
                           color: AppColors.textTertiary,
-                          letterSpacing: 0.5,
+                          letterSpacing: 0.8,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -294,13 +311,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   Widget _buildSectionLabel(String label) {
-    return Text(
-      label,
-      style: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w800,
-        color: AppColors.textTertiary,
-        letterSpacing: 1.2,
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          color: AppColors.textTertiary,
+          letterSpacing: 1.5,
+        ),
       ),
     );
   }
@@ -313,27 +333,48 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
+  Widget _buildServiceActionsCard(BuildContext context) {
+    return MinCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          _buildMenuRow(
+            icon: Icons.calendar_today_rounded,
+            title: 'Lịch sử đặt của tôi',
+            onTap: () => context.push('/user/bookings'),
+          ),
+          _buildMenuDivider(),
+          _buildMenuRow(
+            icon: Icons.favorite_rounded,
+            title: 'Danh sách yêu thích',
+            onTap: () => context.push('/user/favorites'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAccountCard(BuildContext context) {
     return MinCard(
       padding: EdgeInsets.zero,
       child: Column(
         children: [
           _buildMenuRow(
-            icon: Icons.location_on_outlined,
-            title: 'Địa chỉ của tôi',
+            icon: Icons.location_on_rounded,
+            title: 'Địa chỉ đã lưu',
             onTap: () {},
           ),
           _buildMenuDivider(),
           _buildMenuRow(
-            icon: Icons.favorite_outline_rounded,
-            title: 'Dịch vụ yêu thích',
-            onTap: () => context.push('/user/favorites'),
+            icon: Icons.payment_rounded,
+            title: 'Phương thức thanh toán',
+            onTap: () {},
           ),
           _buildMenuDivider(),
           _buildMenuRow(
-            icon: Icons.calendar_today_rounded,
-            title: 'Lịch sử đặt lịch',
-            onTap: () => context.push('/user/bookings'),
+            icon: Icons.security_rounded,
+            title: 'Bảo mật tài khoản',
+            onTap: () {},
           ),
         ],
       ),
@@ -346,20 +387,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       child: Column(
         children: [
           _buildMenuRow(
-            icon: Icons.notifications_none_rounded,
+            icon: Icons.notifications_rounded,
             title: 'Thông báo',
             onTap: () {},
           ),
           _buildMenuDivider(),
           _buildMenuRow(
-            icon: Icons.lock_outline_rounded,
-            title: 'Bảo mật',
+            icon: Icons.language_rounded,
+            title: 'Ngôn ngữ (Tiếng Việt)',
             onTap: () {},
           ),
           _buildMenuDivider(),
           _buildMenuRow(
-            icon: Icons.help_outline_rounded,
-            title: 'Trợ giúp & Hỗ trợ',
+            icon: Icons.help_center_rounded,
+            title: 'Trung tâm trợ giúp',
             onTap: () {},
           ),
         ],
@@ -374,11 +415,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }) {
     return ListTile(
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       leading: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: AppColors.shelf,
+          color: AppColors.shelf.withOpacity(0.5),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(icon, color: AppColors.textPrimary, size: 20),
@@ -391,15 +432,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           color: AppColors.textPrimary,
         ),
       ),
-      trailing: const Icon(Icons.chevron_right_rounded,
-          color: AppColors.textTertiary, size: 22),
+      trailing: const Icon(Icons.arrow_forward_ios_rounded,
+          color: AppColors.textTertiary, size: 14),
     );
   }
 
   Widget _buildMenuDivider() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Divider(height: 1, color: AppColors.divider.withOpacity(0.5)),
+      child: Divider(height: 1, color: AppColors.divider.withOpacity(0.3)),
     );
   }
 
@@ -424,10 +465,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             fontSize: 22,
             fontWeight: FontWeight.w900,
             color: AppColors.textPrimary,
+            letterSpacing: -0.5,
           ),
         ),
         content: const Text(
-          'Bạn có chắc chắn muốn đăng xuất khỏi ứng dụng và kết thúc phiên làm việc này?',
+          'Bạn có chắc chắn muốn thoát khỏi phiên đăng nhập hiện tại không?',
           style: TextStyle(
             color: AppColors.textSecondary,
             fontSize: 15,
@@ -441,7 +483,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             children: [
               Expanded(
                 child: MinButton(
-                  text: 'Hủy',
+                  text: 'Quay lại',
                   isPrimary: false,
                   onPressed: () => Navigator.of(dialogContext).pop(),
                 ),
@@ -465,7 +507,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         style: TextStyle(
                             color: AppColors.error,
                             fontSize: 15,
-                            fontWeight: FontWeight.w800),
+                            fontWeight: FontWeight.w900),
                       ),
                     ),
                   ),

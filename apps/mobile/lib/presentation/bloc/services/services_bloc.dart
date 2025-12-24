@@ -8,6 +8,8 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
   ServicesBloc() : super(ServicesInitial()) {
     on<LoadServices>(_onLoadServices);
     on<LoadServicesByCategory>(_onLoadServicesByCategory);
+    on<LoadGenericServices>(_onLoadGenericServices);
+    on<SearchNearbyProviders>(_onSearchNearbyProviders);
     on<LoadServiceDetails>(_onLoadServiceDetails);
   }
 
@@ -40,6 +42,38 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
         categoryId: event.categoryId,
       );
       emit(ServicesLoaded(services));
+    } catch (e) {
+      emit(ServicesError(e.toString()));
+    }
+  }
+
+  Future<void> _onSearchNearbyProviders(
+    SearchNearbyProviders event,
+    Emitter<ServicesState> emit,
+  ) async {
+    emit(ServicesLoading());
+    try {
+      final services = await _marketplaceDataSource.searchServices(
+        serviceId: event.serviceId,
+        latitude: event.latitude,
+        longitude: event.longitude,
+        limit: event.limit,
+      );
+      emit(ServicesLoaded(services));
+    } catch (e) {
+      emit(ServicesError(e.toString()));
+    }
+  }
+
+  Future<void> _onLoadGenericServices(
+    LoadGenericServices event,
+    Emitter<ServicesState> emit,
+  ) async {
+    emit(ServicesLoading());
+    try {
+      final services =
+          await _marketplaceDataSource.getGenericServices(event.categoryId);
+      emit(GenericServicesLoaded(services));
     } catch (e) {
       emit(ServicesError(e.toString()));
     }

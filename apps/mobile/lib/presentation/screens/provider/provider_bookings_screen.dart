@@ -3,10 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/bookings_datasource.dart';
-import '../../bloc/auth/auth_bloc.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../widgets/minimalist_widgets.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProviderBookingsScreen extends StatefulWidget {
   const ProviderBookingsScreen({super.key});
@@ -505,19 +505,57 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
 
   Widget _buildBookingActions(Booking booking) {
     if (booking.status == 'accepted' || booking.status == 'confirmed') {
-      return MinButton(
-        text: 'Bắt đầu ngay',
-        isFullWidth: true,
-        onPressed: () => _startService(booking),
-        icon: Icons.play_arrow_rounded,
+      return Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: MinButton(
+              text: 'Bắt đầu ngay',
+              onPressed: () => _startService(booking),
+              icon: Icons.play_arrow_rounded,
+            ),
+          ),
+          if (booking.latitude != null && booking.longitude != null) ...[
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 1,
+              child: MinButton(
+                text: 'Chỉ đường',
+                isPrimary: false,
+                onPressed: () =>
+                    _openMap(booking.latitude!, booking.longitude!),
+                icon: Icons.map_rounded,
+              ),
+            ),
+          ],
+        ],
       );
     }
     if (booking.status == 'in_progress') {
-      return MinButton(
-        text: 'Hoàn thành công việc',
-        isFullWidth: true,
-        onPressed: () => _completeService(booking),
-        icon: Icons.check_circle_rounded,
+      return Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: MinButton(
+              text: 'Hoàn thành việc',
+              onPressed: () => _completeService(booking),
+              icon: Icons.check_circle_rounded,
+            ),
+          ),
+          if (booking.latitude != null && booking.longitude != null) ...[
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 1,
+              child: MinButton(
+                text: 'Chỉ đường',
+                isPrimary: false,
+                onPressed: () =>
+                    _openMap(booking.latitude!, booking.longitude!),
+                icon: Icons.map_rounded,
+              ),
+            ),
+          ],
+        ],
       );
     }
     if (booking.status == 'completed' && booking.review != null) {
@@ -596,6 +634,28 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
       await _bookingsDataSource.completeService(booking.id);
       _loadAllData();
     } catch (e) {}
+  }
+
+  Future<void> _openMap(double lat, double lng) async {
+    final googleUrl =
+        Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+    final appleUrl = Uri.parse('https://maps.apple.com/?q=$lat,$lng');
+
+    try {
+      if (await canLaunchUrl(googleUrl)) {
+        await launchUrl(googleUrl, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(appleUrl)) {
+        await launchUrl(appleUrl, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Không thể mở bản đồ')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[ProviderBookings] Error opening map: $e');
+    }
   }
 
   void _showCustomerReviewDialog(BookingReview review, {String? customerName}) {

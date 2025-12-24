@@ -4,9 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/payment_datasource.dart';
+import '../../widgets/minimalist_widgets.dart';
 
-/// Invoice screen shown when booking is pending_payment
-/// Customer can view final price and pay via selected method
 class InvoiceScreen extends StatefulWidget {
   final String bookingId;
 
@@ -57,8 +56,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
 
     try {
       final result = await _paymentDataSource.payWithMomo(widget.bookingId);
-
-      // Open MoMo app or web
       final payUrl = result['payUrl'] as String?;
       final deeplink = result['deeplink'] as String?;
 
@@ -75,13 +72,16 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
             mode: LaunchMode.externalApplication);
       }
 
-      // Reload invoice after returning
       await Future.delayed(const Duration(seconds: 2));
       _loadInvoice();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Lỗi: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
@@ -92,12 +92,23 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Hóa đơn thanh toán'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        title: const Text(
+          'Hóa đơn dịch vụ',
+          style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary,
+              fontSize: 20),
+        ),
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: AppColors.textPrimary, size: 18),
+          onPressed: () => context.pop(),
+        ),
       ),
       body: _buildBody(),
     );
@@ -105,30 +116,41 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+          child: CircularProgressIndicator(color: AppColors.primary));
     }
 
     if (_error != null) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
-            const SizedBox(height: 16),
-            Text('Không thể tải hóa đơn',
-                style: TextStyle(color: Colors.grey.shade600)),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadInvoice,
-              child: const Text('Thử lại'),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline_rounded,
+                  size: 64, color: AppColors.error),
+              const SizedBox(height: 16),
+              const Text('Không thể tải hóa đơn',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+              const SizedBox(height: 8),
+              Text(_error!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.textTertiary)),
+              const SizedBox(height: 24),
+              MinButton(
+                text: 'Thử lại',
+                onPressed: _loadInvoice,
+              ),
+            ],
+          ),
         ),
       );
     }
 
     if (_invoice == null) {
-      return const Center(child: Text('Không có dữ liệu'));
+      return const Center(
+          child: Text('Không có dữ liệu',
+              style: TextStyle(fontWeight: FontWeight.w700)));
     }
 
     final pricing = _invoice!['pricing'] as Map<String, dynamic>? ?? {};
@@ -148,28 +170,35 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     final isPendingPayment = status == 'pending_payment';
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Status banner
           _buildStatusBanner(status, paymentStatus),
-          const SizedBox(height: 20),
-
-          // Service info
-          _buildInfoCard(
-            title: 'Thông tin dịch vụ',
-            icon: Icons.home_repair_service,
-            children: [
-              _buildInfoRow('Mã đơn', _invoice!['bookingCode'] ?? ''),
-              _buildInfoRow('Dịch vụ', service['name'] ?? ''),
-              _buildInfoRow('Nhà cung cấp', provider['name'] ?? ''),
-            ],
+          const SizedBox(height: 32),
+          _buildSectionLabel('THÔNG TIN ĐƠN HÀNG'),
+          const SizedBox(height: 12),
+          MinCard(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                _buildInfoRow(
+                    'Mã Booking', '#${_invoice!['bookingCode'] ?? 'N/A'}',
+                    isCode: true),
+                const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(height: 1)),
+                _buildInfoRow('Dịch vụ', service['name'] ?? 'Dịch vụ lẻ'),
+                const SizedBox(height: 12),
+                _buildInfoRow('Nhà cung cấp', provider['name'] ?? 'Tự do'),
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
-
-          // Pricing breakdown
-          _buildPricingCard(
+          const SizedBox(height: 32),
+          _buildSectionLabel('CHI TIẾT THANH TOÁN'),
+          const SizedBox(height: 12),
+          _buildPricingSection(
             estimatedPrice: estimatedPrice,
             actualPrice: actualPrice,
             additionalCosts: additionalCosts,
@@ -177,61 +206,76 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
             platformFee: platformFee,
             totalAmount: totalAmount,
           ),
-          const SizedBox(height: 16),
-
-          // Payment method
+          const SizedBox(height: 32),
+          _buildSectionLabel('PHƯƠNG THỨC'),
+          const SizedBox(height: 12),
           _buildPaymentMethodCard(paymentMethod),
-          const SizedBox(height: 24),
-
-          // Action buttons
+          const SizedBox(height: 48),
           if (isPendingPayment && !isPaid) ...[
-            if (paymentMethod == 'momo' || paymentMethod == 'MOMO')
+            if (paymentMethod.toLowerCase() == 'momo')
               _buildMomoPayButton()
             else
               _buildCodInfo(),
           ] else if (isPaid) ...[
             _buildPaidSuccess(),
           ],
-
-          const SizedBox(height: 24),
+          const SizedBox(height: 60),
         ],
       ),
     );
   }
 
+  Widget _buildSectionLabel(String label) {
+    return Text(
+      label,
+      style: const TextStyle(
+        fontSize: 10,
+        fontWeight: FontWeight.w900,
+        color: AppColors.textTertiary,
+        letterSpacing: 1.5,
+      ),
+    );
+  }
+
   Widget _buildStatusBanner(String status, String paymentStatus) {
-    Color bgColor;
-    Color textColor;
+    Color color;
     IconData icon;
     String text;
+    String subText;
 
     if (paymentStatus == 'paid') {
-      bgColor = Colors.green.shade50;
-      textColor = Colors.green.shade700;
-      icon = Icons.check_circle;
+      color = AppColors.success;
+      icon = Icons.verified_rounded;
       text = 'Đã thanh toán';
+      subText = 'Giao dịch đã được xác nhận hoàn tất';
     } else if (status == 'pending_payment') {
-      bgColor = Colors.orange.shade50;
-      textColor = Colors.orange.shade700;
-      icon = Icons.pending;
+      color = AppColors.warning;
+      icon = Icons.pending_rounded;
       text = 'Chờ thanh toán';
+      subText = 'Vui lòng hoàn tất thanh toán để kết thúc đơn';
     } else {
-      bgColor = Colors.blue.shade50;
-      textColor = Colors.blue.shade700;
-      icon = Icons.info;
+      color = AppColors.primary;
+      icon = Icons.info_rounded;
       text = 'Đang xử lý';
+      subText = 'Trạng thái đơn hàng đang được cập nhật';
     }
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(12),
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color.withOpacity(0.2)),
       ),
       child: Row(
         children: [
-          Icon(icon, color: textColor, size: 28),
-          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+                color: color.withOpacity(0.1), shape: BoxShape.circle),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          const SizedBox(width: 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -239,17 +283,19 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 Text(
                   text,
                   style: TextStyle(
-                    color: textColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                      color: color,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                      letterSpacing: -0.5),
                 ),
-                if (status == 'pending_payment' && paymentStatus != 'paid')
-                  Text(
-                    'Vui lòng thanh toán để hoàn tất dịch vụ',
-                    style: TextStyle(
-                        color: textColor.withOpacity(0.8), fontSize: 13),
-                  ),
+                const SizedBox(height: 4),
+                Text(
+                  subText,
+                  style: TextStyle(
+                      color: color.withOpacity(0.8),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700),
+                ),
               ],
             ),
           ),
@@ -258,64 +304,32 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     );
   }
 
-  Widget _buildInfoCard({
-    required String title,
-    required IconData icon,
-    required List<Widget> children,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: AppColors.primary, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-            ],
-          ),
-          const Divider(height: 20),
-          ...children,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(color: Colors.grey.shade600)),
-          Flexible(
-            child: Text(
-              value,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-              textAlign: TextAlign.right,
+  Widget _buildInfoRow(String label, String value, {bool isCode = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                color: AppColors.textTertiary,
+                fontWeight: FontWeight.w700,
+                fontSize: 14)),
+        Flexible(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 14,
+              color: isCode ? AppColors.primary : AppColors.textPrimary,
+              letterSpacing: isCode ? 1.0 : 0,
             ),
+            textAlign: TextAlign.right,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildPricingCard({
+  Widget _buildPricingSection({
     required double estimatedPrice,
     required double actualPrice,
     required double additionalCosts,
@@ -326,78 +340,53 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primaryLight.withOpacity(0.4),
-            AppColors.primaryLight.withOpacity(0.1),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.divider.withOpacity(0.3)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.receipt_long, color: AppColors.primaryDark, size: 20),
-              const SizedBox(width: 8),
-              const Text(
-                'Chi tiết thanh toán',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-            ],
-          ),
-          const Divider(height: 20),
-          if (estimatedPrice > 0 && actualPrice != estimatedPrice) ...[
-            _buildPriceRow('Giá ước tính', estimatedPrice,
-                isStrikethrough: actualPrice > 0),
-            const SizedBox(height: 6),
-          ],
           if (actualPrice > 0) ...[
-            _buildPriceRow('Giá thực tế', actualPrice),
-            const SizedBox(height: 6),
+            _buildPriceRow('Giá dịch vụ thực tế', actualPrice),
           ] else ...[
-            _buildPriceRow('Giá dịch vụ', estimatedPrice),
-            const SizedBox(height: 6),
+            _buildPriceRow('Giá dịch vụ ước tính', estimatedPrice),
           ],
+          const SizedBox(height: 16),
           if (additionalCosts > 0) ...[
             _buildPriceRow('Chi phí phát sinh', additionalCosts,
-                color: Colors.orange.shade700),
+                color: Colors.orange),
             if (additionalNotes != null && additionalNotes.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(left: 8, top: 4),
-                child: Text(
-                  '→ $additionalNotes',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.grey.shade600,
-                  ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4, left: 4),
+                  child: Text('Note: $additionalNotes',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textTertiary,
+                          fontStyle: FontStyle.italic)),
                 ),
               ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 16),
           ],
           _buildPriceRow('Phí nền tảng (10%)', platformFee, isSubtle: true),
-          const Divider(height: 20),
+          const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Divider(height: 1)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Tổng cộng',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
+              const Text('TỔNG THANH TOÁN',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
               Text(
                 formatter.format(totalAmount),
-                style: TextStyle(
-                  color: AppColors.primaryDark,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                ),
+                style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 24,
+                    letterSpacing: -1),
               ),
             ],
           ),
@@ -407,25 +396,25 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   }
 
   Widget _buildPriceRow(String label, double amount,
-      {bool isSubtle = false, bool isStrikethrough = false, Color? color}) {
+      {bool isSubtle = false, Color? color}) {
     final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: color ?? (isSubtle ? Colors.grey.shade600 : Colors.black87),
-            fontSize: isSubtle ? 13 : 14,
-          ),
-        ),
+        Text(label,
+            style: TextStyle(
+              color:
+                  isSubtle ? AppColors.textTertiary : AppColors.textSecondary,
+              fontSize: isSubtle ? 13 : 14,
+              fontWeight: isSubtle ? FontWeight.w600 : FontWeight.w700,
+            )),
         Text(
           formatter.format(amount),
           style: TextStyle(
-            color: color ?? (isSubtle ? Colors.grey.shade600 : Colors.black87),
-            fontWeight: FontWeight.w500,
-            fontSize: isSubtle ? 13 : 14,
-            decoration: isStrikethrough ? TextDecoration.lineThrough : null,
+            color: color ??
+                (isSubtle ? AppColors.textTertiary : AppColors.textPrimary),
+            fontWeight: FontWeight.w900,
+            fontSize: isSubtle ? 13 : 15,
           ),
         ),
       ],
@@ -433,45 +422,43 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   }
 
   Widget _buildPaymentMethodCard(String method) {
-    final isCod = method.toUpperCase() == 'COD';
+    final isMomo = method.toLowerCase() == 'momo';
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
-        ],
-      ),
+    return MinCard(
+      padding: const EdgeInsets.all(20),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: isCod
-                  ? Colors.green.shade50
-                  : const Color(0xFFAE2070).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+              color: isMomo
+                  ? const Color(0xFFAE2070).withOpacity(0.1)
+                  : AppColors.success.withOpacity(0.1),
+              shape: BoxShape.circle,
             ),
             child: Icon(
-              isCod ? Icons.payments : Icons.phone_android,
-              color: isCod ? Colors.green : const Color(0xFFAE2070),
+              isMomo ? Icons.phone_android_rounded : Icons.payments_rounded,
+              color: isMomo ? const Color(0xFFAE2070) : AppColors.success,
+              size: 24,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Phương thức thanh toán',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
+                const Text('PHƯƠNG THỨC',
+                    style: TextStyle(
+                        color: AppColors.textTertiary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900)),
+                const SizedBox(height: 2),
                 Text(
-                  isCod ? 'Tiền mặt (COD)' : 'Ví MoMo',
+                  isMomo ? 'Ví MoMo' : 'Tiền mặt (COD)',
                   style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 15),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      color: AppColors.textPrimary),
                 ),
               ],
             ),
@@ -482,55 +469,41 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   }
 
   Widget _buildMomoPayButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: _isProcessing ? null : _payWithMomo,
-        icon: _isProcessing
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.white),
-              )
-            : const Icon(Icons.phone_android),
-        label: Text(_isProcessing ? 'Đang xử lý...' : 'Thanh toán qua MoMo'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFAE2070),
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      ),
+    return MinButton(
+      text: _isProcessing ? 'ĐANG XỬ LÝ...' : 'THANH TOÁN QUA MOMO',
+      onPressed: _isProcessing ? null : _payWithMomo,
+      backgroundColor: const Color(0xFFAE2070),
+      isLoading: _isProcessing,
     );
   }
 
   Widget _buildCodInfo() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.green.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green.shade200),
+        color: AppColors.success.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.success.withOpacity(0.2)),
       ),
       child: Column(
         children: [
-          Icon(Icons.info_outline, color: Colors.green.shade700, size: 32),
+          const Icon(Icons.info_outline_rounded,
+              color: AppColors.success, size: 32),
+          const SizedBox(height: 12),
+          const Text('Thanh toán tiền mặt',
+              style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.success,
+                  fontSize: 17)),
           const SizedBox(height: 8),
-          Text(
-            'Thanh toán tiền mặt',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.green.shade700,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Vui lòng thanh toán trực tiếp cho nhà cung cấp dịch vụ.\nSau khi nhận tiền, họ sẽ xác nhận hoàn tất.',
+          const Text(
+            'Vui lòng thanh toán trực tiếp cho nhà cung cấp.\nHọ sẽ xác nhận hoàn tất sau khi nhận tiền.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.green.shade600, fontSize: 13),
+            style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1.5),
           ),
         ],
       ),
@@ -538,48 +511,41 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   }
 
   Widget _buildPaidSuccess() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.green.shade50,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.green.shade100,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.check_circle,
-                color: Colors.green.shade700, size: 48),
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: AppColors.success.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(32),
           ),
-          const SizedBox(height: 12),
-          Text(
-            'Thanh toán thành công!',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.green.shade700,
-              fontSize: 18,
-            ),
+          child: Column(
+            children: [
+              const Icon(Icons.check_circle_rounded,
+                  color: AppColors.success, size: 64),
+              const SizedBox(height: 16),
+              const Text('Đã nhận thanh toán',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                      color: AppColors.success)),
+              const SizedBox(height: 8),
+              const Text('Cảm ơn bạn đã tin dùng dịch vụ của chúng tôi',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13)),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Cảm ơn bạn đã sử dụng dịch vụ',
-            style: TextStyle(color: Colors.green.shade600),
-          ),
-          const SizedBox(height: 16),
-          OutlinedButton(
-            onPressed: () => context.go('/user/bookings'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.green.shade700,
-              side: BorderSide(color: Colors.green.shade300),
-            ),
-            child: const Text('Xem đơn hàng của tôi'),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 24),
+        MinButton(
+          text: 'VỀ LỊCH ĐẶT CỦA TÔI',
+          onPressed: () => context.go('/user/bookings'),
+        ),
+      ],
     );
   }
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, ParseIntPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { MarketplaceService } from './marketplace.service';
 import { ServiceSearchDto, PaginationDto } from './dto/marketplace.dto';
@@ -12,6 +12,15 @@ export class MarketplaceController {
   @ApiOperation({ summary: 'Get all service categories' })
   async getCategories() {
     return this.marketplaceService.getCategories();
+  }
+
+  @Get('categories/:categoryId/services')
+  @ApiOperation({ summary: 'Get generic services by category ID' })
+  @ApiParam({ name: 'categoryId', example: 1 })
+  async getGenericServicesByCategory(
+    @Param('categoryId', ParseIntPipe) categoryId: number,
+  ) {
+    return this.marketplaceService.getGenericServicesByCategory(categoryId);
   }
 
   @Get('categories/:slug')

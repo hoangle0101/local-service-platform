@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'dart:async';
 import '../../../core/theme/app_colors.dart';
 import '../../bloc/auth/auth_bloc.dart';
 import '../../bloc/categories/categories_bloc.dart';
@@ -13,6 +17,7 @@ import '../../widgets/animations/fade_in_animation.dart';
 import '../../widgets/animations/slide_in_animation.dart';
 import '../../widgets/loading/shimmer_loading.dart';
 import '../../widgets/phone_verification_card.dart';
+import '../../widgets/mini_map_widget.dart';
 
 class UserHomeScreen extends StatefulWidget {
   const UserHomeScreen({super.key});
@@ -22,11 +27,86 @@ class UserHomeScreen extends StatefulWidget {
 }
 
 class _UserHomeScreenState extends State<UserHomeScreen> {
+  LatLng? _currentLocation;
+  bool _isLocating = true;
+  final MapController _mapController = MapController();
+  StreamSubscription<Position>? _positionStream;
+
   @override
   void initState() {
     super.initState();
     context.read<CategoriesBloc>().add(LoadCategories());
     context.read<ServicesBloc>().add(const LoadServices());
+    _determinePosition();
+  }
+
+  @override
+  void dispose() {
+    _positionStream?.cancel();
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _determinePosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    if (mounted) setState(() => _isLocating = true);
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (mounted) setState(() => _isLocating = false);
+      return;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        if (mounted) setState(() => _isLocating = false);
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      if (mounted) setState(() => _isLocating = false);
+      return;
+    }
+
+    try {
+      final position = await Geolocator.getCurrentPosition();
+      if (mounted) {
+        setState(() {
+          _currentLocation = LatLng(position.latitude, position.longitude);
+          _isLocating = false;
+        });
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _currentLocation != null) {
+            try {
+              _mapController.move(_currentLocation!, 15.0);
+            } catch (e) {
+              debugPrint('Map move error: $e');
+            }
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLocating = false);
+    }
+
+    _positionStream = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+      ),
+    ).listen((Position position) {
+      if (mounted) {
+        setState(() {
+          _currentLocation = LatLng(position.latitude, position.longitude);
+        });
+      }
+    });
   }
 
   String _getGreeting() {
@@ -38,60 +118,111 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLocating && _currentLocation == null) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: AppColors.primary),
+              SizedBox(height: 16),
+              Text(
+                'Đang xác định vị trí...',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: RefreshIndicator(
-        color: AppColors.primary,
-        onRefresh: () async {
-          context.read<CategoriesBloc>().add(LoadCategories());
-          context.read<ServicesBloc>().add(const LoadServices());
-        },
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            _buildSliverHeader(),
-            _buildDiscoveryContent(),
-            const SliverToBoxAdapter(child: SizedBox(height: 100)),
-          ],
-        ),
+      body: Stack(
+        children: [
+          // 1. Map Background
+          Positioned.fill(
+            child: _currentLocation == null
+                ? Container(color: AppColors.shelf)
+                : MiniMapWidget(
+                    initialCenter: _currentLocation!,
+                    initialZoom: 15.0,
+                    mapController: _mapController,
+                  ),
+          ),
+
+          // 2. Top Bar (Greeting & Search)
+          _buildTopFloatingSection(),
+
+          // 3. Bottom Sliding Panel (Categories & Services)
+          _buildBottomSlidingPanel(),
+        ],
       ),
       floatingActionButton: _buildModernFAB(),
     );
   }
 
-  Widget _buildSliverHeader() {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-        child: Column(
-          children: [
-            Row(
+  Widget _buildTopFloatingSection() {
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 16,
+      left: 16,
+      right: 16,
+      child: Column(
+        children: [
+          // Header Row
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(100),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 15,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 BlocBuilder<AuthBloc, AuthState>(
                   builder: (context, state) {
                     if (state is Authenticated && state.user != null) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      return Row(
                         children: [
-                          Text(
-                            _getGreeting(),
-                            style: const TextStyle(
-                              color: AppColors.textTertiary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                              letterSpacing: 0.5,
-                            ),
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: AppColors.primary.withOpacity(0.1),
+                            child: const Icon(Icons.person,
+                                color: AppColors.primary, size: 20),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            state.user!.fullName,
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.textPrimary,
-                              letterSpacing: -0.8,
-                            ),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _getGreeting(),
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textTertiary,
+                                  letterSpacing: 1.1,
+                                ),
+                              ),
+                              Text(
+                                state.user!.fullName,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       );
@@ -99,8 +230,114 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                     return const SizedBox.shrink();
                   },
                 ),
-                _buildActionIcons(),
+                Row(
+                  children: [
+                    BlocBuilder<AuthBloc, AuthState>(
+                      builder: (context, state) {
+                        if (state is Authenticated &&
+                            state.user?.isProvider == true) {
+                          return IconButton(
+                            icon: const Icon(Icons.sync_rounded,
+                                color: AppColors.primary),
+                            onPressed: () => context.go('/provider/home'),
+                            tooltip: 'Chuyển sang Chế độ Đối tác',
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.notifications_none_rounded,
+                          color: AppColors.textPrimary),
+                      onPressed: () {},
+                    ),
+                  ],
+                ),
               ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Search Bar
+          FadeInAnimation(
+            delay: const Duration(milliseconds: 100),
+            child: Container(
+              decoration: BoxDecoration(
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: MinTextField(
+                hint: 'Bạn cần giúp gì hôm nay?',
+                prefixIcon: const Icon(Icons.search_rounded,
+                    color: AppColors.primary, size: 22),
+                style:
+                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomSlidingPanel() {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.45,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 20,
+              offset: Offset(0, -5),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: AppColors.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  context.read<CategoriesBloc>().add(LoadCategories());
+                  context.read<ServicesBloc>().add(const LoadServices());
+                },
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildVerificationBanner(),
+                      _buildSectionHeader('Danh mục dịch vụ', () {}),
+                      const SizedBox(height: 16),
+                      _buildCategoriesList(),
+                      const SizedBox(height: 32),
+                      _buildSectionHeader('Dịch vụ phổ biến', () {}),
+                      const SizedBox(height: 16),
+                      _buildPopularServices(),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -108,80 +345,30 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     );
   }
 
-  Widget _buildActionIcons() {
+  Widget _buildSectionHeader(String title, VoidCallback onTap) {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        BlocBuilder<AuthBloc, AuthState>(
-          builder: (context, state) {
-            if (state is Authenticated && state.user?.isProvider == true) {
-              return GestureDetector(
-                onTap: () => context.go('/provider/home'),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.sync_rounded,
-                          color: AppColors.primary, size: 16),
-                      SizedBox(width: 8),
-                      Text(
-                        'Đối tác',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-            return const SizedBox.shrink();
-          },
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            color: AppColors.textPrimary,
+          ),
         ),
-        const SizedBox(width: 12),
-        GestureDetector(
-          onTap: () {},
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+        TextButton(
+          onPressed: onTap,
+          child: const Text(
+            'Tất cả',
+            style: TextStyle(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
             ),
-            child: const Icon(Icons.notifications_none_rounded,
-                size: 22, color: AppColors.textPrimary),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildDiscoveryContent() {
-    return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      sliver: SliverList(
-        delegate: SliverChildListDelegate([
-          _buildVerificationBanner(),
-          const SizedBox(height: 12),
-          _buildSearchBox(),
-          const SizedBox(height: 32),
-          _buildStatsRow(),
-          const SizedBox(height: 40),
-          _buildSectionTitle('Danh mục dịch vụ', () {}),
-          const SizedBox(height: 20),
-          _buildCategoriesList(),
-          const SizedBox(height: 40),
-          _buildSectionTitle('Dịch vụ phổ biến', () {}),
-          const SizedBox(height: 20),
-          _buildPopularServices(),
-        ]),
-      ),
     );
   }
 
@@ -193,10 +380,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
             !state.user!.isVerified) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 24),
-            child: SlideInAnimation(
-              begin: const Offset(0, -0.1),
-              child: PhoneVerificationCard(isVerified: false, verifiedAt: null),
-            ),
+            child: PhoneVerificationCard(isVerified: false, verifiedAt: null),
           );
         }
         return const SizedBox.shrink();
@@ -204,126 +388,14 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     );
   }
 
-  Widget _buildSearchBox() {
-    return FadeInAnimation(
-      delay: const Duration(milliseconds: 100),
-      child: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.black.withOpacity(0.03),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: MinTextField(
-          hint: 'Bạn cần giúp gì hôm nay?',
-          prefixIcon: const Icon(Icons.search_rounded,
-              color: AppColors.primary, size: 22),
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatsRow() {
-    return FadeInAnimation(
-      delay: const Duration(milliseconds: 200),
-      child: Row(
-        children: [
-          Expanded(
-              child: _buildStatItem('Đặt chỗ ngay', 'Lên lịch',
-                  Icons.calendar_today_rounded, AppColors.primary)),
-          const SizedBox(width: 16),
-          Expanded(
-              child: _buildStatItem('Dịch vụ ưu đãi', 'Khuyến mãi',
-                  Icons.local_offer_rounded, AppColors.secondary)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem(
-      String label, String value, IconData icon, Color color) {
-    return MinCard(
-      padding: const EdgeInsets.all(20),
-      backgroundColor: AppColors.white,
-      onTap: () {},
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(height: 16),
-          Text(value,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 16,
-                  color: AppColors.textPrimary)),
-          const SizedBox(height: 2),
-          Text(label,
-              style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title, VoidCallback onTap) {
-    return FadeInAnimation(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: AppColors.textPrimary,
-              letterSpacing: -0.5,
-            ),
-          ),
-          GestureDetector(
-            onTap: onTap,
-            child: const Row(
-              children: [
-                Text(
-                  'Tất cả',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                  ),
-                ),
-                SizedBox(width: 4),
-                Icon(Icons.arrow_forward_ios_rounded,
-                    size: 12, color: AppColors.primary),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildCategoriesList() {
     return SizedBox(
-      height: 110,
+      height: 100,
       child: BlocBuilder<CategoriesBloc, CategoriesState>(
         builder: (context, state) {
           if (state is CategoriesLoading) {
             return ListView.builder(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.only(left: 4),
               itemCount: 5,
               itemBuilder: (context, _) => const ShimmerCategoryCard(),
             );
@@ -331,7 +403,6 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           if (state is CategoriesLoaded) {
             return ListView.builder(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.only(left: 4),
               clipBehavior: Clip.none,
               itemCount: state.categories.length,
               itemBuilder: (context, index) {
@@ -359,26 +430,18 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppColors.divider.withOpacity(0.5)),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.black.withOpacity(0.02),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              color: AppColors.shelf,
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: Icon(icon, color: AppColors.primary, size: 28),
+            child: Icon(icon, color: AppColors.primary, size: 24),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
             title,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
             ),
@@ -399,10 +462,10 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           return Column(
             children: state.services.asMap().entries.map((entry) {
               return SlideInAnimation(
-                delay: Duration(milliseconds: 400 + (entry.key * 100)),
+                delay: Duration(milliseconds: 200 + (entry.key * 100)),
                 begin: const Offset(0.1, 0),
                 child: Padding(
-                  padding: const EdgeInsets.only(bottom: 20),
+                  padding: const EdgeInsets.only(bottom: 16),
                   child: ServiceCardWidget(service: entry.value),
                 ),
               );
@@ -415,17 +478,15 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   }
 
   Widget _buildModernFAB() {
-    return FloatingActionButton.extended(
-      onPressed: () => context.push('/booking/new'),
-      backgroundColor: AppColors.primaryDark,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: Colors.white.withOpacity(0.1), width: 1),
-      ),
-      icon: const Icon(Icons.add_rounded, color: Colors.white),
-      label: const Text('Đặt dịch vụ',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+    return FloatingActionButton(
+      onPressed: () {
+        if (_currentLocation != null) {
+          _mapController.move(_currentLocation!, 15.0);
+        }
+      },
+      backgroundColor: Colors.white,
+      elevation: 4,
+      child: const Icon(Icons.my_location_rounded, color: AppColors.primary),
     );
   }
 

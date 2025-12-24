@@ -39,15 +39,46 @@ class MarketplaceDataSource {
     }
   }
 
+  Future<List<Service>> getGenericServices(int categoryId) async {
+    try {
+      final response =
+          await _dio.get('/marketplace/categories/$categoryId/services');
+      final dynamic responseData = response.data;
+
+      if (responseData is List) {
+        return responseData
+            .map((json) => Service.fromJson(json as Map<String, dynamic>))
+            .toList();
+      } else if (responseData is Map<String, dynamic> &&
+          responseData.containsKey('data')) {
+        final data = responseData['data'];
+        if (data is List) {
+          return data
+              .map((json) => Service.fromJson(json as Map<String, dynamic>))
+              .toList();
+        }
+      }
+
+      return [];
+    } catch (e) {
+      print('[MarketplaceDataSource] Error fetching generic services: $e');
+      throw Exception('Failed to load generic services: $e');
+    }
+  }
+
   Future<List<ProviderService>> searchServices({
     int limit = 10,
     int? categoryId,
+    int? serviceId,
+    double? latitude,
+    double? longitude,
   }) async {
     try {
-      final queryParams = {'limit': limit};
-      if (categoryId != null) {
-        queryParams['categoryId'] = categoryId;
-      }
+      final queryParams = <String, dynamic>{'limit': limit};
+      if (categoryId != null) queryParams['categoryId'] = categoryId;
+      if (serviceId != null) queryParams['serviceId'] = serviceId;
+      if (latitude != null) queryParams['latitude'] = latitude;
+      if (longitude != null) queryParams['longitude'] = longitude;
 
       final response = await _dio.get(
         '/marketplace/services/search',
@@ -171,70 +202,6 @@ class MarketplaceDataSource {
   }
 
   ProviderService _providerServiceFromJson(Map<String, dynamic> json) {
-    try {
-      final serviceData = json['service'];
-      final providerData = json['provider'];
-
-      if (serviceData == null || providerData == null) {
-        print('[Marketplace] Missing service or provider data: $json');
-        throw Exception('Missing service or provider data');
-      }
-
-      // Extract categoryId: first try direct field, then try nested category object
-      int categoryId = 0;
-      if (serviceData['categoryId'] != null) {
-        categoryId = _parseInt(serviceData['categoryId']);
-      } else if (serviceData['category_id'] != null) {
-        categoryId = _parseInt(serviceData['category_id']);
-      } else if (serviceData['category'] != null &&
-          serviceData['category'] is Map) {
-        categoryId = _parseInt(serviceData['category']['id']);
-      }
-
-      return ProviderService(
-        providerUserId:
-            (json['providerUserId'] ?? json['provider_user_id'] ?? '')
-                .toString(),
-        serviceId: _parseInt(json['serviceId'] ?? json['service_id']),
-        price: _parseDouble(json['price']),
-        currency: (json['currency'] ?? 'VND').toString(),
-        isActive:
-            json['isActive'] as bool? ?? json['is_active'] as bool? ?? true,
-        service: Service(
-          id: _parseInt(serviceData['id']),
-          categoryId: categoryId,
-          name: (serviceData['name'] ?? 'Service').toString(),
-          description: serviceData['description']?.toString(),
-          iconUrl: serviceData['iconUrl']?.toString() ??
-              serviceData['icon_url']?.toString(),
-          durationMinutes: _parseInt(serviceData['durationMinutes'] ??
-              serviceData['duration_minutes']),
-        ),
-        provider: ProviderInfo(
-          userId: (providerData['userId'] ?? providerData['user_id'] ?? '')
-              .toString(),
-          displayName: (providerData['displayName'] ??
-                  providerData['display_name'] ??
-                  'Provider')
-              .toString(),
-          isVerified: providerData['isVerified'] as bool? ??
-              providerData['is_verified'] as bool? ??
-              false,
-          verificationStatus: (providerData['verificationStatus'] ??
-                  providerData['verification_status'] ??
-                  'unverified')
-              .toString(),
-          ratingAvg: _parseDouble(
-              providerData['ratingAvg'] ?? providerData['rating_avg']),
-          ratingCount: _parseInt(
-              providerData['ratingCount'] ?? providerData['rating_count']),
-        ),
-      );
-    } catch (e, stackTrace) {
-      print('[Marketplace] Error parsing ProviderService: $e');
-      print('[Marketplace] JSON data: $json');
-      print('[Marketplace] Stack trace: $stackTrace');
-      rethrow;
-    }
+    return ProviderService.fromJson(json);
   }
 }

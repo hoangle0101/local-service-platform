@@ -36,6 +36,23 @@ export class MarketplaceService {
     }));
   }
 
+  // GET /marketplace/categories/:categoryId/services
+  async getGenericServicesByCategory(categoryId: number) {
+    const services = await this.prisma.service.findMany({
+      where: { categoryId: categoryId },
+      orderBy: { name: 'asc' },
+    });
+
+    return services.map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      basePrice: s.basePrice.toString(),
+      durationMinutes: s.durationMinutes,
+      categoryId: s.categoryId,
+    }));
+  }
+
   // GET /marketplace/categories/:slug
   async getCategoryBySlug(slug: string) {
     const category = await this.prisma.serviceCategory.findUnique({
@@ -147,10 +164,12 @@ export class MarketplaceService {
         locationFilter.latitude,
         locationFilter.longitude,
         locationFilter.latitude,
-        locationFilter.radius,
       ];
 
-      if (dto.categoryId) {
+      if (dto.serviceId) {
+        whereClauses.push(`ps.service_id = $${params.length + 1}`);
+        params.push(dto.serviceId);
+      } else if (dto.categoryId) {
         whereClauses.push(
           `ps.service_id IN (SELECT id FROM services WHERE category_id = $${params.length + 1})`,
         );
@@ -184,8 +203,8 @@ export class MarketplaceService {
         WHERE ${whereClauses.join(' AND ')}
           AND ST_DWithin(
             pp.location::geography,
-            ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography,
-            $5
+            ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+            pp.service_radius_m
           )
         ORDER BY distance ASC
         LIMIT ${limit}
