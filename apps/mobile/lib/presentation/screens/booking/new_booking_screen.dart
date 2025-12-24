@@ -10,6 +10,8 @@ import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../bloc/services/services_bloc.dart';
 import '../../bloc/services/services_event_state.dart';
+import '../../bloc/auth/auth_bloc.dart';
+import '../../widgets/verification_required_dialog.dart';
 
 class NewBookingScreen extends StatefulWidget {
   final int? categoryId;
@@ -774,7 +776,36 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
     }
   }
 
-  void _submitBooking(BuildContext context) {
+  void _submitBooking(BuildContext context) async {
+    // Check if user is verified
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated && authState.user != null) {
+      final user = authState.user!;
+
+      // If user is not verified, show verification dialog
+      if (!user.isVerified) {
+        final shouldProceed = await VerificationRequiredDialog.show(
+          context,
+          title: 'Verify Phone to Book',
+          message:
+              'Please verify your phone number before creating a booking to ensure service providers can contact you.',
+          phone: user.phone,
+          canSkip: true,
+        );
+
+        // If user skipped verification, still allow booking but show warning
+        if (!shouldProceed && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Booking created without phone verification. You may miss important updates.'),
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    }
+
     final scheduledAt = DateTime(
       _selectedDate.year,
       _selectedDate.month,
@@ -783,14 +814,16 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
       _selectedTime.minute,
     );
 
-    context.read<BookingsBloc>().add(CreateBookingEvent(
-          serviceId: _selectedService!.serviceId,
-          scheduledAt: scheduledAt,
-          addressText: _addressController.text,
-          latitude: _latitude,
-          longitude: _longitude,
-          notes: _notesController.text.isEmpty ? null : _notesController.text,
-        ));
+    if (mounted) {
+      context.read<BookingsBloc>().add(CreateBookingEvent(
+            serviceId: _selectedService!.serviceId,
+            scheduledAt: scheduledAt,
+            addressText: _addressController.text,
+            latitude: _latitude,
+            longitude: _longitude,
+            notes: _notesController.text.isEmpty ? null : _notesController.text,
+          ));
+    }
   }
 
   void _showSuccessDialog(BuildContext context, BookingCreated state) {

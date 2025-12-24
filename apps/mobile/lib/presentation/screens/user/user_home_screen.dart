@@ -3,12 +3,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../bloc/auth/auth_bloc.dart';
-import '../../bloc/auth/auth_event.dart';
 import '../../bloc/categories/categories_bloc.dart';
 import '../../bloc/categories/categories_event_state.dart';
 import '../../bloc/services/services_bloc.dart';
 import '../../bloc/services/services_event_state.dart';
 import '../../widgets/service_card.dart';
+import '../../widgets/minimalist_widgets.dart';
+import '../../widgets/animations/fade_in_animation.dart';
+import '../../widgets/animations/slide_in_animation.dart';
+import '../../widgets/loading/shimmer_loading.dart';
+import '../../widgets/phone_verification_card.dart';
 
 class UserHomeScreen extends StatefulWidget {
   const UserHomeScreen({super.key});
@@ -18,361 +22,358 @@ class UserHomeScreen extends StatefulWidget {
 }
 
 class _UserHomeScreenState extends State<UserHomeScreen> {
-  int _selectedIndex = 0;
-
   @override
   void initState() {
     super.initState();
-    // Load categories and services
     context.read<CategoriesBloc>().add(LoadCategories());
     context.read<ServicesBloc>().add(const LoadServices());
   }
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-
-    switch (index) {
-      case 0:
-        // Already on home
-        break;
-      case 1:
-        context.push('/user/bookings');
-        break;
-      case 2:
-        context.push('/user/favorites');
-        break;
-      case 3:
-        context.push('/user/profile');
-        break;
-    }
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Chào buổi sáng';
+    if (hour < 17) return 'Chào buổi chiều';
+    return 'Chào buổi tối';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
-      appBar: AppBar(
-        title: const Text('Home'),
-        backgroundColor: AppColors.white,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-        actions: [
-          // Show Switch to Provider button if user is a provider
-          BlocBuilder<AuthBloc, AuthState>(
-            builder: (context, state) {
-              if (state is Authenticated && state.user?.isProvider == true) {
-                return IconButton(
-                  icon: const Icon(Icons.swap_horiz),
-                  tooltip: 'Switch to Provider View',
-                  onPressed: () => context.go('/provider/home'),
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              // TODO: Navigate to notifications
-            },
-          ),
-        ],
+      backgroundColor: AppColors.background,
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () async {
+          context.read<CategoriesBloc>().add(LoadCategories());
+          context.read<ServicesBloc>().add(const LoadServices());
+        },
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            _buildSliverHeader(),
+            _buildDiscoveryContent(),
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          ],
+        ),
       ),
-      body: SingleChildScrollView(
+      floatingActionButton: _buildModernFAB(),
+    );
+  }
+
+  Widget _buildSliverHeader() {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Search Bar
-            Container(
-              color: AppColors.white,
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: 'Search for services...',
-                  prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.borderLight),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.borderLight),
-                  ),
-                  filled: true,
-                  fillColor: AppColors.backgroundSecondary,
-                ),
-              ),
-            ),
-
-            // Quick Book Card
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: InkWell(
-                onTap: () => context.push('/booking/new'),
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primaryDark, AppColors.primary],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.add_circle_outline,
-                          color: Colors.white,
-                          size: 32,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Book a Service',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Create a new booking with full details',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.arrow_forward_ios,
-                          color: Colors.white70, size: 20),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Categories
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'Categories',
-                style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            BlocBuilder<CategoriesBloc, CategoriesState>(
-              builder: (context, state) {
-                if (state is CategoriesLoading) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20),
-                      child: CircularProgressIndicator(),
-                    ),
-                  );
-                } else if (state is CategoriesLoaded) {
-                  return SizedBox(
-                    height: 100,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: state.categories.length,
-                      itemBuilder: (context, index) {
-                        final category = state.categories[index];
-                        return _buildCategoryCard(
-                          category.name,
-                          _getCategoryIcon(category.code),
-                          () {
-                            context.push(
-                              '/category/${category.id}',
-                              extra: category,
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  );
-                } else if (state is CategoriesError) {
-                  return Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Text(
-                      'Error: ${state.message}',
-                      style: const TextStyle(color: AppColors.error),
-                    ),
-                  );
-                }
-                return const SizedBox();
-              },
-            ),
-
-            const SizedBox(height: 24),
-
-            // Popular Services
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Popular Services',
-                    style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      // TODO: View all services
-                    },
-                    child: const Text('See All'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            BlocBuilder<ServicesBloc, ServicesState>(
-              builder: (context, state) {
-                if (state is ServicesLoading) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20),
-                      child: CircularProgressIndicator(),
-                    ),
-                  );
-                } else if (state is ServicesLoaded) {
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: state.services.length,
-                    itemBuilder: (context, index) {
-                      return ServiceCardWidget(
-                        service: state.services[index],
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                BlocBuilder<AuthBloc, AuthState>(
+                  builder: (context, state) {
+                    if (state is Authenticated && state.user != null) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _getGreeting(),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: AppColors.textTertiary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            state.user!.fullName,
+                            style: Theme.of(context)
+                                .textTheme
+                                .displaySmall
+                                ?.copyWith(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                        ],
                       );
-                    },
-                  );
-                } else if (state is ServicesError) {
-                  return Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Text(
-                      'Error: ${state.message}',
-                      style: const TextStyle(color: AppColors.error),
-                    ),
-                  );
-                }
-                return const SizedBox();
-              },
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                _buildActionIcons(),
+              ],
             ),
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: AppColors.primaryDark,
-        unselectedItemColor: AppColors.textSecondary,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today_outlined),
-            activeIcon: Icon(Icons.calendar_today),
-            label: 'Bookings',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite_outline),
-            activeIcon: Icon(Icons.favorite),
-            label: 'Favorites',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profile',
+    );
+  }
+
+  Widget _buildActionIcons() {
+    return Row(
+      children: [
+        BlocBuilder<AuthBloc, AuthState>(
+          builder: (context, state) {
+            if (state is Authenticated && state.user?.isProvider == true) {
+              return _buildIconButton(
+                  Icons.sync_rounded, () => context.go('/provider/home'));
+            }
+            return const SizedBox.shrink();
+          },
+        ),
+        const SizedBox(width: 8),
+        _buildIconButton(Icons.notifications_none_rounded, () {}),
+      ],
+    );
+  }
+
+  Widget _buildIconButton(IconData icon, VoidCallback onTap) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.shelf,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: AppColors.textPrimary, size: 20),
+        onPressed: onTap,
+        splashRadius: 24,
+      ),
+    );
+  }
+
+  Widget _buildDiscoveryContent() {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      sliver: SliverList(
+        delegate: SliverChildListDelegate([
+          _buildVerificationBanner(),
+          const SizedBox(height: 12),
+          _buildSearchBox(),
+          const SizedBox(height: 32),
+          _buildStatsRow(),
+          const SizedBox(height: 40),
+          _buildSectionTitle('Danh mục dịch vụ', () {}),
+          const SizedBox(height: 20),
+          _buildCategoriesList(),
+          const SizedBox(height: 40),
+          _buildSectionTitle('Dịch vụ phổ biến', () {}),
+          const SizedBox(height: 20),
+          _buildPopularServices(),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildVerificationBanner() {
+    return BlocBuilder<AuthBloc, AuthState>(
+      builder: (context, state) {
+        if (state is Authenticated &&
+            state.user != null &&
+            !state.user!.isVerified) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 24),
+            child: SlideInAnimation(
+              begin: const Offset(0, -0.1),
+              child: PhoneVerificationCard(isVerified: false, verifiedAt: null),
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
+  }
+
+  Widget _buildSearchBox() {
+    return FadeInAnimation(
+      delay: const Duration(milliseconds: 100),
+      child: MinTextField(
+        hint: 'Bạn đang tìm dịch vụ gì?',
+        prefixIcon:
+            const Icon(Icons.search_rounded, color: AppColors.textTertiary),
+      ),
+    );
+  }
+
+  Widget _buildStatsRow() {
+    return FadeInAnimation(
+      delay: const Duration(milliseconds: 200),
+      child: Row(
+        children: [
+          Expanded(
+              child: _buildStatItem('Lịch hẹn', '0',
+                  Icons.calendar_today_rounded, AppColors.primary)),
+          const SizedBox(width: 16),
+          Expanded(
+              child: _buildStatItem(
+                  'Yêu thích', '0', Icons.favorite_rounded, AppColors.error)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(
+      String label, String value, IconData icon, Color color) {
+    return MinCard(
+      padding: const EdgeInsets.all(20),
+      color: AppColors.shelf,
+      border: const BorderSide(color: AppColors.divider),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(value,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 18)),
+              Text(label,
+                  style: const TextStyle(
+                      color: AppColors.textTertiary, fontSize: 12)),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCategoryCard(String title, IconData icon, VoidCallback onTap) {
+  Widget _buildSectionTitle(String title, VoidCallback onTap) {
+    return FadeInAnimation(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.headlineMedium),
+          TextButton(
+            onPressed: onTap,
+            child: const Text('Xem thêm',
+                style: TextStyle(
+                    color: AppColors.primary, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoriesList() {
+    return SizedBox(
+      height: 104,
+      child: BlocBuilder<CategoriesBloc, CategoriesState>(
+        builder: (context, state) {
+          if (state is CategoriesLoading) {
+            return ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: 5,
+              itemBuilder: (context, _) => const ShimmerCategoryCard(),
+            );
+          }
+          if (state is CategoriesLoaded) {
+            return ListView.builder(
+              scrollDirection: Axis.horizontal,
+              clipBehavior:
+                  Colors.transparent == null ? Clip.hardEdge : Clip.none,
+              itemCount: state.categories.length,
+              itemBuilder: (context, index) {
+                final category = state.categories[index];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 20),
+                  child: _buildCategoryItem(
+                      category.name, _getCategoryIcon(category.code), () {
+                    context.push('/user/home/category/${category.id}',
+                        extra: category);
+                  }),
+                );
+              },
+            );
+          }
+          return const SizedBox.shrink();
+        },
+      ),
+    );
+  }
+
+  Widget _buildCategoryItem(String title, IconData icon, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 80,
-        margin: const EdgeInsets.only(right: 12),
-        child: Column(
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                color: AppColors.primaryDark,
-                size: 32,
-              ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.divider),
             ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
+            child: Icon(icon, color: AppColors.textPrimary, size: 24),
+          ),
+          const SizedBox(height: 8),
+          Text(title,
+              style:
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        ],
       ),
+    );
+  }
+
+  Widget _buildPopularServices() {
+    return BlocBuilder<ServicesBloc, ServicesState>(
+      builder: (context, state) {
+        if (state is ServicesLoading) {
+          return Column(
+              children: List.generate(3, (_) => const ShimmerServiceCard()));
+        }
+        if (state is ServicesLoaded) {
+          return Column(
+            children: state.services.asMap().entries.map((entry) {
+              return SlideInAnimation(
+                delay: Duration(milliseconds: 400 + (entry.key * 100)),
+                begin: const Offset(0.1, 0),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: ServiceCardWidget(service: entry.value),
+                ),
+              );
+            }).toList(),
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
+  }
+
+  Widget _buildModernFAB() {
+    return FloatingActionButton.extended(
+      onPressed: () => context.push('/booking/new'),
+      backgroundColor: AppColors.primaryDark,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: Colors.white.withOpacity(0.1), width: 1),
+      ),
+      icon: const Icon(Icons.add_rounded, color: Colors.white),
+      label: const Text('Đặt dịch vụ',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
     );
   }
 
   IconData _getCategoryIcon(String code) {
     switch (code.toLowerCase()) {
       case 'cleaning':
-        return Icons.cleaning_services;
+        return Icons.cleaning_services_rounded;
       case 'plumbing':
-        return Icons.plumbing;
+        return Icons.plumbing_rounded;
       case 'electrical':
-        return Icons.electrical_services;
+        return Icons.electrical_services_rounded;
       case 'carpentry':
-        return Icons.carpenter;
+        return Icons.carpenter_rounded;
       case 'painting':
-        return Icons.format_paint;
+        return Icons.format_paint_rounded;
       case 'gardening':
-        return Icons.yard;
+        return Icons.yard_rounded;
       default:
-        return Icons.home_repair_service;
+        return Icons.home_repair_service_rounded;
     }
   }
 }

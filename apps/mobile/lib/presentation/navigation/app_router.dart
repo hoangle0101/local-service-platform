@@ -11,6 +11,7 @@ import '../screens/auth/register_user_screen.dart';
 import '../screens/auth/register_provider_screen.dart';
 import '../screens/auth/otp_verification_screen.dart';
 import '../screens/user/user_home_screen.dart';
+import '../screens/user/user_shell_screen.dart';
 import '../screens/user/user_profile_screen.dart';
 import '../screens/user/user_bookings_screen.dart';
 import '../screens/user/user_favorites_screen.dart';
@@ -63,26 +64,80 @@ final router = GoRouter(
       },
     ),
 
-    // User Routes
-    GoRoute(
-      path: '/user/home',
-      builder: (context, state) => const UserHomeScreen(),
-    ),
-    GoRoute(
-      path: '/user/profile',
-      builder: (context, state) => const UserProfileScreen(),
-    ),
-    GoRoute(
-      path: '/user/bookings',
-      builder: (context, state) => const UserBookingsScreen(),
-    ),
-    GoRoute(
-      path: '/user/favorites',
-      builder: (context, state) => const UserFavoritesScreen(),
-    ),
-    GoRoute(
-      path: '/user/edit-profile',
-      builder: (context, state) => const UserEditProfileScreen(),
+    // User Shell with Bottom Navigation
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, navigationShell) {
+        return UserShellScreen(navigationShell: navigationShell);
+      },
+      branches: [
+        // Home Branch
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/user/home',
+              builder: (context, state) => const UserHomeScreen(),
+              routes: [
+                // Nested routes in home
+                GoRoute(
+                  path: 'category/:id',
+                  builder: (context, state) {
+                    final id = int.parse(state.pathParameters['id']!);
+                    final category = state.extra as Category?;
+                    return CategoryServicesScreen(
+                      categoryId: id,
+                      category: category,
+                    );
+                  },
+                ),
+                GoRoute(
+                  path: 'service/:id',
+                  builder: (context, state) {
+                    final id = int.parse(state.pathParameters['id']!);
+                    final service = state.extra as ProviderService?;
+                    return ServiceDetailsScreen(
+                      serviceId: id,
+                      service: service,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+        // Bookings Branch
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/user/bookings',
+              builder: (context, state) => const UserBookingsScreen(),
+            ),
+          ],
+        ),
+        // Favorites Branch
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/user/favorites',
+              builder: (context, state) => const UserFavoritesScreen(),
+            ),
+          ],
+        ),
+        // Profile Branch
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/user/profile',
+              builder: (context, state) => const UserProfileScreen(),
+              routes: [
+                GoRoute(
+                  path: 'edit',
+                  builder: (context, state) => const UserEditProfileScreen(),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
     ),
 
     // Provider Routes

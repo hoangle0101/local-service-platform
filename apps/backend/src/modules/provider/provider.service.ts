@@ -403,6 +403,7 @@ export class ProviderService {
       // Provider profile
       this.prisma.providerProfile.findUnique({
         where: { userId },
+        include: { user: true }
       }),
     ]);
 
@@ -421,6 +422,8 @@ export class ProviderService {
       ratingAvg: provider?.ratingAvg?.toString() || '0',
       ratingCount: provider?.ratingCount || 0,
       isAvailable: provider?.isAvailable ?? true,
+      verificationStatus: provider?.verificationStatus || 'unverified',
+      isPhoneVerified: provider?.user?.isVerified ?? false,
     };
   }
 

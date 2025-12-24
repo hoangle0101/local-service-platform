@@ -480,7 +480,7 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
               border: Border.all(color: Colors.grey.shade300),
             ),
             child: DropdownButtonFormField<Category>(
-              initialValue: _selectedCategory,
+              value: _selectedCategory,
               decoration: const InputDecoration(
                 contentPadding:
                     EdgeInsets.symmetric(horizontal: 16, vertical: 8),

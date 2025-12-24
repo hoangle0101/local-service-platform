@@ -180,6 +180,7 @@ class ProviderInfo extends Equatable {
   final String userId;
   final String displayName;
   final bool isVerified;
+  final String verificationStatus;
   final double ratingAvg;
   final int ratingCount;
 
@@ -187,6 +188,7 @@ class ProviderInfo extends Equatable {
     required this.userId,
     required this.displayName,
     required this.isVerified,
+    required this.verificationStatus,
     required this.ratingAvg,
     required this.ratingCount,
   });
@@ -202,6 +204,12 @@ class ProviderInfo extends Equatable {
     // Parse isVerified
     bool isVerified =
         json['is_verified'] as bool? ?? json['isVerified'] as bool? ?? false;
+
+    // Parse verificationStatus
+    String verificationStatus = (json['verification_status'] ??
+            json['verificationStatus'] ??
+            'unverified')
+        .toString();
 
     // Parse ratingAvg - could be String or num
     double ratingAvg = 0.0;
@@ -225,12 +233,19 @@ class ProviderInfo extends Equatable {
       userId: userId,
       displayName: displayName,
       isVerified: isVerified,
+      verificationStatus: verificationStatus,
       ratingAvg: ratingAvg,
       ratingCount: ratingCount,
     );
   }
 
   @override
-  List<Object?> get props =>
-      [userId, displayName, isVerified, ratingAvg, ratingCount];
+  List<Object?> get props => [
+        userId,
+        displayName,
+        isVerified,
+        verificationStatus,
+        ratingAvg,
+        ratingCount
+      ];
 }

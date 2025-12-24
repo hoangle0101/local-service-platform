@@ -14,6 +14,7 @@ import {
     AdminUsersQueryDto,
     AdminProvidersQueryDto,
     BanUserDto,
+    VerifyUserDto,
     VerifyProviderDto,
     AdminBookingsQueryDto,
     AdminPaymentsQueryDto,
@@ -114,7 +115,7 @@ export class AdminService {
      * Returns key metrics: total revenue, active bookings, disputes, etc.
      */
     async getDashboard(query: AdminDashboardQueryDto) {
-        const startDate = query.startDate ? new Date(query.startDate) : new Date(new Date().setDate(new Date().getDate() - 30));
+        const startDate = query.startDate ? new Date(query.startDate) : new Date(new Date().setDate(new Date().getDate() - 90));
         const endDate = query.endDate ? new Date(query.endDate) : new Date();
 
         // Use Promise.all for parallel queries
@@ -128,10 +129,8 @@ export class AdminService {
             totalRevenue,
             recentActivity,
         ] = await Promise.all([
-            // Total users count
-            this.prisma.user.count({
-                where: { status: 'active' }
-            }),
+            // Total users count - Get ALL users
+            this.prisma.user.count(),
             // Active providers
             this.prisma.providerProfile.count({
                 where: {
@@ -185,7 +184,8 @@ export class AdminService {
         const completionRate = totalBookings > 0 ? Math.round((completedBookings / totalBookings) * 100) : 0;
 
         // Calculate average booking value
-        const totalRevenueAmount = totalRevenue._sum.actualPrice || new Decimal(0);
+        const totalRevenueResult = totalRevenue as unknown as { _sum: { actualPrice: Decimal | null } };
+        const totalRevenueAmount = totalRevenueResult._sum.actualPrice || new Decimal(0);
         const avgBookingValue = completedBookings > 0 ? totalRevenueAmount.div(completedBookings).toNumber() : 0;
 
         return {
@@ -209,16 +209,74 @@ export class AdminService {
                 endDate,
                 daysIncluded: Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
             },
-            ...(query.detailed && {
+            ...(String(query.detailed) === 'true' && {
                 recentActivity: recentActivity.map(booking => ({
-                    id: booking.id,
-                    customerId: booking.customerId,
-                    providerId: booking.providerId,
+                    id: booking.id.toString(),
+                    customerId: booking.customerId.toString(),
+                    providerId: booking.providerUser?.id.toString(),
                     service: booking.service.name,
                     status: booking.status,
-                    price: booking.actualPrice,
+                    price: booking.actualPrice?.toNumber() || 0,
                     createdAt: booking.createdAt
-                }))
+                })),
+                charts: {
+                    revenue: await (async () => {
+                        const days = 30;
+                        const start = new Date(endDate);
+                        start.setDate(start.getDate() - days);
+                        
+                        const chartBookings = await this.prisma.booking.findMany({
+                            where: {
+                                status: 'completed',
+                                createdAt: { gte: start, lte: endDate }
+                            },
+                            select: { actualPrice: true, createdAt: true }
+                        });
+
+                        const group: Record<string, { date: string; revenue: number; bookings: number }> = {};
+                        for (let i = 0; i <= days; i++) {
+                            const d = new Date(start);
+                            d.setDate(d.getDate() + i);
+                            const ds = d.toISOString().split('T')[0];
+                            group[ds] = { date: ds, revenue: 0, bookings: 0 };
+                        }
+
+                        chartBookings.forEach(b => {
+                            const ds = b.createdAt.toISOString().split('T')[0];
+                            if (group[ds]) {
+                                group[ds].revenue += b.actualPrice?.toNumber() || 0;
+                                group[ds].bookings += 1;
+                            }
+                        });
+                        return Object.values(group).sort((a, b) => a.date.localeCompare(b.date));
+                    })(),
+                    users: await (async () => {
+                        const days = 30;
+                        const start = new Date(endDate);
+                        start.setDate(start.getDate() - days);
+                        
+                        const chartUsers = await this.prisma.user.findMany({
+                            where: { createdAt: { gte: start, lte: endDate } },
+                            select: { createdAt: true }
+                        });
+
+                        const group: Record<string, { date: string; newUsers: number }> = {};
+                        for (let i = 0; i <= days; i++) {
+                            const d = new Date(start);
+                            d.setDate(d.getDate() + i);
+                            const ds = d.toISOString().split('T')[0];
+                            group[ds] = { date: ds, newUsers: 0 };
+                        }
+
+                        chartUsers.forEach(u => {
+                            const ds = u.createdAt.toISOString().split('T')[0];
+                            if (group[ds]) {
+                                group[ds].newUsers += 1;
+                            }
+                        });
+                        return Object.values(group).sort((a, b) => a.date.localeCompare(b.date));
+                    })()
+                }
             })
         };
     }
@@ -364,8 +422,8 @@ export class AdminService {
             data: withdrawals.map(withdrawal => {
                 const user = userMap.get(withdrawal.walletUserId);
                 return {
-                    id: withdrawal.id,
-                    walletUserId: withdrawal.walletUserId,
+                    id: withdrawal.id.toString(),
+                    walletUserId: withdrawal.walletUserId.toString(),
                     amount: withdrawal.amount.toNumber(),
                     status: withdrawal.status,
                     createdAt: withdrawal.createdAt,
@@ -704,6 +762,8 @@ export class AdminService {
                             id: true,
                             phone: true,
                             email: true,
+                            status: true,
+                            isVerified: true,
                             profile: {
                                 select: {
                                     fullName: true,
@@ -743,13 +803,10 @@ export class AdminService {
                     : (typeof stats.totalEarnings === 'number' ? stats.totalEarnings : 0);
 
                 return {
+                    id: provider.userId.toString(),
                     userId: provider.userId.toString(),
                     displayName: provider.displayName,
                     bio: provider.bio,
-                    phone: provider.user.phone,
-                    email: provider.user.email,
-                    fullName: provider.user.profile?.fullName,
-                    avatarUrl: provider.user.profile?.avatarUrl,
                     rating: {
                         average: provider.ratingAvg.toNumber(),
                         count: provider.ratingCount
@@ -759,6 +816,17 @@ export class AdminService {
                     totalServices: provider.providerServices.length,
                     totalBookings: stats.totalBookings,
                     totalEarnings: earnings,
+                    user: {
+                        id: provider.user.id.toString(),
+                        phone: provider.user.phone,
+                        email: provider.user.email,
+                        status: provider.user.status,
+                        isVerified: provider.user.isVerified,
+                        profile: provider.user.profile ? {
+                            fullName: provider.user.profile.fullName,
+                            avatarUrl: provider.user.profile.avatarUrl
+                        } : null
+                    },
                     createdAt: provider.createdAt
                 };
             }),
@@ -845,6 +913,49 @@ export class AdminService {
                 userId: userId.toString(),
                 status: newStatus,
                 reason: dto.reason
+            };
+        });
+    }
+
+    /**
+     * Manually verify or unverify a user account
+     */
+    async verifyUser(userId: bigint, adminId: bigint, dto: VerifyUserDto) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId }
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        return this.prisma.$transaction(async (tx) => {
+            const updatedUser = await tx.user.update({
+                where: { id: userId },
+                data: {
+                    isVerified: dto.isVerified
+                }
+            });
+
+            // Create audit log
+            await tx.auditLog.create({
+                data: {
+                    actorUserId: adminId,
+                    action: dto.isVerified ? 'user_verified' : 'user_unverified',
+                    objectType: 'user',
+                    objectId: userId,
+                    detail: {
+                        userId: userId.toString(),
+                        isVerified: dto.isVerified,
+                        adminNotes: dto.adminNotes
+                    }
+                }
+            });
+
+            return {
+                message: `User ${dto.isVerified ? 'verified' : 'unverified'} successfully`,
+                userId: userId.toString(),
+                isVerified: dto.isVerified
             };
         });
     }
@@ -1365,27 +1476,45 @@ export class AdminService {
         const startDate = query.startDate ? new Date(query.startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
         const endDate = query.endDate ? new Date(query.endDate) : new Date();
 
-        const [payments, totalPayments] = await Promise.all([
-            this.prisma.payment.findMany({
+        const [bookings, totalBookingsCount] = await Promise.all([
+            this.prisma.booking.findMany({
                 where: {
-                    status: 'succeeded',
+                    status: 'completed',
                     createdAt: { gte: startDate, lte: endDate }
                 },
-                include: {
-                    booking: {
-                        select: { id: true, serviceId: true, platformFee: true, providerEarning: true }
-                    }
-                },
+                select: { id: true, actualPrice: true, platformFee: true, providerEarning: true, createdAt: true },
                 orderBy: { createdAt: 'desc' }
             }),
-            this.prisma.payment.count({
-                where: { status: 'succeeded', createdAt: { gte: startDate, lte: endDate } }
+            this.prisma.booking.count({
+                where: { status: 'completed', createdAt: { gte: startDate, lte: endDate } }
             })
         ]);
 
-        const totalRevenue = payments.reduce((sum, p) => sum + p.amount.toNumber(), 0);
-        const totalFee = payments.reduce((sum, p) => sum + (p.booking?.platformFee?.toNumber() || 0), 0);
-        const totalProviderEarning = payments.reduce((sum, p) => sum + (p.booking?.providerEarning?.toNumber() || 0), 0);
+        const totalRevenue = bookings.reduce((sum, b) => sum + (b.actualPrice?.toNumber() || 0), 0);
+        const totalFee = bookings.reduce((sum, b) => sum + (b.platformFee?.toNumber() || 0), 0);
+        const totalProviderEarning = bookings.reduce((sum, b) => sum + (b.providerEarning?.toNumber() || 0), 0);
+
+        // Group by date for time series
+        const timeSeriesGroup: Record<string, { date: string; revenue: number; bookings: number; commission: number }> = {};
+        const daysToInclude = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        
+        for (let i = 0; i < daysToInclude; i++) {
+            const date = new Date(startDate);
+            date.setDate(date.getDate() + i);
+            const dateStr = date.toISOString().split('T')[0];
+            timeSeriesGroup[dateStr] = { date: dateStr, revenue: 0, bookings: 0, commission: 0 };
+        }
+
+        bookings.forEach(b => {
+            const dateStr = b.createdAt.toISOString().split('T')[0];
+            if (timeSeriesGroup[dateStr]) {
+                timeSeriesGroup[dateStr].revenue += b.actualPrice?.toNumber() || 0;
+                timeSeriesGroup[dateStr].bookings += 1;
+                timeSeriesGroup[dateStr].commission += b.platformFee?.toNumber() || 0;
+            }
+        });
+
+        const timeSeriesData = Object.values(timeSeriesGroup).sort((a, b) => a.date.localeCompare(b.date));
 
         return {
             summary: {
@@ -1395,18 +1524,17 @@ export class AdminService {
                 totalRevenue,
                 totalPlatformFee: totalFee,
                 totalProviderEarning: totalProviderEarning,
-                totalTransactions: totalPayments,
-                averageTransactionValue: totalPayments > 0 ? totalRevenue / totalPayments : 0
+                totalTransactions: totalBookingsCount,
+                averageTransactionValue: totalBookingsCount > 0 ? totalRevenue / totalBookingsCount : 0
             },
-            data: payments.map(p => ({
-                paymentId: p.id.toString(),
-                amount: p.amount.toNumber(),
-                currency: p.currency,
-                status: p.status,
-                gateway: p.gateway,
-                platformFee: p.booking?.platformFee?.toNumber() || 0,
-                providerEarning: p.booking?.providerEarning?.toNumber() || 0,
-                createdAt: p.createdAt
+            timeSeriesData,
+            data: bookings.map(b => ({
+                bookingId: b.id.toString(),
+                amount: b.actualPrice?.toNumber() || 0,
+                status: 'completed',
+                platformFee: b.platformFee?.toNumber() || 0,
+                providerEarning: b.providerEarning?.toNumber() || 0,
+                createdAt: b.createdAt
             }))
         };
     }
@@ -1497,6 +1625,31 @@ export class AdminService {
             _avg: { balance: true }
         });
 
+        // Group by date for time series
+        const periodUsers = await this.prisma.user.findMany({
+            where: { createdAt: { gte: startDate, lte: endDate } },
+            select: { createdAt: true }
+        });
+
+        const timeSeriesGroup: Record<string, { date: string; newUsers: number; activeUsers: number; bookings: number }> = {};
+        const daysToInclude = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+        for (let i = 0; i < daysToInclude; i++) {
+            const date = new Date(startDate);
+            date.setDate(date.getDate() + i);
+            const dateStr = date.toISOString().split('T')[0];
+            timeSeriesGroup[dateStr] = { date: dateStr, newUsers: 0, activeUsers: 0, bookings: 0 };
+        }
+
+        periodUsers.forEach(u => {
+            const dateStr = u.createdAt.toISOString().split('T')[0];
+            if (timeSeriesGroup[dateStr]) {
+                timeSeriesGroup[dateStr].newUsers += 1;
+            }
+        });
+
+        const timeSeriesData = Object.values(timeSeriesGroup).sort((a, b) => a.date.localeCompare(b.date));
+
         return {
             summary: {
                 startDate,
@@ -1509,6 +1662,7 @@ export class AdminService {
                 averageWalletBalance: walletStats._avg.balance?.toNumber() || 0,
                 userRole: query.userRole
             },
+            timeSeriesData,
             data: []
         };
     }

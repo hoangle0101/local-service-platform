@@ -220,6 +220,10 @@ class MarketplaceDataSource {
           isVerified: providerData['isVerified'] as bool? ??
               providerData['is_verified'] as bool? ??
               false,
+          verificationStatus: (providerData['verificationStatus'] ??
+                  providerData['verification_status'] ??
+                  'unverified')
+              .toString(),
           ratingAvg: _parseDouble(
               providerData['ratingAvg'] ?? providerData['rating_avg']),
           ratingCount: _parseInt(

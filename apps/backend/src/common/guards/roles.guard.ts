@@ -16,13 +16,18 @@ export class RolesGuard implements CanActivate {
       context.getClass(),
     ]);
     
+    console.log('[RolesGuard] Required roles:', requiredRoles);
+    
     if (!requiredRoles) {
       return true;
     }
     
     const { user } = context.switchToHttp().getRequest();
     
+    console.log('[RolesGuard] User from request:', user);
+    
     if (!user || !user.userId) {
+      console.log('[RolesGuard] No user or userId found - DENIED');
       return false;
     }
     
@@ -32,9 +37,14 @@ export class RolesGuard implements CanActivate {
       include: { role: true },
     });
     
+    console.log('[RolesGuard] User roles from DB:', userRoles.map(ur => ur.role.name));
+    
     const roleNames = userRoles.map((ur) => ur.role.name);
     
     // Check if user has any of the required roles
-    return requiredRoles.some((role) => roleNames.includes(role));
+    const hasRole = requiredRoles.some((role) => roleNames.includes(role));
+    console.log('[RolesGuard] Has required role:', hasRole);
+    
+    return hasRole;
   }
 }
