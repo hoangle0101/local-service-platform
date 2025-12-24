@@ -287,6 +287,8 @@ model Service {
   description     String?  @db.Text
   basePrice       Decimal  @default(0) @map("base_price") @db.Decimal(12, 2)
   durationMinutes Int?     @map("duration_minutes")
+  imageUrl        String?  @map("image_url") @db.Text
+  isActive        Boolean  @default(true) @map("is_active")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 

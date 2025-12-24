@@ -1,13 +1,20 @@
 // Booking types matching backend responses
-import { Dispute } from './dispute';
-import { Payment } from './payment';
+import { Dispute } from "./dispute";
+import { Payment } from "./payment";
 
 export interface Booking {
   id: string;
   customerId: string;
   providerId: string;
   serviceId: number;
-  status: 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled' | 'disputed';
+  status:
+    | "pending"
+    | "accepted"
+    | "in_progress"
+    | "completed"
+    | "cancelled"
+    | "disputed"
+    | "pending_payment";
   scheduledAt: string;
   startedAt: string | null;
   completedAt: string | null;
@@ -33,7 +40,7 @@ export interface Booking {
       id: string;
       phone: string;
     };
-  };
+  } | null;
   service: {
     id: number;
     name: string;
@@ -48,7 +55,29 @@ export interface Booking {
 }
 
 export interface BookingDetail extends Booking {
-  timeline: BookingTimeline[];
+  // Address
+  addressText?: string;
+
+  // Pricing details
+  estimatedPrice?: string | number;
+  platformFee?: string | number;
+  providerEarning?: string | number;
+
+  // Payment
+  paymentStatus?: string;
+  paymentMethod?: string;
+
+  // Events/Timeline
+  events?: BookingEvent[];
+  timeline?: BookingTimeline[];
+}
+
+export interface BookingEvent {
+  id: string;
+  previousStatus: string;
+  newStatus: string;
+  note?: string;
+  createdAt: string;
 }
 
 export interface BookingTimeline {
