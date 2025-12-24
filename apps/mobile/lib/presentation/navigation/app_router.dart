@@ -29,6 +29,8 @@ import '../screens/provider/provider_shell_screen.dart';
 import '../screens/provider/provider_earnings_screen.dart';
 import '../screens/provider/provider_services_screen.dart';
 import '../screens/provider/job_market_screen.dart';
+import '../screens/provider/navigation_screen.dart';
+import '../screens/chat/chat_screen.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -215,6 +217,18 @@ final router = GoRouter(
       builder: (context, state) => const JobMarketScreen(),
     ),
     GoRoute(
+      path: '/provider/navigation',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return NavigationScreen(
+          destinationLat: extra['lat'] as double,
+          destinationLng: extra['lng'] as double,
+          destinationAddress: extra['address'] as String?,
+          customerName: extra['customerName'] as String?,
+        );
+      },
+    ),
+    GoRoute(
       path: '/provider/complete-job/:id',
       builder: (context, state) {
         final bookingId = state.pathParameters['id']!;
@@ -226,6 +240,17 @@ final router = GoRouter(
       builder: (context, state) {
         final bookingId = state.pathParameters['id']!;
         return InvoiceScreen(bookingId: bookingId);
+      },
+    ),
+    GoRoute(
+      path: '/chat/:bookingId',
+      builder: (context, state) {
+        final bookingId = state.pathParameters['bookingId']!;
+        final otherUserName = state.extra as String?;
+        return ChatScreen(
+          bookingId: bookingId,
+          otherUserName: otherUserName,
+        );
       },
     ),
 

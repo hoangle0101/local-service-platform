@@ -502,6 +502,11 @@ export class BookingsService {
           status: 'accepted',
           estimatedPrice: offer.price,
         },
+        include: {
+          customer: {
+            include: { profile: true },
+          },
+        },
       });
 
       // Update Offers using raw SQL
@@ -521,10 +526,21 @@ export class BookingsService {
         offer.id,
       );
 
+      // Query coordinates securely
+      const locations = await tx.$queryRawUnsafe<any[]>(
+        `SELECT ST_X(location::geometry) as longitude, ST_Y(location::geometry) as latitude FROM bookings WHERE id = $1`,
+        bookingId,
+      );
+      const loc = locations[0];
+
       return {
         message: 'Provider selected',
         bookingId: updatedBooking.id.toString(),
         providerId: providerId.toString(),
+        latitude: loc?.latitude,
+        longitude: loc?.longitude,
+        addressText: updatedBooking.addressText,
+        customerName: updatedBooking.customer.profile?.fullName,
       };
     });
   }
@@ -821,35 +837,66 @@ export class BookingsService {
       this.prisma.booking.count({ where }),
     ]);
 
+    // Query raw SQL to get lat/lng from PostGIS location (Prisma can't handle geography type)
+    const bookingIds = bookings.map((b) => b.id);
+    let locationMap: Map<string, { latitude: number; longitude: number }> =
+      new Map();
+
+    if (bookingIds.length > 0) {
+      const locations = await this.prisma.$queryRawUnsafe<
+        { id: bigint; latitude: number; longitude: number }[]
+      >(
+        `
+        SELECT 
+          id,
+          ST_Y(location::geometry) as latitude,
+          ST_X(location::geometry) as longitude
+        FROM bookings 
+        WHERE id = ANY($1::bigint[]) AND location IS NOT NULL
+      `,
+        bookingIds,
+      );
+
+      for (const loc of locations) {
+        locationMap.set(loc.id.toString(), {
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+        });
+      }
+    }
+
     return {
-      bookings: bookings.map((b: any) => ({
-        id: b.id.toString(),
-        code: b.code,
-        status: b.status,
-        scheduledAt: b.scheduledAt,
-        addressText: b.addressText,
-        latitude: b.location ? (b.location as any).y : null,
-        longitude: b.location ? (b.location as any).x : null,
-        estimatedPrice: b.estimatedPrice?.toString(),
-        actualPrice: b.actualPrice?.toString(),
-        service: {
-          id: b.service.id,
-          name: b.service.name,
-        },
-        customer: {
-          id: b.customer.id.toString(),
-          fullName: b.customer.profile?.fullName,
-          avatarUrl: b.customer.profile?.avatarUrl,
-        },
-        provider: b.providerUser
-          ? {
-              id: b.providerUser.id.toString(),
-              fullName: b.providerUser.profile?.fullName,
-              avatarUrl: b.providerUser.profile?.avatarUrl,
-            }
-          : null,
-        offersCount: b._count?.bookingOffers || 0,
-      })),
+      bookings: bookings.map((b: any) => {
+        const loc = locationMap.get(b.id.toString());
+        return {
+          id: b.id.toString(),
+          code: b.code,
+          status: b.status,
+          scheduledAt: b.scheduledAt,
+          addressText: b.addressText,
+          latitude: loc?.latitude ?? null,
+          longitude: loc?.longitude ?? null,
+          estimatedPrice: b.estimatedPrice?.toString(),
+          actualPrice: b.actualPrice?.toString(),
+          service: {
+            id: b.service.id,
+            name: b.service.name,
+          },
+          customer: {
+            id: b.customer.id.toString(),
+            fullName: b.customer.profile?.fullName,
+            avatarUrl: b.customer.profile?.avatarUrl,
+          },
+          provider: b.providerUser
+            ? {
+                id: b.providerUser.id.toString(),
+                fullName: b.providerUser.profile?.fullName,
+                avatarUrl: b.providerUser.profile?.avatarUrl,
+              }
+            : null,
+          offersCount: b._count?.bookingOffers || 0,
+        };
+      }),
       meta: {
         total,
         page,
@@ -1044,6 +1091,7 @@ export class BookingsService {
         id: updated.id.toString(),
         status: updated.status,
         message: 'Booking accepted',
+        customerId: booking.customerId.toString(),
       };
     });
   }
@@ -1086,6 +1134,7 @@ export class BookingsService {
         id: updated.id.toString(),
         status: updated.status,
         message: 'Service started',
+        customerId: booking.customerId.toString(),
       };
     });
   }
@@ -1132,6 +1181,7 @@ export class BookingsService {
         id: updated.id.toString(),
         status: updated.status,
         message: 'Đã đánh dấu hoàn thành. Đang chờ khách hàng xác nhận.',
+        customerId: booking.customerId.toString(),
       };
     });
   }
@@ -1182,6 +1232,7 @@ export class BookingsService {
         status: updated.status,
         message: 'Công việc đã hoàn thành. Vui lòng đánh giá dịch vụ.',
         canReview: true,
+        providerId: booking.providerId ? booking.providerId.toString() : null,
       };
     });
   }

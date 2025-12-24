@@ -27,13 +27,17 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ChatGateway } from '../conversations/chat.gateway';
 
 @ApiTags('Bookings')
 @Controller('bookings')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class BookingsController {
-  constructor(private bookingsService: BookingsService) {}
+  constructor(
+    private bookingsService: BookingsService,
+    private chatGateway: ChatGateway,
+  ) {}
 
   @Post('estimate')
   @ApiOperation({ summary: 'Estimate booking price' })
@@ -51,8 +55,9 @@ export class BookingsController {
 
     // Notify nearby providers
     if (result.nearbyProviderIds && result.nearbyProviderIds.length > 0) {
-      // In a real app, inject SocketGateway and call notifyProviders
-      // this.socketGateway.notifyProviders(result.nearbyProviderIds, 'new_booking_request', result);
+      for (const providerId of result.nearbyProviderIds) {
+        this.chatGateway.notifyUser(providerId, 'booking.new_request', result);
+      }
     }
 
     return result;
@@ -126,11 +131,22 @@ export class BookingsController {
     @Param('id', ParseIntPipe) id: number,
     @Param('providerId', ParseIntPipe) providerId: number,
   ) {
-    return this.bookingsService.selectProvider(
+    const result = await this.bookingsService.selectProvider(
       BigInt(user.userId),
       BigInt(id),
       BigInt(providerId),
     );
+
+    // Notify provider
+    if (result.providerId) {
+      this.chatGateway.notifyUser(
+        result.providerId,
+        'booking.accepted',
+        result,
+      );
+    }
+
+    return result;
   }
 
   @Patch(':id/confirm-completion')
@@ -140,10 +156,20 @@ export class BookingsController {
     @CurrentUser() user: any,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    return this.bookingsService.confirmCompletion(
+    const result = await this.bookingsService.confirmCompletion(
       BigInt(user.userId),
       BigInt(id),
     );
+
+    if (result.providerId) {
+      this.chatGateway.notifyUser(
+        result.providerId,
+        'booking.confirmed',
+        result,
+      );
+    }
+
+    return result;
   }
 
   @Patch(':id/dispute')
@@ -168,7 +194,10 @@ export class BookingsController {
 @Roles('provider')
 @ApiBearerAuth()
 export class ProviderBookingsController {
-  constructor(private bookingsService: BookingsService) {}
+  constructor(
+    private bookingsService: BookingsService,
+    private chatGateway: ChatGateway,
+  ) {}
 
   @Get('requests')
   @ApiOperation({
@@ -199,10 +228,16 @@ export class ProviderBookingsController {
     @CurrentUser() user: any,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    return this.bookingsService.acceptBookingRequest(
+    const result = await this.bookingsService.acceptBookingRequest(
       BigInt(user.userId),
       BigInt(id),
     );
+
+    if (result.customerId) {
+      this.chatGateway.notifyUser(result.customerId, 'booking.new_offer', result);
+    }
+
+    return result;
   }
 
   @Patch(':id/accept')
@@ -212,7 +247,19 @@ export class ProviderBookingsController {
     @CurrentUser() user: any,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    return this.bookingsService.acceptBooking(BigInt(user.userId), BigInt(id));
+    const result = await this.bookingsService.acceptBooking(
+      BigInt(user.userId),
+      BigInt(id),
+    );
+
+    if (result.customerId) {
+      this.chatGateway.notifyUser(
+        result.customerId,
+        'booking.accepted_legacy',
+        result,
+      );
+    }
+    return result;
   }
 
   @Patch(':id/start')
@@ -222,7 +269,14 @@ export class ProviderBookingsController {
     @CurrentUser() user: any,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    return this.bookingsService.startBooking(BigInt(user.userId), BigInt(id));
+    const result = await this.bookingsService.startBooking(
+      BigInt(user.userId),
+      BigInt(id),
+    );
+    if (result.customerId) {
+      this.chatGateway.notifyUser(result.customerId, 'booking.started', result);
+    }
+    return result;
   }
 
   @Patch(':id/complete')
@@ -232,9 +286,13 @@ export class ProviderBookingsController {
     @CurrentUser() user: any,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    return this.bookingsService.completeBooking(
+    const result = await this.bookingsService.completeBooking(
       BigInt(user.userId),
       BigInt(id),
     );
+    if (result.customerId) {
+      this.chatGateway.notifyUser(result.customerId, 'booking.completed', result);
+    }
+    return result;
   }
 }

@@ -171,4 +171,92 @@ class FavoritesDataSource {
     final favorites = await getFavorites();
     return favorites.map((f) => f.serviceId).toSet();
   }
+
+  // ========== PROVIDER FAVORITES ==========
+
+  /// Get favorite providers with pagination
+  Future<Map<String, dynamic>> getFavoriteProviders({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/users/me/favorites/providers',
+        queryParameters: {'page': page, 'limit': limit},
+      );
+
+      var data = response.data;
+      if (data is Map && data.containsKey('data')) {
+        data = data['data'];
+      }
+
+      return {
+        'providers': (data['providers'] as List?) ?? [],
+        'total': data['total'] ?? 0,
+        'page': data['page'] ?? page,
+        'limit': data['limit'] ?? limit,
+      };
+    } catch (e) {
+      print('[FavoritesDataSource] Error getting favorite providers: $e');
+      return {'providers': [], 'total': 0, 'page': page, 'limit': limit};
+    }
+  }
+
+  /// Check if a provider is in favorites
+  Future<bool> checkFavoriteProvider(int providerId) async {
+    try {
+      final response = await _dio.get(
+        '/users/me/favorites/providers/$providerId/check',
+      );
+
+      var data = response.data;
+      if (data is Map && data.containsKey('data')) {
+        data = data['data'];
+      }
+
+      return data['isFavorite'] == true;
+    } catch (e) {
+      print('[FavoritesDataSource] Error checking favorite provider: $e');
+      return false;
+    }
+  }
+
+  /// Add a provider to favorites
+  Future<Map<String, dynamic>> addFavoriteProvider(int providerId) async {
+    try {
+      final response = await _dio.post(
+        '/users/me/favorites/providers',
+        data: {'providerId': providerId},
+      );
+
+      var data = response.data;
+      if (data is Map && data.containsKey('data')) {
+        data = data['data'];
+      }
+
+      return data as Map<String, dynamic>? ?? {};
+    } catch (e) {
+      print('[FavoritesDataSource] Error adding favorite provider: $e');
+      rethrow;
+    }
+  }
+
+  /// Remove a provider from favorites
+  Future<Map<String, dynamic>?> removeFavoriteProvider(int providerId) async {
+    try {
+      final response = await _dio.delete(
+        '/users/me/favorites/providers/$providerId',
+      );
+
+      var data = response.data;
+      if (data is Map && data.containsKey('data')) {
+        data = data['data'];
+      }
+
+      return data as Map<String, dynamic>?;
+    } catch (e) {
+      print('[FavoritesDataSource] Error removing favorite provider: $e');
+      rethrow;
+    }
+  }
 }
