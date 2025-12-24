@@ -41,14 +41,14 @@ class UserShellScreen extends StatelessWidget {
                 AnimatedBottomNavItem(
                   icon: Icons.home_outlined,
                   activeIcon: Icons.home,
-                  label: 'Home',
+                  label: 'Trang chủ',
                   isSelected: navigationShell.currentIndex == 0,
                   onTap: () => _onTap(0),
                 ),
                 AnimatedBottomNavItem(
                   icon: Icons.calendar_today_outlined,
                   activeIcon: Icons.calendar_today,
-                  label: 'Bookings',
+                  label: 'Đơn hàng',
                   isSelected: navigationShell.currentIndex == 1,
                   onTap: () => _onTap(1),
                   badgeCount: 0, // TODO: Get from bloc
@@ -56,7 +56,7 @@ class UserShellScreen extends StatelessWidget {
                 AnimatedBottomNavItem(
                   icon: Icons.favorite_outline,
                   activeIcon: Icons.favorite,
-                  label: 'Favorites',
+                  label: 'Yêu thích',
                   isSelected: navigationShell.currentIndex == 2,
                   onTap: () => _onTap(2),
                   badgeCount: 0, // TODO: Get from favorites bloc
@@ -64,7 +64,7 @@ class UserShellScreen extends StatelessWidget {
                 AnimatedBottomNavItem(
                   icon: Icons.person_outline,
                   activeIcon: Icons.person,
-                  label: 'Profile',
+                  label: 'Hồ sơ',
                   isSelected: navigationShell.currentIndex == 3,
                   onTap: () => _onTap(3),
                 ),

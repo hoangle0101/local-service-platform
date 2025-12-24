@@ -23,6 +23,7 @@ export default function CategoriesPage() {
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
+    code: '',
     slug: '',
     description: '',
     parentId: null as number | null,
@@ -44,6 +45,7 @@ export default function CategoriesPage() {
       setSelectedCategory(category);
       setFormData({
         name: category.name,
+        code: category.code,
         slug: category.slug,
         description: category.description || '',
         parentId: category.parentId,
@@ -53,6 +55,7 @@ export default function CategoriesPage() {
       setSelectedCategory(null);
       setFormData({
         name: '',
+        code: '',
         slug: '',
         description: '',
         parentId: null,
@@ -187,19 +190,31 @@ export default function CategoriesPage() {
                     ...formData,
                     name,
                     slug: name.toLowerCase().replace(/\s+/g, '-'),
+                    code: name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
                   });
                 }}
                 required
               />
             </div>
-            <div>
-              <Label htmlFor="slug">Slug *</Label>
-              <Input
-                id="slug"
-                value={formData.slug}
-                onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                required
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="code">Code *</Label>
+                <Input
+                  id="code"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="slug">Slug *</Label>
+                <Input
+                  id="slug"
+                  value={formData.slug}
+                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                  required
+                />
+              </div>
             </div>
             <div>
               <Label htmlFor="description">Description</Label>

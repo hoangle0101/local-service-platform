@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 import 'dart:async';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/entities/entities.dart';
@@ -14,7 +12,7 @@ import '../../bloc/services/services_bloc.dart';
 import '../../bloc/services/services_event_state.dart';
 import '../../bloc/categories/categories_bloc.dart';
 import '../../bloc/categories/categories_event_state.dart';
-import '../../widgets/payment_method_selector.dart';
+import '../../widgets/minimalist_widgets.dart';
 
 class CompleteBookingScreen extends StatefulWidget {
   const CompleteBookingScreen({super.key});
@@ -24,47 +22,29 @@ class CompleteBookingScreen extends StatefulWidget {
 }
 
 class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
-  final _formKey = GlobalKey<FormState>();
   final _addressController = TextEditingController();
   final _notesController = TextEditingController();
 
-  // Vietnamese address fields
-  final _provinceController = TextEditingController();
-  final _districtController = TextEditingController();
-  final _wardController = TextEditingController();
-  final _streetController = TextEditingController();
-  final _houseNumberController = TextEditingController();
-  bool _useManualAddress = false;
-
-  // Selected items
   Category? _selectedCategory;
-  ProviderService? _selectedService;
+  Service? _selectedGenericService;
+  ProviderService? _selectedProvider;
+  int _currentStep = 1;
 
-  // Date and time
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = const TimeOfDay(hour: 9, minute: 0);
 
-  // Location
+  bool _useGPS = true;
   double _latitude = 21.0285;
   double _longitude = 105.8542;
-  bool _isLoadingLocation = false;
 
-  bool _isSubmitting = false;
-
-  // Track Asia autocomplete
   final TrackAsiaDataSource _trackAsiaDataSource = TrackAsiaDataSource();
   List<AddressPrediction> _addressPredictions = [];
   Timer? _debounceTimer;
   bool _showPredictions = false;
-  bool _isSearching = false;
-
-  // Payment method
-  String _selectedPaymentMethod = 'COD';
 
   @override
   void initState() {
     super.initState();
-    // Load categories and services
     context.read<CategoriesBloc>().add(LoadCategories());
     context.read<ServicesBloc>().add(const LoadServices());
   }
@@ -73,20 +53,13 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
   void dispose() {
     _addressController.dispose();
     _notesController.dispose();
-    _provinceController.dispose();
-    _districtController.dispose();
-    _wardController.dispose();
-    _streetController.dispose();
-    _houseNumberController.dispose();
     _debounceTimer?.cancel();
     super.dispose();
   }
 
-  /// Search for addresses using Track Asia API
   void _onAddressSearch(String query) {
     _debounceTimer?.cancel();
-
-    if (query.length < 2) {
+    if (query.length < 3) {
       setState(() {
         _addressPredictions = [];
         _showPredictions = false;
@@ -94,294 +67,37 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
       return;
     }
 
-    setState(() => _isSearching = true);
-
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+    _debounceTimer = Timer(const Duration(milliseconds: 400), () async {
       try {
         final predictions = await _trackAsiaDataSource.searchAddress(query);
         if (mounted) {
           setState(() {
             _addressPredictions = predictions;
             _showPredictions = predictions.isNotEmpty;
-            _isSearching = false;
           });
         }
       } catch (e) {
-        print('[CompleteBooking] Search error: $e');
-        if (mounted) {
-          setState(() {
-            _isSearching = false;
-            _showPredictions = false;
-          });
-        }
+        debugPrint('[CompleteBooking] Address search error: $e');
       }
     });
   }
 
-  /// Select an address prediction and fetch GPS coordinates
-  Future<void> _onPredictionSelected(AddressPrediction prediction) async {
-    setState(() {
-      _addressController.text = prediction.formattedAddress;
-      _showPredictions = false;
-      _addressPredictions = [];
-      _isLoadingLocation = true;
-    });
-
+  Future<void> _selectAddress(AddressPrediction prediction) async {
+    setState(() => _showPredictions = false);
     try {
       final detail =
           await _trackAsiaDataSource.getPlaceDetail(prediction.placeId);
-      if (detail != null && mounted) {
+      if (mounted && detail != null) {
+        final fullAddress = FullAddress.fromPlaceDetail(detail);
         setState(() {
-          _latitude = detail.latitude;
-          _longitude = detail.longitude;
-          _isLoadingLocation = false;
+          _addressController.text = fullAddress.displayText;
+          _latitude = fullAddress.latitude;
+          _longitude = fullAddress.longitude;
         });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                      'Đã lấy tọa độ: ${_latitude.toStringAsFixed(4)}, ${_longitude.toStringAsFixed(4)}'),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else if (mounted) {
-        setState(() => _isLoadingLocation = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Không thể lấy tọa độ từ địa chỉ này'),
-            backgroundColor: Colors.orange,
-          ),
-        );
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingLocation = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      debugPrint('[CompleteBooking] Place detail error: $e');
     }
-  }
-
-  /// Geocode manual Vietnamese address to get GPS coordinates
-  Future<void> _geocodeManualAddress() async {
-    if (_houseNumberController.text.isEmpty &&
-        _streetController.text.isEmpty &&
-        _wardController.text.isEmpty &&
-        _districtController.text.isEmpty &&
-        _provinceController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng nhập ít nhất một trường địa chỉ'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isLoadingLocation = true);
-
-    try {
-      // Build full address string for geocoding
-      String fullAddress = [
-        _houseNumberController.text,
-        _streetController.text,
-        _wardController.text,
-        _districtController.text,
-        _provinceController.text,
-        'Việt Nam',
-      ].where((s) => s.isNotEmpty).join(', ');
-
-      // Update the address field
-      _addressController.text = fullAddress;
-
-      // Geocode the address
-      List<Location> locations = await locationFromAddress(fullAddress);
-
-      if (locations.isNotEmpty) {
-        setState(() {
-          _latitude = locations.first.latitude;
-          _longitude = locations.first.longitude;
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Text(
-                      'Đã tìm thấy tọa độ: ${_latitude.toStringAsFixed(4)}, ${_longitude.toStringAsFixed(4)}'),
-                ],
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } else {
-        // Use default location if geocoding fails
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Không tìm thấy tọa độ, sử dụng vị trí mặc định'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi khi tìm tọa độ: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoadingLocation = false);
-      }
-    }
-  }
-
-  Future<void> _getCurrentLocation() async {
-    setState(() => _isLoadingLocation = true);
-
-    try {
-      // Check if location services are enabled
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content:
-                  Text('Location services are disabled. Please enable them.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        _useDefaultLocation();
-        return;
-      }
-
-      // Check permission
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content:
-                    Text('Location permission denied. Using default location.'),
-                backgroundColor: Colors.orange,
-              ),
-            );
-          }
-          _useDefaultLocation();
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'Location permission permanently denied. Using default location.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        _useDefaultLocation();
-        return;
-      }
-
-      // Get current position
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      setState(() {
-        _latitude = position.latitude;
-        _longitude = position.longitude;
-      });
-
-      // Get address from coordinates
-      try {
-        List<Placemark> placemarks = await placemarkFromCoordinates(
-          position.latitude,
-          position.longitude,
-        );
-
-        if (placemarks.isNotEmpty) {
-          Placemark place = placemarks.first;
-          String address = [
-            place.street,
-            place.subLocality,
-            place.locality,
-            place.administrativeArea,
-            place.country,
-          ].where((s) => s != null && s.isNotEmpty).join(', ');
-
-          _addressController.text = address;
-        }
-      } catch (e) {
-        _addressController.text =
-            'Lat: ${_latitude.toStringAsFixed(4)}, Lng: ${_longitude.toStringAsFixed(4)}';
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Text('Location updated successfully!'),
-              ],
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error getting location: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      _useDefaultLocation();
-    } finally {
-      if (mounted) {
-        setState(() => _isLoadingLocation = false);
-      }
-    }
-  }
-
-  void _useDefaultLocation() {
-    setState(() {
-      _latitude = 21.0285;
-      _longitude = 105.8542;
-      _addressController.text = 'Hoàn Kiếm, Hà Nội, Việt Nam';
-      _isLoadingLocation = false;
-    });
   }
 
   @override
@@ -389,340 +105,555 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
     return BlocListener<BookingsBloc, BookingsState>(
       listener: (context, state) {
         if (state is BookingCreated) {
-          setState(() => _isSubmitting = false);
-          _showSuccessDialog(state);
-        } else if (state is BookingsError) {
-          setState(() => _isSubmitting = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message), backgroundColor: Colors.red),
-          );
+          context.go('/user/bookings');
         }
       },
       child: Scaffold(
-        backgroundColor: AppColors.backgroundPrimary,
-        appBar: AppBar(
-          title: const Text('Create New Booking'),
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
-          elevation: 0,
+        backgroundColor: AppColors.background,
+        body: Container(
+          color: AppColors.background,
+          child: CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              _buildAppBar(),
+              SliverPadding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    _buildStepIndicator(),
+                    const SizedBox(height: 32),
+                    if (_currentStep == 1) ...[
+                      _buildSectionLabel('1. CHỌN LOẠI DỊCH VỤ'),
+                      const SizedBox(height: 16),
+                      _buildCategorySelector(),
+                      const SizedBox(height: 24),
+                      _buildServiceSelector(),
+                    ] else if (_currentStep == 2) ...[
+                      _buildSectionLabel('2. CHỌN THỢ XUNG QUANH'),
+                      const SizedBox(height: 16),
+                      _buildNearbyProvidersSection(),
+                    ] else ...[
+                      _buildSectionLabel('3. THÔNG TIN CHI TIẾT'),
+                      const SizedBox(height: 16),
+                      _buildDateTimeSection(),
+                      const SizedBox(height: 32),
+                      _buildSectionLabel('4. ĐỊA CHỈ LÀM VIỆC'),
+                      const SizedBox(height: 16),
+                      _buildAddressSection(),
+                      const SizedBox(height: 32),
+                      _buildNotesSection(),
+                      const SizedBox(height: 32),
+                      _buildSectionLabel('5. TÓM TẮT CHI PHÍ'),
+                      const SizedBox(height: 16),
+                      _buildPriceSummary(),
+                    ],
+                    const SizedBox(height: 100),
+                  ]),
+                ),
+              ),
+            ],
+          ),
         ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSectionTitle('1. Select Category', Icons.category),
-                const SizedBox(height: 12),
-                _buildCategorySelector(),
-                const SizedBox(height: 24),
-                _buildSectionTitle(
-                    '2. Select Service', Icons.home_repair_service),
-                const SizedBox(height: 12),
-                _buildServiceSelector(),
-                const SizedBox(height: 24),
-                _buildSectionTitle(
-                    '3. Choose Date & Time', Icons.calendar_today),
-                const SizedBox(height: 12),
-                _buildDateTimeSelector(),
-                const SizedBox(height: 24),
-                _buildSectionTitle('4. Your Location', Icons.location_on),
-                const SizedBox(height: 12),
-                _buildLocationInput(),
-                const SizedBox(height: 24),
-                _buildSectionTitle('5. Additional Notes', Icons.note_alt),
-                const SizedBox(height: 12),
-                _buildNotesInput(),
-                const SizedBox(height: 24),
-                _buildSectionTitle('6. Phương thức thanh toán', Icons.payment),
-                const SizedBox(height: 12),
-                _buildPaymentMethodSelector(),
-                const SizedBox(height: 24),
-                _buildPriceSummary(),
-                const SizedBox(height: 24),
-                _buildSubmitButton(),
-                const SizedBox(height: 24),
-              ],
+        bottomNavigationBar: _buildBottomBar(),
+      ),
+    );
+  }
+
+  Widget _buildStepIndicator() {
+    return Row(
+      children: [
+        _buildStepItem(1, 'Dịch vụ', _currentStep >= 1),
+        _buildStepDivider(),
+        _buildStepItem(2, 'Chọn thợ', _currentStep >= 2),
+        _buildStepDivider(),
+        _buildStepItem(3, 'Đặt lịch', _currentStep >= 3),
+      ],
+    );
+  }
+
+  Widget _buildStepItem(int step, String label, bool isActive) {
+    return Column(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color:
+                isActive ? AppColors.primary : AppColors.shelf.withOpacity(0.3),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              step.toString(),
+              style: TextStyle(
+                color: isActive ? AppColors.white : AppColors.textTertiary,
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+              ),
             ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(
+            color: isActive ? AppColors.textPrimary : AppColors.textTertiary,
+            fontWeight: isActive ? FontWeight.w900 : FontWeight.w700,
+            fontSize: 11,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStepDivider() {
+    return Expanded(
+      child: Container(
+        height: 2,
+        margin: const EdgeInsets.only(bottom: 24, left: 12, right: 12),
+        color: AppColors.shelf.withOpacity(0.2),
+      ),
+    );
+  }
+
+  Widget _buildBottomBar() {
+    String text = 'TIẾP TỤC';
+    VoidCallback? onPressed;
+
+    if (_currentStep == 1 && _selectedGenericService != null) {
+      onPressed = () {
+        setState(() => _currentStep = 2);
+        _fetchNearbyProviders();
+      };
+    } else if (_currentStep == 2 && _selectedProvider != null) {
+      onPressed = () => setState(() => _currentStep = 3);
+    } else if (_currentStep == 3) {
+      text = 'XÁC NHẬN ĐẶT LỊCH';
+      onPressed = _submitBooking;
+    }
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+          24, 16, 24, 16 + MediaQuery.of(context).padding.bottom),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 20,
+              offset: const Offset(0, -5))
+        ],
+      ),
+      child: MinButton(
+        text: text,
+        onPressed: onPressed,
+      ),
+    );
+  }
+
+  void _fetchNearbyProviders() {
+    if (_selectedGenericService != null) {
+      context.read<ServicesBloc>().add(SearchNearbyProviders(
+            serviceId: _selectedGenericService!.id,
+            latitude: _latitude,
+            longitude: _longitude,
+          ));
+    }
+  }
+
+  Widget _buildAppBar() {
+    return SliverAppBar(
+      pinned: true,
+      expandedHeight: 120,
+      backgroundColor: AppColors.background,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      automaticallyImplyLeading: false,
+      flexibleSpace: FlexibleSpaceBar(
+        background: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 64, 24, 0),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () => context.pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded,
+                      size: 18, color: AppColors.textPrimary),
+                ),
+              ),
+              const SizedBox(width: 20),
+              const Text(
+                'Đặt lịch dịch vụ',
+                style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.5),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, color: AppColors.primary, size: 20),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
+  Widget _buildSectionLabel(String label) {
+    return Text(
+      label,
+      style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          color: AppColors.textTertiary,
+          letterSpacing: 1.2),
     );
   }
 
   Widget _buildCategorySelector() {
     return BlocBuilder<CategoriesBloc, CategoriesState>(
       builder: (context, state) {
-        if (state is CategoriesLoading) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (state is CategoriesLoaded) {
-          return Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: DropdownButtonFormField<Category>(
-              value: _selectedCategory,
-              decoration: const InputDecoration(
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                border: InputBorder.none,
-                hintText: 'Choose a category',
-              ),
-              items: state.categories.map((category) {
-                return DropdownMenuItem(
-                  value: category,
-                  child: Row(
-                    children: [
-                      Icon(_getCategoryIcon(category.code),
-                          size: 20, color: AppColors.primary),
-                      const SizedBox(width: 12),
-                      Text(category.name),
-                    ],
+        if (state is CategoriesLoaded) {
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: state.categories.map((cat) {
+                final isSelected = _selectedCategory?.id == cat.id;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: GestureDetector(
+                    onTap: () => setState(() {
+                      _selectedCategory = cat;
+                      _selectedGenericService = null;
+                      _selectedProvider = null;
+                      context
+                          .read<ServicesBloc>()
+                          .add(LoadGenericServices(categoryId: cat.id));
+                    }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.primary : AppColors.white,
+                        borderRadius: BorderRadius.circular(100),
+                        border: Border.all(
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.divider.withOpacity(0.5)),
+                      ),
+                      child: Text(
+                        cat.name,
+                        style: TextStyle(
+                          color:
+                              isSelected ? Colors.white : AppColors.textPrimary,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
                   ),
                 );
               }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedCategory = value;
-                  _selectedService =
-                      null; // Reset service when category changes
-                });
-              },
-              validator: (value) =>
-                  value == null ? 'Please select a category' : null,
             ),
           );
         }
-        return const Text('Failed to load categories');
+        return const SizedBox(
+            height: 50, child: Center(child: CircularProgressIndicator()));
       },
+    );
+  }
+
+  Widget _buildToggleOption({
+    required String title,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isActive ? AppColors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(100),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                        color: Colors.black.withOpacity(0.05), blurRadius: 10)
+                  ]
+                : null,
+          ),
+          child: Center(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 13,
+                color:
+                    isActive ? AppColors.textPrimary : AppColors.textTertiary,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
   Widget _buildServiceSelector() {
+    if (_selectedCategory == null) {
+      return MinCard(
+        backgroundColor: AppColors.shelf.withOpacity(0.3),
+        child: const Center(
+          child: Text('Vui lòng chọn danh mục trước',
+              style: TextStyle(
+                  color: AppColors.textTertiary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700)),
+        ),
+      );
+    }
+
     return BlocBuilder<ServicesBloc, ServicesState>(
       builder: (context, state) {
-        if (state is ServicesLoading) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (state is ServicesLoaded) {
-          // Filter services by selected category
-          final filteredServices = _selectedCategory != null
-              ? state.services
-                  .where((s) => s.service.categoryId == _selectedCategory!.id)
-                  .toList()
-              : state.services;
-
-          if (filteredServices.isEmpty) {
-            return Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Center(
-                child: Text(
-                  'No services available for this category',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ),
-            );
+        if (state is GenericServicesLoaded) {
+          if (state.services.isEmpty) {
+            return const Center(
+                child: Text('Không có loại dịch vụ nào trong danh mục này',
+                    style: TextStyle(fontSize: 13)));
           }
-
           return Column(
-            children: filteredServices.map((service) {
-              final isSelected =
-                  _selectedService?.serviceId == service.serviceId;
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: isSelected ? AppColors.primary : Colors.transparent,
-                    width: 2,
-                  ),
-                ),
-                child: InkWell(
-                  onTap: () => setState(() => _selectedService = service),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color:
-                                AppColors.primaryLight.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.home_repair_service,
-                              color: AppColors.primary),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                service.service.name,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold),
-                              ),
-                              Text(
-                                service.provider.displayName,
-                                style: TextStyle(
-                                    color: Colors.grey.shade600, fontSize: 12),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              NumberFormat.currency(
-                                      locale: 'vi_VN', symbol: '₫')
-                                  .format(service.price),
-                              style: const TextStyle(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Row(
-                              children: [
-                                const Icon(Icons.star,
-                                    size: 14, color: Colors.amber),
-                                Text(
-                                  ' ${service.provider.ratingAvg.toStringAsFixed(1)}',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        if (isSelected) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.check,
-                                color: Colors.white, size: 16),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
+            children:
+                state.services.map((s) => _buildGenericServiceCard(s)).toList(),
           );
         }
-        return const Text('Failed to load services');
+        return const Center(child: CircularProgressIndicator());
       },
     );
   }
 
-  Widget _buildDateTimeSelector() {
+  Widget _buildNearbyProvidersSection() {
+    return BlocBuilder<ServicesBloc, ServicesState>(
+      builder: (context, state) {
+        if (state is ServicesLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (state is ServicesLoaded) {
+          if (state.services.isEmpty) {
+            return Center(
+              child: Column(
+                children: [
+                  const SizedBox(height: 32),
+                  Icon(Icons.person_off_rounded,
+                      size: 48, color: AppColors.textTertiary.withOpacity(0.3)),
+                  const SizedBox(height: 16),
+                  const Text('Không tìm thấy thợ nào ở gần bạn',
+                      style: TextStyle(
+                          color: AppColors.textTertiary, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  const Text('Vui lòng thử lại với dịch vụ hoặc vị trí khác',
+                      style: TextStyle(
+                          color: AppColors.textTertiary, fontSize: 12)),
+                ],
+              ),
+            );
+          }
+          return Column(
+            children: state.services.map((s) => _buildProviderCard(s)).toList(),
+          );
+        }
+        if (state is ServicesError) {
+          return Center(child: Text('Lỗi: ${state.message}'));
+        }
+        return const SizedBox();
+      },
+    );
+  }
+
+  Widget _buildProviderCard(ProviderService s) {
+    final isSelected = _selectedProvider?.providerUserId == s.providerUserId;
+    final distanceKm = (s.distance ?? 0) / 1000;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: MinCard(
+        onTap: () => setState(() => _selectedProvider = s),
+        backgroundColor:
+            isSelected ? AppColors.primary.withOpacity(0.05) : AppColors.white,
+        border: isSelected
+            ? const BorderSide(color: AppColors.primary, width: 2)
+            : null,
+        child: Row(
+          children: [
+            _buildAvatar(s.provider.avatarUrl),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(s.provider.displayName,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w900, fontSize: 15)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.star_rounded,
+                          color: Colors.amber, size: 14),
+                      const SizedBox(width: 4),
+                      Text(s.provider.rating?.toStringAsFixed(1) ?? 'N/A',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w900, fontSize: 12)),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.location_on_rounded,
+                          color: AppColors.textTertiary, size: 14),
+                      const SizedBox(width: 2),
+                      Text('${distanceKm.toStringAsFixed(1)} km',
+                          style: const TextStyle(
+                              color: AppColors.textTertiary, fontSize: 12)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            _buildPriceText(s.price),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvatar(String? url) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: AppColors.shelf.withOpacity(0.2),
+        shape: BoxShape.circle,
+        image: url != null
+            ? DecorationImage(image: NetworkImage(url), fit: BoxFit.cover)
+            : null,
+      ),
+      child: url == null
+          ? const Icon(Icons.person_rounded, color: AppColors.textTertiary)
+          : null,
+    );
+  }
+
+  Widget _buildGenericServiceCard(Service s) {
+    final isSelected = _selectedGenericService?.id == s.id;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: MinCard(
+        onTap: () => setState(() {
+          _selectedGenericService = s;
+          _selectedProvider = null;
+        }),
+        backgroundColor:
+            isSelected ? AppColors.primary.withOpacity(0.05) : AppColors.white,
+        border: isSelected
+            ? const BorderSide(color: AppColors.primary, width: 2)
+            : null,
+        child: Row(
+          children: [
+            _buildServiceIcon(),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(s.name,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w900, fontSize: 15)),
+                  Text(s.description ?? 'Dịch vụ chuyên nghiệp',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: AppColors.textTertiary, fontSize: 12)),
+                ],
+              ),
+            ),
+            if (s.basePrice > 0) _buildPriceText(s.basePrice),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildServiceIcon() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+          color: AppColors.primary.withOpacity(0.1), shape: BoxShape.circle),
+      child: const Icon(Icons.star_rounded, color: AppColors.primary, size: 20),
+    );
+  }
+
+  Widget _buildPriceText(double price) {
+    return Text(
+      NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
+          .format(price)
+          .replaceAll(',00', ''),
+      style: const TextStyle(
+          fontWeight: FontWeight.w900, color: AppColors.primary),
+    );
+  }
+
+  Widget _buildDateTimeSection() {
+    final dateFormat = DateFormat('dd/MM/yyyy');
     return Row(
       children: [
         Expanded(
-          child: InkWell(
+          child: MinCard(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             onTap: () async {
               final date = await showDatePicker(
                 context: context,
                 initialDate: _selectedDate,
                 firstDate: DateTime.now(),
-                lastDate: DateTime.now().add(const Duration(days: 60)),
+                lastDate: DateTime.now().add(const Duration(days: 30)),
               );
-              if (date != null) {
-                setState(() => _selectedDate = date);
-              }
+              if (date != null) setState(() => _selectedDate = date);
             },
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.calendar_today, color: AppColors.primary),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Date',
-                          style: TextStyle(color: Colors.grey, fontSize: 12)),
-                      Text(
-                        DateFormat('EEE, dd MMM').format(_selectedDate),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_today_rounded,
+                    size: 16, color: AppColors.primary),
+                const SizedBox(width: 12),
+                Text(dateFormat.format(_selectedDate),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 13)),
+              ],
             ),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: InkWell(
+          child: MinCard(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             onTap: () async {
               final time = await showTimePicker(
-                context: context,
-                initialTime: _selectedTime,
-              );
-              if (time != null) {
-                setState(() => _selectedTime = time);
-              }
+                  context: context, initialTime: _selectedTime);
+              if (time != null) setState(() => _selectedTime = time);
             },
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.access_time, color: AppColors.primary),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Time',
-                          style: TextStyle(color: Colors.grey, fontSize: 12)),
-                      Text(
-                        _selectedTime.format(context),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            child: Row(
+              children: [
+                const Icon(Icons.access_time_rounded,
+                    size: 16, color: AppColors.primary),
+                const SizedBox(width: 12),
+                Text(_selectedTime.format(context),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 13)),
+              ],
             ),
           ),
         ),
@@ -730,525 +661,101 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
     );
   }
 
-  Widget _buildLocationInput() {
+  Widget _buildAddressSection() {
     return Column(
       children: [
-        // Toggle between GPS and Manual address
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade300),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _useManualAddress = false),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: !_useManualAddress
-                          ? AppColors.primary
-                          : Colors.transparent,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(11),
-                        bottomLeft: Radius.circular(11),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.my_location,
-                            size: 18,
-                            color: !_useManualAddress
-                                ? Colors.white
-                                : Colors.grey),
-                        const SizedBox(width: 6),
-                        Text('GPS',
-                            style: TextStyle(
-                              color: !_useManualAddress
-                                  ? Colors.white
-                                  : Colors.grey,
-                              fontWeight: FontWeight.w600,
-                            )),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _useManualAddress = true),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: _useManualAddress
-                          ? AppColors.primary
-                          : Colors.transparent,
-                      borderRadius: const BorderRadius.only(
-                        topRight: Radius.circular(11),
-                        bottomRight: Radius.circular(11),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.edit_location_alt,
-                            size: 18,
-                            color:
-                                _useManualAddress ? Colors.white : Colors.grey),
-                        const SizedBox(width: 6),
-                        Text('Nhập thủ công',
-                            style: TextStyle(
-                              color: _useManualAddress
-                                  ? Colors.white
-                                  : Colors.grey,
-                              fontWeight: FontWeight.w600,
-                            )),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+        MinTextField(
+          controller: _addressController,
+          hint: _useGPS
+              ? 'Vị trí hiện tại của bạn...'
+              : 'Nhập địa chỉ nhà, số phòng...',
+          prefixIcon: const Icon(Icons.location_on_rounded,
+              color: AppColors.primary, size: 22),
+          onChanged: _onAddressSearch,
         ),
-        const SizedBox(height: 12),
-
-        // Track Asia Autocomplete or GPS Option
-        if (!_useManualAddress) ...[
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextFormField(
-                controller: _addressController,
-                onChanged: _onAddressSearch,
-                onTap: () {
-                  if (_addressController.text.length >= 2) {
-                    _onAddressSearch(_addressController.text);
-                  }
-                },
-                decoration: InputDecoration(
-                  hintText: 'Nhập địa chỉ để tìm kiếm...',
-                  helperText: 'Sử dụng Track Asia API cho địa chỉ Việt Nam',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _isSearching || _isLoadingLocation
-                      ? const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : _addressController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                setState(() {
-                                  _addressController.clear();
-                                  _addressPredictions = [];
-                                  _showPredictions = false;
-                                });
-                              },
-                            )
-                          : null,
-                ),
-                validator: (value) {
-                  if (!_useManualAddress && (value == null || value.isEmpty)) {
-                    return 'Vui lòng nhập địa chỉ';
-                  }
-                  return null;
-                },
-              ),
-
-              // Autocomplete suggestions dropdown
-              if (_showPredictions && _addressPredictions.isNotEmpty)
-                Container(
-                  margin: const EdgeInsets.only(top: 4),
-                  constraints: const BoxConstraints(maxHeight: 200),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade300),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    padding: EdgeInsets.zero,
-                    itemCount: _addressPredictions.length,
-                    separatorBuilder: (_, __) =>
-                        Divider(height: 1, color: Colors.grey.shade200),
-                    itemBuilder: (context, index) {
-                      final prediction = _addressPredictions[index];
-                      return ListTile(
-                        dense: true,
-                        leading: const Icon(Icons.location_on,
-                            color: AppColors.primary, size: 20),
-                        title: Text(
-                          prediction.mainText.isNotEmpty
-                              ? prediction.mainText
-                              : prediction.description,
-                          style: const TextStyle(fontWeight: FontWeight.w500),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(
-                          prediction.secondaryText,
-                          style: TextStyle(
-                              fontSize: 12, color: Colors.grey.shade600),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        onTap: () => _onPredictionSelected(prediction),
-                      );
-                    },
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _isLoadingLocation ? null : _getCurrentLocation,
-                  icon: const Icon(Icons.gps_fixed, size: 18),
-                  label: const Text('GPS hiện tại'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey.shade600,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(0, 44),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-
-        // Manual Address Option
-        if (_useManualAddress) ...[
-          // Province/City
-          TextFormField(
-            controller: _provinceController,
-            decoration: InputDecoration(
-              labelText: 'Tỉnh/Thành phố *',
-              hintText: 'VD: Hà Nội, Hồ Chí Minh...',
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey.shade300),
-              ),
-              prefixIcon: const Icon(Icons.location_city),
+        if (!_useGPS && _showPredictions && _addressPredictions.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.divider.withOpacity(0.3)),
             ),
-            validator: (value) {
-              if (_useManualAddress && (value == null || value.isEmpty)) {
-                return 'Vui lòng nhập tỉnh/thành phố';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 10),
-
-          // District
-          TextFormField(
-            controller: _districtController,
-            decoration: InputDecoration(
-              labelText: 'Quận/Huyện *',
-              hintText: 'VD: Cầu Giấy, Quận 1...',
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey.shade300),
-              ),
-              prefixIcon: const Icon(Icons.apartment),
-            ),
-            validator: (value) {
-              if (_useManualAddress && (value == null || value.isEmpty)) {
-                return 'Vui lòng nhập quận/huyện';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 10),
-
-          // Ward
-          TextFormField(
-            controller: _wardController,
-            decoration: InputDecoration(
-              labelText: 'Phường/Xã',
-              hintText: 'VD: Dịch Vọng Hậu, Phường 5...',
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey.shade300),
-              ),
-              prefixIcon: const Icon(Icons.home_work),
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _addressPredictions.length,
+              separatorBuilder: (_, __) =>
+                  Divider(height: 1, color: AppColors.divider.withOpacity(0.2)),
+              itemBuilder: (context, index) {
+                final p = _addressPredictions[index];
+                return ListTile(
+                  title: Text(p.mainText,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800, fontSize: 14)),
+                  subtitle: Text(p.secondaryText,
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.textTertiary)),
+                  onTap: () => _selectAddress(p),
+                );
+              },
             ),
           ),
-          const SizedBox(height: 10),
-
-          // Street and House Number
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: TextFormField(
-                  controller: _streetController,
-                  decoration: InputDecoration(
-                    labelText: 'Tên đường',
-                    hintText: 'VD: Xuân Thủy',
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    prefixIcon: const Icon(Icons.signpost),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextFormField(
-                  controller: _houseNumberController,
-                  decoration: InputDecoration(
-                    labelText: 'Số nhà',
-                    hintText: 'VD: 123',
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Geocode Button
-          ElevatedButton.icon(
-            onPressed: _isLoadingLocation ? null : _geocodeManualAddress,
-            icon: const Icon(Icons.search, size: 18),
-            label: Text(_isLoadingLocation
-                ? 'Đang tìm tọa độ...'
-                : 'Tìm tọa độ GPS từ địa chỉ'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 44),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-        ],
-
-        const SizedBox(height: 8),
-        // GPS Coordinates Display
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.blue.shade50,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.gps_fixed, size: 16, color: Colors.blue.shade700),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'GPS: ${_latitude.toStringAsFixed(6)}, ${_longitude.toStringAsFixed(6)}',
-                  style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
 
-  Widget _buildNotesInput() {
-    return TextFormField(
+  Widget _buildNotesSection() {
+    return MinTextField(
       controller: _notesController,
-      decoration: InputDecoration(
-        hintText: 'Any special instructions or requirements...',
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-      ),
       maxLines: 3,
-    );
-  }
-
-  Widget _buildPaymentMethodSelector() {
-    return PaymentMethodSelector(
-      selectedMethod: _selectedPaymentMethod,
-      onMethodSelected: (method) {
-        setState(() => _selectedPaymentMethod = method);
-      },
+      hint: 'Chỉ dẫn thêm cho người làm...',
+      prefixIcon: const Icon(Icons.note_add_rounded,
+          color: AppColors.primary, size: 22),
     );
   }
 
   Widget _buildPriceSummary() {
-    if (_selectedService == null) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Center(
-          child: Text('Chọn dịch vụ để xem giá',
-              style: TextStyle(color: Colors.grey)),
-        ),
-      );
-    }
-
-    final servicePrice = _selectedService!.price;
-    final platformFee = servicePrice * 0.10; // 10%
-    final totalPrice = servicePrice + platformFee;
+    final double price = _selectedProvider?.price ?? 0;
+    final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primaryLight.withOpacity(0.5),
-            AppColors.primaryLight.withOpacity(0.2),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.divider.withOpacity(0.3)),
       ),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Dịch vụ', style: TextStyle(color: Colors.grey.shade700)),
-              Flexible(
-                child: Text(
-                  _selectedService!.service.name,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                  textAlign: TextAlign.right,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Nhà cung cấp',
-                  style: TextStyle(color: Colors.grey.shade700)),
-              Text(_selectedService!.provider.displayName,
-                  style: const TextStyle(fontWeight: FontWeight.w500)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Thanh toán', style: TextStyle(color: Colors.grey.shade700)),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _selectedPaymentMethod == 'COD'
-                      ? Colors.green.shade100
-                      : const Color(0xFFAE2070).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _selectedPaymentMethod == 'COD' ? 'Tiền mặt' : 'MoMo',
+              const Text('Giá dịch vụ',
                   style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: _selectedPaymentMethod == 'COD'
-                        ? Colors.green.shade700
-                        : const Color(0xFFAE2070),
-                    fontSize: 13,
-                  ),
-                ),
-              ),
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700)),
+              Text(formatter.format(price),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary)),
             ],
           ),
-          const Divider(height: 20),
+          const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Divider(height: 1)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Giá dịch vụ'),
-              Text(
-                NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
-                    .format(servicePrice),
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Phí nền tảng (10%)',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-              Text(
-                NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
-                    .format(platformFee),
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-              ),
-            ],
-          ),
-          const Divider(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Tổng ước tính',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              Text(
-                NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
-                    .format(totalPrice),
-                style: const TextStyle(
-                  color: AppColors.primaryDark,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
+              const Text('TỔNG CỘNG',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+              Text(formatter.format(price),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 24,
+                      color: AppColors.primary,
+                      letterSpacing: -1)),
             ],
           ),
         ],
@@ -1256,50 +763,8 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
     );
   }
 
-  Widget _buildSubmitButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed:
-            _isSubmitting || _selectedService == null ? null : _submitBooking,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: _isSubmitting
-            ? const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2),
-                  ),
-                  SizedBox(width: 12),
-                  Text('Finding Providers...'),
-                ],
-              )           : const Text('Đặt dịch vụ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      ),
-    );
-  }
-
   void _submitBooking() {
-    if (!_formKey.currentState!.validate()) return;
-    if (_selectedService == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Please select a service'),
-            backgroundColor: Colors.orange),
-      );
-      return;
-    }
-
-    setState(() => _isSubmitting = true);
+    if (_selectedProvider == null) return;
 
     final scheduledAt = DateTime(
       _selectedDate.year,
@@ -1310,127 +775,22 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
     );
 
     context.read<BookingsBloc>().add(CreateBookingEvent(
-          serviceId: _selectedService!.serviceId,
+          serviceId: _selectedProvider!.serviceId,
+          providerId:
+              int.tryParse(_selectedProvider!.providerUserId.toString()),
           scheduledAt: scheduledAt,
           addressText: _addressController.text,
           latitude: _latitude,
           longitude: _longitude,
-          notes: _notesController.text.isEmpty ? null : _notesController.text,
+          notes: _notesController.text,
         ));
-  }
 
-  void _showSuccessDialog(BookingCreated state) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child:
-                  const Icon(Icons.check_circle, color: Colors.green, size: 64),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Booking Created!',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Code: ${state.bookingCode}',
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            if (state.nearbyProviderIds.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.orange),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'No providers nearby yet. We will notify you.',
-                        style: TextStyle(color: Colors.orange, fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.people, color: Colors.green),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${state.nearbyProviderIds.length} provider(s) found!',
-                        style: const TextStyle(
-                            color: Colors.green, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              context.go('/user/bookings');
-            },
-            child: const Text('View Bookings'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              context.go('/user/home');
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Done'),
-          ),
-        ],
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Đang gửi yêu cầu đặt lịch cho thợ...'),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
       ),
     );
-  }
-
-  IconData _getCategoryIcon(String code) {
-    switch (code.toLowerCase()) {
-      case 'cleaning':
-        return Icons.cleaning_services;
-      case 'plumbing':
-        return Icons.plumbing;
-      case 'electrical':
-        return Icons.electrical_services;
-      case 'carpentry':
-        return Icons.carpenter;
-      case 'painting':
-        return Icons.format_paint;
-      case 'gardening':
-        return Icons.yard;
-      default:
-        return Icons.home_repair_service;
-    }
   }
 }

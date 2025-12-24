@@ -289,7 +289,8 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
 
   Widget _buildProgressHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+      color: AppColors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
       child: Row(
         children: [
           _buildStepNode(0, 'Tài khoản'),
@@ -309,40 +310,45 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
       children: [
         AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          width: 32,
-          height: 32,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
-            color:
-                isActive || isCompleted ? AppColors.primary : AppColors.shelf,
+            color: isCompleted
+                ? AppColors.primary
+                : isActive
+                    ? AppColors.primary.withOpacity(0.1)
+                    : AppColors.shelf,
             shape: BoxShape.circle,
             border: Border.all(
               color: isActive || isCompleted
                   ? AppColors.primary
-                  : AppColors.borderLight,
+                  : AppColors.divider.withOpacity(0.5),
               width: 2,
             ),
           ),
           child: Center(
             child: isCompleted
-                ? const Icon(Icons.check, color: AppColors.white, size: 16)
+                ? const Icon(Icons.check_rounded,
+                    color: AppColors.white, size: 18)
                 : Text(
                     '${step + 1}',
                     style: TextStyle(
                       color:
-                          isActive ? AppColors.white : AppColors.textTertiary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                          isActive ? AppColors.primary : AppColors.textTertiary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
                     ),
                   ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Text(
-          label,
+          label.toUpperCase(),
           style: TextStyle(
-            fontSize: 10,
+            fontSize: 9,
+            letterSpacing: 0.5,
             fontWeight:
-                isActive || isCompleted ? FontWeight.bold : FontWeight.normal,
+                isActive || isCompleted ? FontWeight.w900 : FontWeight.w600,
             color: isActive || isCompleted
                 ? AppColors.primary
                 : AppColors.textTertiary,
@@ -356,9 +362,14 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
     bool isCompleted = _currentStep > step;
     return Expanded(
       child: Container(
-        height: 2,
-        margin: const EdgeInsets.only(bottom: 18),
-        color: isCompleted ? AppColors.primary : AppColors.shelf,
+        height: 3,
+        margin: const EdgeInsets.only(bottom: 24, left: 8, right: 8),
+        decoration: BoxDecoration(
+          color: isCompleted
+              ? AppColors.primary
+              : AppColors.divider.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(2),
+        ),
       ),
     );
   }
@@ -380,17 +391,45 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Thông tin cơ bản',
-            style: Theme.of(context).textTheme.displaySmall),
-        const SizedBox(height: 12),
-        const Text('Hãy bắt đầu bằng việc tạo tài khoản cho bạn.',
-            style: TextStyle(color: AppColors.textSecondary)),
-        const SizedBox(height: 32),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.person_add_rounded,
+                  color: AppColors.primary, size: 24),
+            ),
+            const SizedBox(width: 16),
+            const Text(
+              'Thiết lập tài khoản',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Vui lòng điền đầy đủ thông tin để trở thành đối tác tin cậy của chúng tôi.',
+          style: TextStyle(
+            fontSize: 15,
+            color: AppColors.textSecondary,
+            height: 1.5,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 40),
         MinTextField(
           label: 'Họ và tên',
           hint: 'Vd: Nguyễn Văn A',
           controller: _fullNameController,
-          prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
+          prefixIcon: const Icon(Icons.person_3_rounded, size: 20),
           validator: (v) =>
               (v == null || v.isEmpty) ? 'Vui lòng nhập họ tên' : null,
         ),
@@ -400,7 +439,7 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
           hint: 'Vd: 0912345678',
           controller: _phoneController,
           keyboardType: TextInputType.phone,
-          prefixIcon: const Icon(Icons.phone_iphone_rounded, size: 20),
+          prefixIcon: const Icon(Icons.phone_android_rounded, size: 20),
           validator: (v) => (v == null || v.length < 10)
               ? 'Số điện thoại không hợp lệ'
               : null,
@@ -411,7 +450,7 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
           hint: 'Tối thiểu 6 ký tự',
           obscureText: true,
           controller: _passwordController,
-          prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+          prefixIcon: const Icon(Icons.lock_rounded, size: 20),
           validator: (v) =>
               (v == null || v.length < 6) ? 'Mật khẩu quá ngắn' : null,
         ),
@@ -421,13 +460,13 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
           hint: 'Nhập lại mật khẩu',
           obscureText: true,
           controller: _confirmPasswordController,
-          prefixIcon: const Icon(Icons.lock_reset_rounded, size: 20),
+          prefixIcon: const Icon(Icons.shield_rounded, size: 20),
           validator: (v) =>
               (v != _passwordController.text) ? 'Mật khẩu không khớp' : null,
         ),
-        const SizedBox(height: 40),
+        const SizedBox(height: 48),
         MinButton(
-          text: 'Tiếp tục',
+          text: 'Tiếp tục bước xác thực',
           isFullWidth: true,
           onPressed: _handleNext,
         ),
@@ -439,31 +478,83 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Xác thực số điện thoại',
-            style: Theme.of(context).textTheme.displaySmall),
-        const SizedBox(height: 12),
-        Text('Chúng tôi đã gửi mã OTP đến ${_phoneController.text}',
-            style: const TextStyle(color: AppColors.textSecondary)),
-        const SizedBox(height: 32),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.verified_user_rounded,
+                  color: AppColors.primary, size: 24),
+            ),
+            const SizedBox(width: 16),
+            const Text(
+              'Xác thực số điện thoại',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              fontSize: 15,
+              color: AppColors.textSecondary,
+              height: 1.5,
+              fontWeight: FontWeight.w500,
+            ),
+            children: [
+              const TextSpan(
+                  text: 'Chúng tôi đã gửi mã xác thực gồm 6 chữ số đến '),
+              TextSpan(
+                text: _phoneController.text,
+                style: const TextStyle(
+                    color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 48),
         MinTextField(
-          label: 'Mã xác thực (6 số)',
-          hint: '123456',
+          label: 'Mã xác thực (OTP)',
+          hint: '123 456',
           controller: _otpController,
           keyboardType: TextInputType.number,
-          prefixIcon: const Icon(Icons.security_rounded, size: 20),
+          textAlign: TextAlign.center,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+          style: const TextStyle(
+              fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 8),
+          prefixIcon: const Icon(Icons.vpn_key_rounded, size: 20),
           validator: (v) => (v?.length != 6) ? 'Mã OTP phải có 6 chữ số' : null,
         ),
-        const SizedBox(height: 40),
+        const SizedBox(height: 48),
         MinButton(
-            text: 'Xác nhận OTP', isFullWidth: true, onPressed: _handleNext),
-        const SizedBox(height: 16),
+            text: 'Xác nhận & Tiếp tục',
+            isFullWidth: true,
+            onPressed: _handleNext),
+        const SizedBox(height: 24),
         Center(
-          child: TextButton(
-            onPressed: () => context.read<AuthBloc>().add(OtpSendRequested(
-                phone: _phoneController.text, purpose: 'verify_phone')),
-            child: const Text('Gửi lại mã OTP',
-                style: TextStyle(
-                    color: AppColors.primary, fontWeight: FontWeight.bold)),
+          child: Column(
+            children: [
+              const Text('Chưa nhận được mã?',
+                  style:
+                      TextStyle(color: AppColors.textTertiary, fontSize: 13)),
+              const SizedBox(height: 4),
+              TextButton(
+                onPressed: () => context.read<AuthBloc>().add(OtpSendRequested(
+                    phone: _phoneController.text, purpose: 'verify_phone')),
+                child: const Text('Gửi lại mã ngay',
+                    style: TextStyle(
+                        color: AppColors.primary, fontWeight: FontWeight.w800)),
+              ),
+            ],
           ),
         ),
       ],
@@ -474,108 +565,214 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Hồ sơ chuyên nghiệp',
-            style: Theme.of(context).textTheme.displaySmall),
-        const SizedBox(height: 12),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.info.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.business_center_rounded,
+                  color: AppColors.info, size: 24),
+            ),
+            const SizedBox(width: 16),
+            const Text(
+              'Hồ sơ của bạn',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
         const Text(
-            'Cung cấp thêm thông tin để khách hàng có thể tìm thấy bạn dễ dàng hơn.',
-            style: TextStyle(color: AppColors.textSecondary)),
-        const SizedBox(height: 32),
+          'Hãy tạo ấn tượng tốt với khách hàng bằng thông tin đầy đủ và chuyên nghiệp.',
+          style: TextStyle(
+            fontSize: 15,
+            color: AppColors.textSecondary,
+            height: 1.5,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 40),
         MinTextField(
           label: 'Tên hiển thị (Tên cửa hàng/cá nhân) *',
           hint: 'Vd: Điện lạnh Bách Khoa',
           controller: _displayNameController,
-          prefixIcon: const Icon(Icons.badge_outlined, size: 20),
+          prefixIcon: const Icon(Icons.store_rounded, size: 20),
           validator: (v) =>
               (v == null || v.isEmpty) ? 'Vui lòng nhập tên hiển thị' : null,
         ),
         const SizedBox(height: 24),
         MinTextField(
-          label: 'Giới thiệu ngắn',
+          label: 'Giới thiệu ngắn gọn',
           hint: 'Vd: Chuyên sửa chữa điều hòa, tủ lạnh tại nhà...',
           controller: _bioController,
-          prefixIcon: const Icon(Icons.description_outlined, size: 20),
+          maxLines: 3,
+          prefixIcon: const Icon(Icons.notes_rounded, size: 20),
         ),
         const SizedBox(height: 24),
         MinTextField(
           label: 'Kỹ năng / Dịch vụ *',
           hint: 'Vd: Sửa điện, Sửa nước, Vệ sinh...',
           controller: _skillsController,
-          prefixIcon: const Icon(Icons.handyman_outlined, size: 20),
+          prefixIcon: const Icon(Icons.auto_awesome_rounded, size: 20),
           validator: (v) => (v == null || v.isEmpty)
               ? 'Vui lòng nhập ít nhất một kỹ năng'
               : null,
         ),
         const SizedBox(height: 8),
-        const Text('Mẹo: Ngắt quãng bằng dấu phẩy (,)',
-            style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
-        const SizedBox(height: 32),
-        const Divider(),
-        const SizedBox(height: 24),
-        Row(
-          children: [
-            const Icon(Icons.map_rounded, color: AppColors.primary, size: 24),
-            const SizedBox(width: 12),
-            Text('Khu vực hoạt động',
-                style: Theme.of(context).textTheme.headlineMedium),
-          ],
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.shelf.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.lightbulb_outline_rounded,
+                  size: 14, color: AppColors.textTertiary),
+              SizedBox(width: 8),
+              Text('Mẹo: Dùng dấu phẩy (,) để ngăn cách các kỹ năng',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textTertiary,
+                      fontWeight: FontWeight.w600)),
+            ],
+          ),
         ),
-        const SizedBox(height: 20),
-        MinTextField(
-          label: 'Địa chỉ hoạt động',
-          hint: 'Nhập địa chỉ của bạn',
-          controller: _addressController,
-          prefixIcon: const Icon(Icons.location_pin, size: 20),
-          suffixIcon: IconButton(
-              icon: const Icon(Icons.my_location_rounded,
-                  color: AppColors.primary, size: 20),
-              onPressed: _getCurrentLocation),
-        ),
-        const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Bán kính phục vụ',
-                style: TextStyle(fontWeight: FontWeight.w600)),
-            Text('${_serviceRadius.toInt()} km',
-                style: const TextStyle(
-                    color: AppColors.primary, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        Slider(
-          value: _serviceRadius,
-          min: 1,
-          max: 50,
-          activeColor: AppColors.primary,
-          inactiveColor: AppColors.shelf,
-          onChanged: (v) => setState(() => _serviceRadius = v),
-        ),
+        const SizedBox(height: 40),
+        const Divider(color: AppColors.borderLight),
         const SizedBox(height: 32),
         Row(
           children: [
-            Checkbox(
-              value: _acceptsTerms,
-              activeColor: AppColors.primary,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6)),
-              onChanged: (v) => setState(() => _acceptsTerms = v ?? false),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.map_rounded,
+                  color: AppColors.primary, size: 24),
             ),
-            Expanded(
-              child: Text(
-                'Tôi chấp nhận Điều khoản và Quy định của nền tảng đối tác.',
-                style: Theme.of(context).textTheme.bodySmall,
+            const SizedBox(width: 16),
+            const Text(
+              'Phạm vi hoạt động',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.5,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 40),
+        const SizedBox(height: 24),
+        MinTextField(
+          label: 'Địa chỉ hoạt động',
+          hint: 'Nhập địa chỉ chính của bạn',
+          controller: _addressController,
+          prefixIcon: const Icon(Icons.location_on_rounded, size: 20),
+          suffixIcon: Container(
+            margin: const EdgeInsets.all(8),
+            child: GestureDetector(
+              onTap: _getCurrentLocation,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.my_location_rounded,
+                    color: AppColors.primary, size: 16),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 32),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Bán kính phục vụ',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text('${_serviceRadius.toInt()} km',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            activeTrackColor: AppColors.primary,
+            inactiveTrackColor: AppColors.shelf,
+            thumbColor: AppColors.white,
+            overlayColor: AppColors.primary.withOpacity(0.1),
+            trackHeight: 4,
+            thumbShape: const RoundSliderThumbShape(
+                enabledThumbRadius: 10, elevation: 4),
+          ),
+          child: Slider(
+            value: _serviceRadius,
+            min: 1,
+            max: 50,
+            onChanged: (v) => setState(() => _serviceRadius = v),
+          ),
+        ),
+        const SizedBox(height: 48),
+        InkWell(
+          onTap: () => setState(() => _acceptsTerms = !_acceptsTerms),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Checkbox(
+                    value: _acceptsTerms,
+                    activeColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6)),
+                    onChanged: (v) =>
+                        setState(() => _acceptsTerms = v ?? false),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Tôi chấp nhận Điều khoản và Quy định của nền tảng dành cho đối tác.',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 48),
         MinButton(
-          text: 'Hoàn tất đăng ký',
+          text: 'Hoàn tất đăng ký ngay',
           isLoading: _isCreatingProvider,
           isFullWidth: true,
           onPressed: _createProviderProfile,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 48),
       ],
     );
   }

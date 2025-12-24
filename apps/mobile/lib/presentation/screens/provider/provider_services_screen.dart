@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/entities/entities.dart';
 import '../../../data/datasources/provider_datasource.dart';
@@ -7,6 +8,7 @@ import '../../bloc/services/services_bloc.dart';
 import '../../bloc/services/services_event_state.dart';
 import '../../bloc/categories/categories_bloc.dart';
 import '../../bloc/categories/categories_event_state.dart';
+import '../../widgets/minimalist_widgets.dart';
 
 // Helper to safely parse int
 int _safeInt(dynamic value, {int defaultValue = 0}) {
@@ -93,92 +95,93 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppColors.background,
       body: CustomScrollView(
         slivers: [
-          // Modern AppBar with gradient
           SliverAppBar(
-            expandedHeight: 140,
-            floating: false,
             pinned: true,
+            floating: false,
+            expandedHeight: 180,
+            backgroundColor: AppColors.white,
             elevation: 0,
-            backgroundColor: AppColors.primary,
+            automaticallyImplyLeading: false,
             flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppColors.primary,
-                      AppColors.primary.withBlue(180),
-                    ],
-                  ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.end,
+              background: Padding(
+                padding: EdgeInsets.fromLTRB(24, topPadding + 16, 24, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.build_circle,
-                                  color: Colors.white, size: 28),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: AppColors.divider.withOpacity(0.5)),
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Dịch vụ của tôi',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${_services.length} dịch vụ đang hoạt động',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.9),
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            child: const Icon(Icons.arrow_back_ios_new_rounded,
+                                size: 18, color: AppColors.textPrimary),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: _loadServices,
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: AppColors.divider.withOpacity(0.5)),
                             ),
-                          ],
+                            child: const Icon(Icons.refresh_rounded,
+                                size: 20, color: AppColors.textPrimary),
+                          ),
                         ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Dịch vụ của tôi',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -1,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_services.length} dịch vụ đang được cung cấp bởi bạn',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh, color: Colors.white),
-                onPressed: _loadServices,
-              ),
-            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child:
+                  Divider(height: 1, color: AppColors.divider.withOpacity(0.3)),
+            ),
           ),
-
-          // Content
           SliverPadding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
             sliver: _isLoading
                 ? const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(
+                        child: CircularProgressIndicator(
+                            color: AppColors.primary)),
                   )
                 : _services.isEmpty
                     ? SliverFillRemaining(child: _buildEmptyState())
@@ -192,13 +195,21 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddServiceSheet,
-        backgroundColor: AppColors.primary,
-        elevation: 4,
-        icon: const Icon(Icons.add_circle_outline),
-        label: const Text('Thêm dịch vụ',
-            style: TextStyle(fontWeight: FontWeight.w600)),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: FloatingActionButton.extended(
+          onPressed: _showAddServiceSheet,
+          backgroundColor: AppColors.primary,
+          elevation: 8,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          icon: const Icon(Icons.add_rounded, color: Colors.white),
+          label: const Text('Thêm dịch vụ',
+              style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  fontSize: 14)),
+        ),
       ),
     );
   }
@@ -209,38 +220,51 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.build_circle_outlined,
-                size: 64, color: AppColors.primary.withOpacity(0.6)),
+            child: const Icon(Icons.auto_awesome_rounded,
+                size: 64, color: AppColors.primary),
           ),
-          const SizedBox(height: 24),
-          Text(
+          const SizedBox(height: 32),
+          const Text(
             'Chưa có dịch vụ nào',
             style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade800,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Thêm dịch vụ để bắt đầu nhận đơn hàng',
-            style: TextStyle(color: Colors.grey.shade600),
+          const SizedBox(height: 12),
+          const Text(
+            'Hãy thêm các dịch vụ sở trường để khách hàng\ncó thể tìm thấy và đặt lịch với bạn.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 15,
+              height: 1.5,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _showAddServiceSheet,
-            icon: const Icon(Icons.add),
-            label: const Text('Thêm dịch vụ đầu tiên'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+          const SizedBox(height: 48),
+          SizedBox(
+            width: 240,
+            child: ElevatedButton.icon(
+              onPressed: _showAddServiceSheet,
+              icon: const Icon(Icons.add_rounded, color: Colors.white),
+              label: const Text('Thêm dịch vụ ngay',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w800, color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                elevation: 0,
+              ),
             ),
           ),
         ],
@@ -259,50 +283,39 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
     final serviceId = _safeInt(service['serviceId'] ?? service['service_id']);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: AppColors.black.withOpacity(0.02),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Column(
         children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border(
-                left: BorderSide(
-                  color: isActive ? AppColors.primary : Colors.grey.shade400,
-                  width: 4,
-                ),
-              ),
-            ),
+          Padding(
+            padding: const EdgeInsets.all(20),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: isActive
-                          ? [
-                              AppColors.primary.withOpacity(0.1),
-                              AppColors.primary.withOpacity(0.05)
-                            ]
-                          : [Colors.grey.shade200, Colors.grey.shade100],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
+                    color: isActive
+                        ? AppColors.primary.withOpacity(0.1)
+                        : AppColors.shelf,
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
-                    Icons.home_repair_service,
-                    color: isActive ? AppColors.primary : Colors.grey,
-                    size: 28,
+                    Icons.home_repair_service_rounded,
+                    color:
+                        isActive ? AppColors.primary : AppColors.textTertiary,
+                    size: 24,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -313,119 +326,101 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                       Text(
                         serviceName,
                         style: const TextStyle(
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w800,
                           fontSize: 16,
+                          color: AppColors.textPrimary,
                         ),
                       ),
-                      if (categoryName.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            categoryName,
-                            style: TextStyle(
-                                fontSize: 11, color: Colors.grey.shade700),
+                      const SizedBox(height: 4),
+                      if (categoryName.isNotEmpty)
+                        Text(
+                          categoryName.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textTertiary,
+                            letterSpacing: 0.5,
                           ),
                         ),
-                      ],
+                      const SizedBox(height: 12),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            _formatPrice(price),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.primary,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            currency,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textTertiary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      _formatPrice(price),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    Text(currency,
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey.shade600)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          // Status & Actions
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-              ),
-            ),
-            child: Row(
-              children: [
-                // Status badge
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color:
-                        isActive ? Colors.green.shade50 : Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isActive
-                          ? Colors.green.shade200
-                          : Colors.orange.shade200,
+                    color: isActive
+                        ? AppColors.primary.withOpacity(0.1)
+                        : AppColors.warning.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    isActive ? 'ĐANG BẬT' : 'TẠM NGƯNG',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      color: isActive ? AppColors.primary : AppColors.warning,
+                      letterSpacing: 0.5,
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: isActive ? Colors.green : Colors.orange,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isActive ? 'Hoạt động' : 'Tạm ngưng',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: isActive
-                              ? Colors.green.shade700
-                              : Colors.orange.shade700,
-                        ),
-                      ),
-                    ],
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: AppColors.divider.withOpacity(0.3)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildActionButton(
+                    icon: Icons.edit_rounded,
+                    label: 'Chỉnh sửa',
+                    color: AppColors.info,
+                    onTap: () => _showEditServiceSheet(service),
                   ),
                 ),
-                const Spacer(),
-                // Action buttons
-                _buildActionButton(
-                  icon: Icons.edit_outlined,
-                  label: 'Sửa',
-                  color: Colors.blue,
-                  onTap: () => _showEditServiceSheet(service),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildActionButton(
+                    icon: isActive
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                    label: isActive ? 'Tạm ngưng' : 'Kích hoạt',
+                    color: isActive ? AppColors.warning : AppColors.primary,
+                    onTap: () => _toggleService(serviceId, !isActive),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 _buildActionButton(
-                  icon: isActive ? Icons.pause : Icons.play_arrow,
-                  label: isActive ? 'Ngưng' : 'Bật',
-                  color: isActive ? Colors.orange : Colors.green,
-                  onTap: () => _toggleService(serviceId, !isActive),
-                ),
-                const SizedBox(width: 8),
-                _buildActionButton(
-                  icon: Icons.delete_outline,
-                  label: 'Xóa',
-                  color: Colors.red,
+                  icon: Icons.delete_outline_rounded,
+                  label: '',
+                  color: AppColors.error,
                   onTap: () => _confirmDelete(serviceId, serviceName),
                 ),
               ],
@@ -442,23 +437,29 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 4),
-            Text(label,
+            Icon(icon, size: 18, color: color),
+            if (label.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Text(
+                label,
                 style: TextStyle(
-                    fontSize: 12, color: color, fontWeight: FontWeight.w500)),
+                  fontSize: 13,
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -466,12 +467,8 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
   }
 
   String _formatPrice(double price) {
-    if (price >= 1000000) {
-      return '${(price / 1000000).toStringAsFixed(1)}M';
-    } else if (price >= 1000) {
-      return '${(price / 1000).toStringAsFixed(0)}K';
-    }
-    return price.toStringAsFixed(0);
+    final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: '');
+    return formatter.format(price).trim();
   }
 
   Future<void> _toggleService(int serviceId, bool isActive) async {
@@ -611,117 +608,118 @@ class _AddServiceSheetState extends State<_AddServiceSheet> {
       padding:
           EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
         child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle bar
               Center(
                 child: Container(
-                  width: 48,
+                  width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: AppColors.divider.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
-              // Title
+              const SizedBox(height: 32),
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    child:
-                        const Icon(Icons.add_circle, color: AppColors.primary),
+                    child: const Icon(Icons.add_task_rounded,
+                        color: AppColors.primary),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   const Text(
                     'Thêm dịch vụ mới',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-
-              // Category Dropdown
-              _buildLabel('Danh mục'),
+              const SizedBox(height: 32),
+              _buildLabel('Danh mục dịch vụ'),
               BlocBuilder<CategoriesBloc, CategoriesState>(
                 builder: (context, state) {
                   if (state is CategoriesLoaded) {
                     return _buildDropdown<Category>(
                       value: _selectedCategory,
-                      hint: 'Chọn danh mục',
+                      hint: 'Chọn một danh mục',
                       items: state.categories,
-                      itemBuilder: (cat) => Text(cat.name),
-                      onChanged: (cat) => setState(() {
-                        _selectedCategory = cat;
-                        _selectedService = null;
-                      }),
+                      itemBuilder: (cat) => Text(cat.name,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 14)),
+                      onChanged: (cat) {
+                        if (cat != null) {
+                          setState(() {
+                            _selectedCategory = cat;
+                            _selectedService = null;
+                          });
+                          context
+                              .read<ServicesBloc>()
+                              .add(LoadGenericServices(categoryId: cat.id));
+                        }
+                      },
                     );
                   }
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(
+                      child: LinearProgressIndicator(color: AppColors.primary));
                 },
               ),
-              const SizedBox(height: 16),
-
-              // Service Dropdown - Now using unique Service objects
-              _buildLabel('Dịch vụ'),
+              const SizedBox(height: 24),
+              _buildLabel('Tên dịch vụ cụ thể'),
               BlocBuilder<ServicesBloc, ServicesState>(
                 builder: (context, state) {
-                  if (state is ServicesLoaded) {
-                    // Get unique services by service ID (not ProviderService)
-                    final Map<int, Service> uniqueServices = {};
-                    for (var ps in state.services) {
-                      if (_selectedCategory == null ||
-                          ps.service.categoryId == _selectedCategory!.id) {
-                        uniqueServices[ps.service.id] = ps.service;
-                      }
-                    }
-                    final services = uniqueServices.values.toList();
-
+                  if (state is GenericServicesLoaded) {
                     return _buildDropdown<Service>(
                       value: _selectedService,
-                      hint: _selectedCategory == null
-                          ? 'Chọn danh mục trước'
-                          : 'Chọn dịch vụ',
-                      items: services,
-                      itemBuilder: (svc) => Text(svc.name),
-                      onChanged: _selectedCategory == null
-                          ? null
-                          : (svc) => setState(() => _selectedService = svc),
+                      hint: 'Chọn một dịch vụ cụ thể',
+                      items: state.services,
+                      itemBuilder: (svc) => Text(svc.name,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 14)),
+                      onChanged: (svc) =>
+                          setState(() => _selectedService = svc),
                     );
                   }
-                  return const Center(child: CircularProgressIndicator());
+                  if (state is ServicesLoading) {
+                    return const Center(
+                        child:
+                            LinearProgressIndicator(color: AppColors.primary));
+                  }
+                  return _buildDropdown<Service>(
+                    value: null,
+                    hint: _selectedCategory == null
+                        ? 'Vui lòng chọn danh mục trước'
+                        : 'Chọn một dịch vụ',
+                    items: [],
+                    itemBuilder: (svc) => const SizedBox(),
+                    onChanged: null,
+                  );
                 },
               ),
-              const SizedBox(height: 16),
-
-              // Price Input
-              _buildLabel('Giá dịch vụ (VND)'),
-              TextFormField(
+              const SizedBox(height: 24),
+              MinTextField(
+                label: 'Giá dịch vụ của bạn (VND)',
+                hint: 'Ví dụ: 150,000',
                 controller: _priceController,
                 keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  hintText: 'Ví dụ: 150000',
-                  prefixIcon:
-                      const Icon(Icons.attach_money, color: AppColors.primary),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                ),
+                prefixIcon: const Icon(Icons.payments_rounded,
+                    color: AppColors.textTertiary, size: 20),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Vui lòng nhập giá';
                   if (double.tryParse(v.replaceAll(',', '')) == null) {
@@ -730,32 +728,14 @@ class _AddServiceSheetState extends State<_AddServiceSheet> {
                   return null;
                 },
               ),
-              const SizedBox(height: 28),
-
-              // Submit Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    elevation: 2,
-                  ),
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : const Text('Thêm dịch vụ',
-                          style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600)),
-                ),
+              const SizedBox(height: 48),
+              MinButton(
+                text: 'Xác nhận thêm dịch vụ',
+                isLoading: _isSubmitting,
+                isFullWidth: true,
+                onPressed: _submit,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
             ],
           ),
         ),
@@ -867,75 +847,71 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
       padding:
           EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
         child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle bar
               Center(
                 child: Container(
-                  width: 48,
+                  width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2)),
+                    color: AppColors.divider.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-              const SizedBox(height: 20),
-              // Title
+              const SizedBox(height: 32),
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
+                      color: AppColors.info.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.edit, color: Colors.blue),
+                    child: const Icon(Icons.edit_note_rounded,
+                        color: AppColors.info),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Chỉnh sửa giá',
-                            style: TextStyle(
-                                fontSize: 20, fontWeight: FontWeight.bold)),
-                        Text(serviceName,
-                            style: TextStyle(
-                                color: Colors.grey.shade600, fontSize: 14)),
+                        const Text(
+                          'Chỉnh sửa giá',
+                          style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary),
+                        ),
+                        Text(
+                          serviceName,
+                          style: const TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-
-              // Price Input
-              Text('Giá mới (VND)',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade700)),
-              const SizedBox(height: 8),
-              TextFormField(
+              const SizedBox(height: 32),
+              MinTextField(
+                label: 'Cập nhật giá mới (VND)',
+                hint: 'Ví dụ: 180,000',
                 controller: _priceController,
                 keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  hintText: 'Nhập giá mới',
-                  prefixIcon:
-                      const Icon(Icons.attach_money, color: Colors.blue),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                ),
+                prefixIcon: const Icon(Icons.payments_rounded,
+                    color: AppColors.textTertiary, size: 20),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Vui lòng nhập giá';
                   if (double.tryParse(v.replaceAll(',', '')) == null) {
@@ -944,31 +920,14 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
                   return null;
                 },
               ),
-              const SizedBox(height: 28),
-
-              // Submit Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : const Text('Lưu thay đổi',
-                          style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600)),
-                ),
+              const SizedBox(height: 48),
+              MinButton(
+                text: 'Lưu thay đổi',
+                isLoading: _isSubmitting,
+                isFullWidth: true,
+                onPressed: _submit,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
             ],
           ),
         ),

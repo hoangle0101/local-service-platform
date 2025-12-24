@@ -3,8 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../bloc/favorites/favorites_bloc.dart';
 import '../../widgets/favorite_service_card.dart';
+import '../../widgets/minimalist_widgets.dart';
 
-/// Beautiful, modern favorites screen with pull-to-refresh
 class UserFavoritesScreen extends StatefulWidget {
   const UserFavoritesScreen({super.key});
 
@@ -16,16 +16,16 @@ class _UserFavoritesScreenState extends State<UserFavoritesScreen> {
   @override
   void initState() {
     super.initState();
-    // Load favorites on screen open
     context.read<FavoritesBloc>().add(LoadFavorites());
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundSecondary,
+      backgroundColor: AppColors.background,
       body: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics()),
         slivers: [
           _buildHeader(),
           _buildContent(),
@@ -35,100 +35,81 @@ class _UserFavoritesScreenState extends State<UserFavoritesScreen> {
   }
 
   Widget _buildHeader() {
-    return SliverToBoxAdapter(
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.primaryDark,
-              AppColors.accent,
-            ],
-          ),
-          borderRadius: const BorderRadius.only(
-            bottomLeft: Radius.circular(32),
-            bottomRight: Radius.circular(32),
-          ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(24, 64, 24, 32),
+      sliver: SliverToBoxAdapter(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Back button row
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Title
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Icon(
-                        Icons.favorite,
-                        color: Colors.white,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Yêu thích',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        BlocBuilder<FavoritesBloc, FavoritesState>(
-                          builder: (context, state) {
-                            final count = state is FavoritesLoaded
-                                ? state.items.length
-                                : 0;
-                            return Text(
-                              '$count dịch vụ đã lưu',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.9),
-                                fontSize: 14,
-                              ),
-                            );
-                          },
+                GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
-                  ],
+                    child: const Icon(Icons.arrow_back_ios_new_rounded,
+                        size: 18, color: AppColors.textPrimary),
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: const Text(
+                    'DANH SÁCH LƯU',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: 32),
+            const Text(
+              'Yêu thích',
+              style: TextStyle(
+                fontSize: 34,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+                letterSpacing: -1.5,
+                height: 1.1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            BlocBuilder<FavoritesBloc, FavoritesState>(
+              builder: (context, state) {
+                final count = state is FavoritesLoaded ? state.items.length : 0;
+                return Text(
+                  count > 0
+                      ? 'Bạn có $count dịch vụ đã lưu để xem lại sau.'
+                      : 'Lưu những dịch vụ bạn quan tâm tại đây.',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -139,7 +120,8 @@ class _UserFavoritesScreenState extends State<UserFavoritesScreen> {
       builder: (context, state) {
         if (state is FavoritesLoading && state.favoriteIds.isEmpty) {
           return const SliverFillRemaining(
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(
+                child: CircularProgressIndicator(color: AppColors.primary)),
           );
         }
 
@@ -157,19 +139,22 @@ class _UserFavoritesScreenState extends State<UserFavoritesScreen> {
           }
 
           return SliverPadding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final item = state.items[index];
-                  return FavoriteServiceCard(
-                    favorite: item,
-                    onRemove: () {
-                      context
-                          .read<FavoritesBloc>()
-                          .add(RemoveFavorite(item.serviceId));
-                      _showSnackBar('Đã xóa khỏi yêu thích');
-                    },
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    child: FavoriteServiceCard(
+                      favorite: item,
+                      onRemove: () {
+                        context
+                            .read<FavoritesBloc>()
+                            .add(RemoveFavorite(item.serviceId));
+                        _showSnackBar('Đã xóa khỏi yêu thích');
+                      },
+                    ),
                   );
                 },
                 childCount: state.items.length,
@@ -184,97 +169,97 @@ class _UserFavoritesScreenState extends State<UserFavoritesScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Illustration
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight.withOpacity(0.5),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.favorite_outline,
-                size: 80,
-                color: AppColors.primary.withOpacity(0.5),
-              ),
+    return Padding(
+      padding: const EdgeInsets.all(40),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(48),
+            decoration: BoxDecoration(
+              color: AppColors.shelf.withOpacity(0.5),
+              shape: BoxShape.circle,
             ),
-            const SizedBox(height: 32),
-
-            const Text(
-              'Chưa có dịch vụ yêu thích',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
+            child: Icon(
+              Icons.favorite_rounded,
+              size: 80,
+              color: AppColors.textTertiary.withOpacity(0.3),
             ),
-            const SizedBox(height: 12),
-
-            Text(
-              'Khám phá và lưu những dịch vụ\nbạn thích để dễ dàng tìm kiếm sau!',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-                height: 1.5,
-              ),
+          ),
+          const SizedBox(height: 48),
+          const Text(
+            'Chưa có nội dung',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.5,
             ),
-            const SizedBox(height: 32),
-
-            ElevatedButton.icon(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.explore),
-              label: const Text('Khám phá ngay'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryDark,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
-                ),
-              ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Khám phá các dịch vụ chất lượng và lưu lại tại đây bằng cách nhấn vào biểu tượng trái tim.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              color: AppColors.textSecondary,
+              height: 1.6,
+              fontWeight: FontWeight.w500,
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 48),
+          MinButton(
+            text: 'Bắt đầu ngay',
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildErrorState(String message) {
-    return Center(
+    return Padding(
+      padding: const EdgeInsets.all(40),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Colors.grey.shade400,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Không thể tải yêu thích',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
+          Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: AppColors.error.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.cloud_off_rounded,
+              size: 64,
+              color: AppColors.error,
             ),
           ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
+          const SizedBox(height: 32),
+          const Text(
+            'Không thể kết nối',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 15,
+              color: AppColors.textSecondary,
+              height: 1.6,
+            ),
+          ),
+          const SizedBox(height: 48),
+          MinButton(
+            text: 'Thử lại',
             onPressed: () {
               context.read<FavoritesBloc>().add(LoadFavorites());
             },
-            icon: const Icon(Icons.refresh),
-            label: const Text('Thử lại'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryDark,
-              foregroundColor: Colors.white,
-            ),
           ),
         ],
       ),
@@ -284,10 +269,12 @@ class _UserFavoritesScreenState extends State<UserFavoritesScreen> {
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content:
+            Text(message, style: const TextStyle(fontWeight: FontWeight.w600)),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
+        backgroundColor: AppColors.textPrimary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        margin: const EdgeInsets.all(24),
         duration: const Duration(seconds: 2),
       ),
     );

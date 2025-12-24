@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/datasources/bookings_datasource.dart';
 import '../bloc/bookings/bookings_event_state.dart';
+import '../widgets/minimalist_widgets.dart';
 
-/// Dialog to show booking offers from providers
-/// Allows customer to select a provider
 class BookingOffersDialog extends StatefulWidget {
   final String bookingId;
   final VoidCallback onProviderSelected;
@@ -24,8 +25,10 @@ class _BookingOffersDialogState extends State<BookingOffersDialog> {
   final BookingsDataSource _datasource = BookingsDataSource();
 
   List<BookingOffer> _offers = [];
+  Booking? _booking;
   bool _isLoading = true;
   bool _isSelecting = false;
+  bool _showMap = false;
   String? _error;
 
   @override
@@ -41,21 +44,17 @@ class _BookingOffersDialogState extends State<BookingOffersDialog> {
     });
 
     try {
-      print(
-          '[BookingOffersDialog] Loading offers for bookingId: ${widget.bookingId}');
-      final offers =
-          await _datasource.getBookingOffers(int.parse(widget.bookingId));
-      print('[BookingOffersDialog] Loaded ${offers.length} offers');
-      for (var offer in offers) {
-        print(
-            '[BookingOffersDialog] Offer: id=${offer.id}, provider=${offer.providerName}, price=${offer.price}');
-      }
+      final results = await Future.wait([
+        _datasource.getBookingById(widget.bookingId),
+        _datasource.getBookingOffers(int.parse(widget.bookingId)),
+      ]);
+
       setState(() {
-        _offers = offers;
+        _booking = results[0] as Booking;
+        _offers = results[1] as List<BookingOffer>;
         _isLoading = false;
       });
     } catch (e) {
-      print('[BookingOffersDialog] Error loading offers: $e');
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -76,14 +75,9 @@ class _BookingOffersDialogState extends State<BookingOffersDialog> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 8),
-                Text('Đã chọn ${offer.providerName}'),
-              ],
-            ),
-            backgroundColor: Colors.green,
+            content: Text('Đã chọn ${offer.providerName}'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
           ),
         );
         widget.onProviderSelected();
@@ -91,7 +85,11 @@ class _BookingOffersDialogState extends State<BookingOffersDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Lỗi: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
@@ -102,246 +100,457 @@ class _BookingOffersDialogState extends State<BookingOffersDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
       child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.7,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.local_offer, color: Colors.white),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Báo giá từ thợ',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(32),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 30,
+              offset: const Offset(0, 15),
             ),
-
-            // Content
-            Flexible(child: _buildContent()),
           ],
         ),
+        child: Column(
+          children: [
+            _buildHeader(),
+            Expanded(child: _buildContent()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(28, 28, 16, 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Danh sách báo giá',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                if (_offers.isNotEmpty)
+                  Text(
+                    'Có ${_offers.length} thợ đang sẵn sàng hỗ trợ',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () => setState(() => _showMap = !_showMap),
+            icon: Icon(
+              _showMap ? Icons.list_alt_rounded : Icons.map_rounded,
+              color: AppColors.primary,
+            ),
+          ),
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon:
+                const Icon(Icons.close_rounded, color: AppColors.textTertiary),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildContent() {
     if (_isLoading) {
-      return const Padding(
-        padding: EdgeInsets.all(32),
-        child: Center(child: CircularProgressIndicator()),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: AppColors.primary),
+            const SizedBox(height: 16),
+            Text(
+              'Đang tải danh sách...',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
       );
     }
 
     if (_error != null) {
-      return Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
-            const SizedBox(height: 12),
-            Text('Lỗi: $_error', textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            ElevatedButton(
-                onPressed: _loadOffers, child: const Text('Thử lại')),
-          ],
-        ),
-      );
+      return _buildErrorState();
     }
 
     if (_offers.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.hourglass_empty, size: 48, color: Colors.grey.shade400),
-            const SizedBox(height: 12),
-            Text(
-              'Chưa có thợ nào báo giá',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Vui lòng chờ các thợ xem và gửi báo giá cho bạn',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
-            ),
-          ],
-        ),
-      );
+      return _buildEmptyState();
     }
 
-    return ListView.separated(
-      shrinkWrap: true,
-      padding: const EdgeInsets.all(12),
+    if (_showMap && _booking != null && _booking!.latitude != null) {
+      return _buildMapView();
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       itemCount: _offers.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) => _buildOfferCard(_offers[index]),
     );
   }
 
   Widget _buildOfferCard(BookingOffer offer) {
     final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
-    final isAccepted = offer.status.toUpperCase() == 'ACCEPTED';
-    final isPending = offer.status.toUpperCase() == 'PENDING';
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: isAccepted ? Colors.green.shade50 : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isAccepted ? Colors.green : Colors.grey.shade200,
-          width: isAccepted ? 2 : 1,
-        ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.divider.withOpacity(0.4)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Provider info
-          Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: AppColors.primaryLight,
-                child: Text(
-                  (offer.providerName.isNotEmpty ? offer.providerName[0] : '?')
-                      .toUpperCase(),
-                  style: TextStyle(
-                      color: AppColors.primaryDark,
-                      fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      offer.providerName,
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                // Avatar
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Center(
+                    child: Text(
+                      offer.providerName.isNotEmpty
+                          ? offer.providerName[0].toUpperCase()
+                          : '?',
                       style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 15),
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.primary,
+                      ),
                     ),
-                    if (offer.distance != null)
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        offer.providerName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.location_on,
-                              size: 14, color: Colors.grey.shade600),
+                          const Icon(Icons.star_rounded,
+                              size: 16, color: Colors.amber),
                           const SizedBox(width: 4),
                           Text(
-                            '${(offer.distance! / 1000).toStringAsFixed(1)} km',
-                            style: TextStyle(
-                                color: Colors.grey.shade600, fontSize: 12),
+                            offer.rating?.toStringAsFixed(1) ?? 'Mới',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Icon(Icons.location_on_rounded,
+                              size: 14, color: AppColors.textTertiary),
+                          const SizedBox(width: 4),
+                          Text(
+                            offer.formattedDistance ?? '...',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textTertiary,
+                            ),
                           ),
                         ],
                       ),
-                  ],
+                    ],
+                  ),
                 ),
+              ],
+            ),
+          ),
+          // Price & Select button
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.shelf.withOpacity(0.3),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(24),
+                bottomRight: Radius.circular(24),
               ),
-              if (offer.rating != null)
-                Row(
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.star, size: 16, color: Colors.amber),
-                    const SizedBox(width: 2),
+                    const Text(
+                      'BÁO GIÁ TRỌN GÓI',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textTertiary,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                     Text(
-                      offer.rating?.toStringAsFixed(1) ??
-                          'N/A', // Removed double.tryParse
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      formatter.format(offer.price).replaceAll(',00', ''),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ],
                 ),
+                MinButton(
+                  text: 'CHỌN THỢ',
+                  onPressed: _isSelecting ? null : () => _selectProvider(offer),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: AppColors.shelf.withOpacity(0.5),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.hourglass_empty_rounded,
+              size: 48,
+              color: AppColors.textTertiary,
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Hệ thống đang tìm thợ',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              'Yêu cầu của bạn đã được gửi đi. Vui lòng đợi trong giây lát để các thợ gửi báo giá.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+          MinButton(
+            text: 'CẬP NHẬT',
+            onPressed: _loadOffers,
+            isPrimary: false,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline_rounded,
+                size: 48, color: AppColors.error),
+            const SizedBox(height: 24),
+            Text(
+              'Đã có lỗi xảy ra',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _error ?? 'Không thể tải danh sách thợ',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 32),
+            MinButton(text: 'THỬ LẠI', onPressed: _loadOffers),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapView() {
+    if (_booking == null || _booking!.latitude == null) return const SizedBox();
+
+    final customerPos = LatLng(_booking!.latitude!, _booking!.longitude!);
+    final markers = <Marker>[];
+
+    // Customer marker
+    markers.add(
+      Marker(
+        point: customerPos,
+        width: 40,
+        height: 40,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.primary, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 10,
+              ),
             ],
           ),
+          child: const Icon(Icons.home_rounded,
+              color: AppColors.primary, size: 20),
+        ),
+      ),
+    );
 
-          const SizedBox(height: 12),
-
-          // Price and action
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    // Provider markers
+    for (var offer in _offers) {
+      if (offer.latitude != null && offer.longitude != null) {
+        markers.add(
+          Marker(
+            point: LatLng(offer.latitude!, offer.longitude!),
+            width: 100,
+            height: 60,
+            child: GestureDetector(
+              onTap: () {
+                // You could show a small preview here
+              },
+              child: Column(
                 children: [
-                  Text('Báo giá',
-                      style:
-                          TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                  Text(
-                    formatter.format(offer.price), // Removed double.tryParse
-                    style: TextStyle(
-                      color: AppColors.primaryDark,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 4,
+                        ),
+                      ],
                     ),
+                    child: Text(
+                      NumberFormat.compactCurrency(locale: 'vi_VN', symbol: '₫')
+                          .format(offer.price),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.location_on_rounded,
+                      color: AppColors.primary, size: 30),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
+      child: Stack(
+        children: [
+          FlutterMap(
+            options: MapOptions(
+              initialCenter: customerPos,
+              initialZoom: 14.0,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.app',
+              ),
+              MarkerLayer(markers: markers),
+            ],
+          ),
+          Positioned(
+            left: 20,
+            bottom: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
                   ),
                 ],
               ),
-              if (isAccepted)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.green,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.white, size: 16),
-                      SizedBox(width: 4),
-                      Text('Đã chọn',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                )
-              else if (isPending)
-                ElevatedButton(
-                  onPressed: _isSelecting ? null : () => _selectProvider(offer),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20)),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  ),
-                  child: _isSelecting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : const Text('Chọn thợ này'),
+              child: Text(
+                '${_offers.length} thợ xung quanh',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
                 ),
-            ],
+              ),
+            ),
           ),
         ],
       ),

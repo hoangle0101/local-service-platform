@@ -260,6 +260,8 @@ class BookingOffer {
   final double price;
   final String status;
   final int? distance; // Distance in meters from booking location
+  final double? latitude;
+  final double? longitude;
 
   BookingOffer({
     required this.id,
@@ -271,6 +273,8 @@ class BookingOffer {
     required this.price,
     required this.status,
     this.distance,
+    this.latitude,
+    this.longitude,
   });
 
   /// Get formatted distance string (e.g., "1.5 km" or "500 m")
@@ -298,6 +302,12 @@ class BookingOffer {
       distance: json['distance'] != null
           ? int.tryParse(json['distance'].toString())
           : null,
+      latitude: json['latitude'] != null
+          ? (json['latitude'] as num).toDouble()
+          : null,
+      longitude: json['longitude'] != null
+          ? (json['longitude'] as num).toDouble()
+          : null,
     );
   }
 }
@@ -314,10 +324,13 @@ class Booking {
   final String? providerName;
   final String? customerName;
   final int? distance; // Distance in meters from provider
+  final double? latitude;
+  final double? longitude;
   final String? bookingType; // 'DIRECT' or 'GENERAL'
   final bool isDirectBooking;
   final bool hasReview;
   final BookingReview? review;
+  final int offersCount;
 
   Booking({
     required this.id,
@@ -331,10 +344,13 @@ class Booking {
     this.providerName,
     this.customerName,
     this.distance,
+    this.latitude,
+    this.longitude,
     this.bookingType,
     this.isDirectBooking = false,
     this.hasReview = false,
     this.review,
+    this.offersCount = 0,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) {
@@ -353,12 +369,19 @@ class Booking {
       customerName: json['customer']?['fullName'] ?? json['customerName'],
       distance:
           json['distance'] != null ? (json['distance'] as num).toInt() : null,
+      latitude: json['latitude'] != null
+          ? (json['latitude'] as num).toDouble()
+          : null,
+      longitude: json['longitude'] != null
+          ? (json['longitude'] as num).toDouble()
+          : null,
       bookingType: json['bookingType'] as String?,
       isDirectBooking: json['isDirectBooking'] == true,
       hasReview: json['hasReview'] == true,
       review: json['review'] != null
           ? BookingReview.fromJson(json['review'])
           : null,
+      offersCount: json['offersCount'] ?? 0,
     );
   }
 }

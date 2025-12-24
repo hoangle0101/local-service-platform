@@ -14,6 +14,12 @@ export class ServiceSearchDto {
   @IsNumber()
   categoryId?: number;
 
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  serviceId?: number;
+
   @ApiPropertyOptional({ example: 100000 })
   @IsOptional()
   @Type(() => Number)

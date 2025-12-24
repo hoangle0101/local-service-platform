@@ -24,15 +24,24 @@ export default function ServicesPage() {
   const { data: response, isLoading, refetch } = useQuery({
     queryKey: ['admin-services', page, searchQuery, statusFilter],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<PaginatedResponse<Service>>>('/services/search', {
+      const res = await api.get<ApiResponse<any>>('/services/search', {
         params: {
           page,
           limit: 20,
-          search: searchQuery || undefined,
-          isActive: statusFilter === 'active' ? true : statusFilter === 'inactive' ? false : undefined,
+          keyword: searchQuery || undefined,
         },
       });
-      return res.data.data;
+      // Handle both response formats: { items, meta } or { data, pagination }
+      const rawData = res.data.data || res.data;
+      return {
+        data: rawData.items || rawData.data || [],
+        pagination: rawData.meta ? {
+          total: rawData.meta.total,
+          limit: rawData.meta.limit,
+          page: rawData.meta.page,
+          totalPages: rawData.meta.totalPages,
+        } : rawData.pagination,
+      };
     },
   });
 
@@ -208,11 +217,11 @@ export default function ServicesPage() {
         pagination={
           response?.pagination
             ? {
-                page,
-                pageSize: response.pagination.limit,
-                total: response.pagination.total,
-                onPageChange: setPage,
-              }
+              page,
+              pageSize: response.pagination.limit,
+              total: response.pagination.total,
+              onPageChange: setPage,
+            }
             : undefined
         }
         isLoading={isLoading}
