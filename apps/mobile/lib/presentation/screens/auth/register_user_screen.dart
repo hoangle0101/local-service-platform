@@ -3,8 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../bloc/auth/auth_bloc.dart';
-import '../../widgets/atoms/custom_button.dart';
-import '../../widgets/atoms/custom_text_field.dart';
+import '../../widgets/minimalist_widgets.dart';
 
 class RegisterUserScreen extends StatefulWidget {
   const RegisterUserScreen({super.key});
@@ -44,28 +43,35 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Create Account'),
-        centerTitle: true,
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.background,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new,
+              size: 20, color: AppColors.textPrimary),
+          onPressed: () => context.pop(),
+        ),
       ),
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is RegistrationSuccess) {
-            // Navigate to OTP verification
             context.push('/verify-otp', extra: {
               'phone': state.phone,
               'purpose': 'verify_phone',
             });
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
+              SnackBar(
+                content: Text(state.message),
+                behavior: SnackBarBehavior.floating,
+              ),
             );
           } else if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
                 backgroundColor: AppColors.error,
+                behavior: SnackBarBehavior.floating,
               ),
             );
           }
@@ -75,122 +81,134 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
 
           return SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.symmetric(horizontal: 28.0),
               child: Form(
                 key: _formKey,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
                     Text(
-                      'Join ServiceHub',
-                      style: Theme.of(context).textTheme.headlineLarge,
+                      'Tạo tài khoản\nmới',
+                      style: Theme.of(context).textTheme.displayLarge,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Text(
-                      'Create your customer account',
-                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                      'Đăng ký tài khoản khách hàng để bắt đầu sử dụng các dịch vụ tiện ích.',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             color: AppColors.textSecondary,
+                            height: 1.5,
                           ),
                     ),
                     const SizedBox(height: 40),
 
                     // Full Name
-                    CustomTextField(
-                      label: 'Full Name',
-                      hint: 'John Doe',
+                    MinTextField(
+                      label: 'Họ và tên',
+                      hint: 'Nhập họ và tên của bạn',
                       controller: _fullNameController,
-                      prefixIcon: const Icon(Icons.person_outline),
+                      prefixIcon:
+                          const Icon(Icons.person_outline_rounded, size: 20),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Please enter your full name';
+                          return 'Vui lòng nhập họ và tên';
                         }
                         return null;
                       },
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
                     // Phone Number
-                    CustomTextField(
-                      label: 'Phone Number',
-                      hint: '+84987654321',
-                      type: TextFieldType.phone,
+                    MinTextField(
+                      label: 'Số điện thoại',
+                      hint: 'Nhập số điện thoại của bạn',
                       controller: _phoneController,
-                      prefixIcon: const Icon(Icons.phone_outlined),
+                      keyboardType: TextInputType.phone,
+                      prefixIcon:
+                          const Icon(Icons.phone_iphone_rounded, size: 20),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Please enter your phone number';
+                          return 'Vui lòng nhập số điện thoại';
                         }
                         return null;
                       },
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
                     // Password
-                    CustomTextField(
-                      label: 'Password',
-                      hint: 'At least 6 characters',
-                      type: TextFieldType.password,
+                    MinTextField(
+                      label: 'Mật khẩu',
+                      hint: 'Tối thiểu 6 ký tự',
+                      obscureText: true,
                       controller: _passwordController,
-                      prefixIcon: const Icon(Icons.lock_outline),
+                      prefixIcon:
+                          const Icon(Icons.lock_outline_rounded, size: 20),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Please enter a password';
+                          return 'Vui lòng nhập mật khẩu';
                         }
                         if (value.length < 6) {
-                          return 'Password must be at least 6 characters';
+                          return 'Mật khẩu phải có ít nhất 6 ký tự';
                         }
                         return null;
                       },
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
                     // Confirm Password
-                    CustomTextField(
-                      label: 'Confirm Password',
-                      hint: 'Re-enter your password',
-                      type: TextFieldType.password,
+                    MinTextField(
+                      label: 'Xác nhận mật khẩu',
+                      hint: 'Nhập lại mật khẩu của bạn',
+                      obscureText: true,
                       controller: _confirmPasswordController,
-                      prefixIcon: const Icon(Icons.lock_outline),
+                      prefixIcon:
+                          const Icon(Icons.lock_reset_rounded, size: 20),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Please confirm your password';
+                          return 'Vui lòng xác nhận mật khẩu';
                         }
                         if (value != _passwordController.text) {
-                          return 'Passwords do not match';
+                          return 'Mật khẩu xác nhận không khớp';
                         }
                         return null;
                       },
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 48),
 
                     // Register Button
-                    CustomButton(
-                      text: 'Create Account',
+                    MinButton(
+                      text: 'Đăng ký ngay',
                       onPressed: isLoading ? null : _handleRegister,
                       isLoading: isLoading,
                       isFullWidth: true,
-                      size: ButtonSize.large,
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
 
                     // Login Link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Already have an account? ',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            context.push('/login');
-                          },
-                          child: const Text('Login'),
-                        ),
-                      ],
+                    Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Đã có tài khoản? ',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          GestureDetector(
+                            onTap: () => context.push('/login'),
+                            child: Text(
+                              'Đăng nhập ngay',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(height: 32),
                   ],
                 ),
               ),

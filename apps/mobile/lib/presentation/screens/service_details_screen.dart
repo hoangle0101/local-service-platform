@@ -212,7 +212,7 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
                       size: 16, color: AppColors.primary),
                   const SizedBox(width: 4),
                   Text(
-                    '${service.service.durationMinutes ?? 60} min',
+                    '${service.service.durationMinutes ?? 60} p',
                     style: const TextStyle(
                       color: AppColors.primary,
                       fontWeight: FontWeight.bold,
@@ -335,7 +335,7 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Description',
+          'Mô tả dịch vụ',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -388,7 +388,7 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Total Price',
+                    'Giá dịch vụ',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12,
@@ -446,7 +446,7 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
                         elevation: 0,
                       ),
                       child: const Text(
-                        'Book Now',
+                        'Đặt lịch ngay',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,

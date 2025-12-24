@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../widgets/minimalist_widgets.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
@@ -8,56 +9,66 @@ class RoleSelectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Join as'),
-        centerTitle: true,
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.background,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new,
+              size: 20, color: AppColors.textPrimary),
+          onPressed: () => context.pop(),
+        ),
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 28.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const SizedBox(height: 20),
               Text(
-                'Choose your role',
-                style: Theme.of(context).textTheme.headlineLarge,
-                textAlign: TextAlign.center,
+                'Bạn là ai?',
+                style: Theme.of(context).textTheme.displayLarge,
               ),
               const SizedBox(height: 12),
               Text(
-                'Select how you want to use ServiceHub',
-                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                'Chọn vai trò của bạn để bắt đầu trải nghiệm những tiện ích tuyệt vời nhất.',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: AppColors.textSecondary,
+                      height: 1.5,
                     ),
-                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 48),
               _RoleCard(
-                icon: Icons.person_outline,
-                title: 'I\'m a Customer',
-                description: 'Looking for services',
-                onTap: () {
-                  context.push('/register/user');
-                },
+                icon: Icons.person_search_rounded,
+                title: 'Tôi là Khách hàng',
+                description:
+                    'Tìm kiếm, đặt lịch và trải nghiệm các dịch vụ chất lượng.',
+                onTap: () => context.push('/register/user'),
+              ),
+              const SizedBox(height: 24),
+              _RoleCard(
+                icon: Icons.business_center_rounded,
+                title: 'Tôi là Đối tác',
+                description:
+                    'Cung cấp dịch vụ chuyên nghiệp và phát triển kinh doanh.',
+                onTap: () => context.push('/register/provider'),
+              ),
+              const Spacer(),
+              Center(
+                child: TextButton(
+                  onPressed: () => context.go('/'),
+                  child: const Text(
+                    'Quay lại Trang chủ',
+                    style: TextStyle(
+                      color: AppColors.textTertiary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 20),
-              _RoleCard(
-                icon: Icons.work_outline,
-                title: 'I\'m a Provider',
-                description: 'Offering services',
-                onTap: () {
-                  context.push('/register/provider');
-                },
-              ),
-              const SizedBox(height: 32),
-              TextButton(
-                onPressed: () {
-                  context.go('/');
-                },
-                child: const Text('Back to Home'),
-              ),
             ],
           ),
         ),
@@ -81,67 +92,51 @@ class _RoleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return MinCard(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: AppColors.borderLight,
-            width: 2,
+      padding: const EdgeInsets.all(24),
+      borderRadius: 32,
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.08),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 28,
+              color: AppColors.primary,
+            ),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontSize: 17,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  description,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        height: 1.4,
+                      ),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                size: 32,
-                color: AppColors.primaryDark,
-              ),
-            ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.arrow_forward_ios,
-              color: AppColors.textSecondary,
-              size: 20,
-            ),
-          ],
-        ),
+          ),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: AppColors.borderMedium,
+            size: 24,
+          ),
+        ],
       ),
     );
   }
