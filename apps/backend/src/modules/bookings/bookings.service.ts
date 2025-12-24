@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   EstimateDto,
   CreateBookingDto,
@@ -15,7 +16,10 @@ import {
 
 @Injectable()
 export class BookingsService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   // POST /bookings/estimate
   async estimateBooking(dto: EstimateDto) {
@@ -50,10 +54,10 @@ export class BookingsService {
       estimatedDuration: service.durationMinutes,
       provider: provider
         ? {
-          id: (provider as any).user_id.toString(),
-          displayName: (provider as any).display_name,
-          ratingAvg: (provider as any).rating_avg?.toString() || '0',
-        }
+            id: (provider as any).user_id.toString(),
+            displayName: (provider as any).display_name,
+            ratingAvg: (provider as any).rating_avg?.toString() || '0',
+          }
         : null,
     };
   }
@@ -309,6 +313,9 @@ export class BookingsService {
           serviceId: booking.serviceId,
         },
       },
+      include: {
+        provider: true,
+      },
     });
 
     if (!providerService)
@@ -358,6 +365,24 @@ export class BookingsService {
       bookingId,
       providerId,
       Number(providerService.price),
+    );
+
+    // Notify Customer
+    const providerName = providerService.provider.displayName || 'Thợ';
+    const priceFormatted = Number(providerService.price).toLocaleString(
+      'vi-VN',
+    );
+
+    await this.notificationsService.create(
+      booking.customerId,
+      'OFFER_RECEIVED',
+      'Đã nhận được báo giá mới',
+      `${providerName} vừa gửi báo giá ${priceFormatted}đ cho đơn đặt lịch của bạn. Xem ngay!`,
+      {
+        bookingId: booking.id.toString(),
+        offerId: offerResult[0].id.toString(),
+        type: 'booking_offer',
+      },
     );
 
     return {
@@ -445,7 +470,13 @@ export class BookingsService {
     if (booking.customerId !== userId)
       throw new ForbiddenException('Not your booking');
 
+    console.log(
+      '[getBookingOffers] Loading offers for bookingId:',
+      bookingId.toString(),
+    );
+
     // Get offers using raw SQL with distance calculation
+    // Use LEFT JOIN to include offers even if provider doesn't have a profile
     const offers = await this.prisma.$queryRawUnsafe<any[]>(
       `
       SELECT 
@@ -454,7 +485,7 @@ export class BookingsService {
         bo.provider_id,
         bo.price,
         bo.status,
-        pp.display_name as provider_name,
+        COALESCE(pp.display_name, up.full_name, 'Thợ') as provider_name,
         pp.rating_avg,
         pp.address as provider_address,
         CASE 
@@ -463,7 +494,8 @@ export class BookingsService {
           ELSE NULL 
         END as distance
       FROM booking_offers bo
-      JOIN provider_profiles pp ON bo.provider_id = pp.user_id
+      LEFT JOIN provider_profiles pp ON bo.provider_id = pp.user_id
+      LEFT JOIN user_profiles up ON bo.provider_id = up.user_id
       JOIN bookings b ON bo.booking_id = b.id
       WHERE bo.booking_id = $1
       ORDER BY bo.created_at DESC
@@ -471,12 +503,17 @@ export class BookingsService {
       bookingId,
     );
 
+    console.log('[getBookingOffers] Found', offers.length, 'offers');
+    if (offers.length > 0) {
+      console.log('[getBookingOffers] First offer:', offers[0]);
+    }
+
     return {
       offers: offers.map((o) => ({
         id: o.id.toString(),
         bookingId: o.booking_id.toString(),
         providerId: o.provider_id.toString(),
-        providerName: o.provider_name,
+        providerName: o.provider_name || 'Thợ',
         providerAddress: o.provider_address,
         rating: o.rating_avg?.toString(),
         price: o.price.toString(),
@@ -709,10 +746,10 @@ export class BookingsService {
         },
         provider: b.providerUser
           ? {
-            id: b.providerUser.id.toString(),
-            fullName: b.providerUser.profile?.fullName,
-            avatarUrl: b.providerUser.profile?.avatarUrl,
-          }
+              id: b.providerUser.id.toString(),
+              fullName: b.providerUser.profile?.fullName,
+              avatarUrl: b.providerUser.profile?.avatarUrl,
+            }
           : null,
       })),
       meta: {
@@ -794,11 +831,11 @@ export class BookingsService {
       },
       provider: b.providerUser
         ? {
-          id: b.providerUser.id.toString(),
-          phone: b.providerUser.phone,
-          fullName: b.providerUser.profile?.fullName,
-          avatarUrl: b.providerUser.profile?.avatarUrl,
-        }
+            id: b.providerUser.id.toString(),
+            phone: b.providerUser.phone,
+            fullName: b.providerUser.profile?.fullName,
+            avatarUrl: b.providerUser.profile?.avatarUrl,
+          }
         : null,
       timeline: b.bookingEvents.map((e: any) => ({
         status: e.newStatus,
@@ -808,10 +845,10 @@ export class BookingsService {
       })),
       review: b.review
         ? {
-          rating: b.review.rating,
-          comment: b.review.comment,
-          createdAt: b.review.createdAt,
-        }
+            rating: b.review.rating,
+            comment: b.review.comment,
+            createdAt: b.review.createdAt,
+          }
         : null,
     };
   }

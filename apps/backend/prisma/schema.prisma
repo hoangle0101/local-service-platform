@@ -26,6 +26,7 @@ enum BookingStatus {
   accepted
   in_progress
   pending_completion
+  pending_payment
   completed
   cancelled
   disputed
@@ -73,6 +74,7 @@ enum TransactionType {
 }
 
 enum PaymentMethod {
+  cod
   card
   momo
   bank_transfer
@@ -117,6 +119,11 @@ model User {
   auditLogs             AuditLog[]
   favorites             Favorite[]
   bookingOffers         BookingOffer[]
+  serviceQuotes         ServiceQuote[]   @relation("ProviderQuotes")
+  customerPayments      BookingPayment[] @relation("CustomerPayments")
+  providerPayments      BookingPayment[] @relation("ProviderPayments")
+  providerWithdrawals   Withdrawal[]     @relation("ProviderWithdrawals")
+  adminWithdrawals      Withdrawal[]     @relation("AdminWithdrawals")
 
   @@index([email])
   @@index([status])
@@ -353,22 +360,29 @@ model Booking {
   estimatedDurationMinutes Int?                                 @map("estimated_duration_minutes")
   estimatedPrice           Decimal?                             @map("estimated_price") @db.Decimal(12, 2)
   actualPrice              Decimal?                             @map("actual_price") @db.Decimal(12, 2)
+  additionalCosts          Decimal?                             @map("additional_costs") @db.Decimal(12, 2)
+  additionalNotes          String?                              @map("additional_notes") @db.Text
   platformFee              Decimal                              @default(0) @map("platform_fee") @db.Decimal(12, 2)
   providerEarning          Decimal                              @default(0) @map("provider_earning") @db.Decimal(12, 2)
+  paymentMethod            PaymentMethod?                       @map("payment_method")
+  paymentStatus            String                               @default("unpaid") @map("payment_status") @db.VarChar(20)
   createdAt                DateTime                             @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                DateTime                             @updatedAt @map("updated_at") @db.Timestamptz(6)
   completedAt              DateTime?                            @map("completed_at") @db.Timestamptz(6)
   cancelledAt              DateTime?                            @map("cancelled_at") @db.Timestamptz(6)
+  paidAt                   DateTime?                            @map("paid_at") @db.Timestamptz(6)
 
-  customer      User           @relation("CustomerBookings", fields: [customerId], references: [id], onDelete: Restrict)
-  providerUser  User?          @relation("ProviderBookings", fields: [providerId], references: [id], onDelete: Restrict)
-  service       Service        @relation(fields: [serviceId], references: [id], onDelete: Restrict)
-  bookingEvents BookingEvent[]
-  payments      Payment[]
-  review        Review?
-  dispute       Dispute?
-  conversations Conversation[]
-  bookingOffers BookingOffer[]
+  customer       User            @relation("CustomerBookings", fields: [customerId], references: [id], onDelete: Restrict)
+  providerUser   User?           @relation("ProviderBookings", fields: [providerId], references: [id], onDelete: Restrict)
+  service        Service         @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  bookingEvents  BookingEvent[]
+  payments       Payment[]
+  review         Review?
+  dispute        Dispute?
+  conversations  Conversation[]
+  bookingOffers  BookingOffer[]
+  serviceQuotes  ServiceQuote[]
+  bookingPayment BookingPayment?
 
   @@index([customerId, status])
   @@index([providerId, status])
@@ -624,4 +638,142 @@ model Setting {
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("settings")
+}
+
+// ============================================
+// MODULE 9: PAYMENT SYSTEM (3 bảng mới)
+// ============================================
+
+enum QuoteStatus {
+  pending
+  accepted
+  rejected
+  expired
+}
+
+enum WithdrawalStatus {
+  pending
+  processing
+  completed
+  failed
+  cancelled
+}
+
+enum BookingPaymentStatus {
+  pending // Chờ thanh toán
+  held // Đã giữ trong escrow
+  released // Đã chuyển cho provider
+  refunded // Đã hoàn tiền
+  disputed // Đang tranh chấp
+}
+
+// Báo giá cho dịch vụ sửa chữa (giá biến đổi)
+model ServiceQuote {
+  id         BigInt @id @default(autoincrement())
+  bookingId  BigInt @map("booking_id")
+  providerId BigInt @map("provider_id")
+
+  diagnosis   String  @db.Text // Mô tả lỗi
+  items       Json    @db.JsonB // [{name, price, qty}]
+  laborCost   Decimal @map("labor_cost") @db.Decimal(18, 2) // Công sửa
+  partsCost   Decimal @map("parts_cost") @db.Decimal(18, 2) // Linh kiện
+  totalCost   Decimal @map("total_cost") @db.Decimal(18, 2) // Tổng
+  platformFee Decimal @map("platform_fee") @db.Decimal(18, 2) // 10%
+  finalPrice  Decimal @map("final_price") @db.Decimal(18, 2) // Khách trả
+
+  warranty      String?  @db.VarChar(100) // Bảo hành
+  estimatedTime Int?     @map("estimated_time") // Phút
+  images        String[] @db.VarChar(500) // URL ảnh hư hỏng
+  notes         String?  @db.Text
+
+  status     QuoteStatus @default(pending)
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt  DateTime    @map("expires_at") @db.Timestamptz(6) // Hết hạn 24h
+  acceptedAt DateTime?   @map("accepted_at") @db.Timestamptz(6)
+
+  booking  Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  provider User    @relation("ProviderQuotes", fields: [providerId], references: [id])
+
+  @@index([bookingId])
+  @@index([providerId])
+  @@index([status])
+  @@map("service_quotes")
+}
+
+// Theo dõi thanh toán booking với escrow
+model BookingPayment {
+  id         BigInt @id @default(autoincrement())
+  bookingId  BigInt @unique @map("booking_id")
+  customerId BigInt @map("customer_id")
+  providerId BigInt @map("provider_id")
+
+  amount         Decimal @db.Decimal(18, 2) // Tổng tiền khách trả
+  platformFee    Decimal @map("platform_fee") @db.Decimal(18, 2) // 10%
+  providerAmount Decimal @map("provider_amount") @db.Decimal(18, 2) // 90%
+
+  paymentMethod String  @map("payment_method") @db.VarChar(20) // COD, MOMO
+  momoTransId   String? @map("momo_trans_id") @db.VarChar(100)
+
+  status     BookingPaymentStatus @default(pending)
+  paidAt     DateTime?            @map("paid_at") @db.Timestamptz(6)
+  heldAt     DateTime?            @map("held_at") @db.Timestamptz(6)
+  releasedAt DateTime?            @map("released_at") @db.Timestamptz(6)
+  refundedAt DateTime?            @map("refunded_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  booking  Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  customer User    @relation("CustomerPayments", fields: [customerId], references: [id])
+  provider User    @relation("ProviderPayments", fields: [providerId], references: [id])
+
+  @@index([customerId])
+  @@index([providerId])
+  @@index([status])
+  @@map("booking_payments")
+}
+
+// Rút tiền của Provider
+model Withdrawal {
+  id         BigInt @id @default(autoincrement())
+  providerId BigInt @map("provider_id")
+
+  amount    Decimal @db.Decimal(18, 2) // Số tiền rút
+  fee       Decimal @default(0) @db.Decimal(18, 2) // Phí rút
+  netAmount Decimal @map("net_amount") @db.Decimal(18, 2) // Thực nhận
+
+  method      String  @db.VarChar(20) // BANK, MOMO
+  bankName    String? @map("bank_name") @db.VarChar(100)
+  bankAccount String? @map("bank_account") @db.VarChar(50)
+  bankHolder  String? @map("bank_holder") @db.VarChar(100)
+  momoPhone   String? @map("momo_phone") @db.VarChar(20)
+
+  status      WithdrawalStatus @default(pending)
+  note        String?          @db.Text
+  adminNote   String?          @map("admin_note") @db.Text
+  processedBy BigInt?          @map("processed_by")
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(6)
+
+  provider User  @relation("ProviderWithdrawals", fields: [providerId], references: [id])
+  admin    User? @relation("AdminWithdrawals", fields: [processedBy], references: [id])
+
+  @@index([providerId])
+  @@index([status])
+  @@map("withdrawals")
+}
+
+// Giá sàn cho từng loại dịch vụ (Platform quyết định)
+model MinimumPrice {
+  id           BigInt   @id @default(autoincrement())
+  categoryCode String   @map("category_code") @db.VarChar(50)
+  categoryName String   @map("category_name") @db.VarChar(100)
+  minPrice     Decimal  @map("min_price") @db.Decimal(18, 2)
+  description  String?  @db.Text
+  isActive     Boolean  @default(true) @map("is_active")
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([categoryCode])
+  @@map("minimum_prices")
 }

@@ -46,8 +46,11 @@ class BookingsDataSource {
         'addressText': addressText,
         'latitude': latitude,
         'longitude': longitude,
-        'notes': notes,
       };
+
+      if (notes != null && notes.isNotEmpty) {
+        data['notes'] = notes;
+      }
 
       // Add providerId if this is a direct booking
       if (providerId != null) {
@@ -81,6 +84,18 @@ class BookingsDataSource {
         'isDirectBooking': bookingData['isDirectBooking'] ?? false,
         'nearbyProviderIds': bookingData['nearbyProviderIds'] ?? [],
       };
+    } on DioException catch (e) {
+      print('[BookingsDataSource] DioException creating booking: ${e.message}');
+      print('[BookingsDataSource] Error Response Body: ${e.response?.data}');
+      if (e.response?.data is Map && e.response!.data.containsKey('message')) {
+        final msg = e.response!.data['message'];
+        // Backend validation errors can be array
+        if (msg is List) {
+          throw Exception(msg.join(', '));
+        }
+        throw Exception(msg);
+      }
+      throw Exception('Failed to create booking: ${e.message}');
     } catch (e) {
       print('[BookingsDataSource] Error creating booking: $e');
       throw Exception('Failed to create booking: $e');
@@ -89,10 +104,36 @@ class BookingsDataSource {
 
   Future<List<BookingOffer>> getBookingOffers(int bookingId) async {
     try {
+      print(
+          '[BookingsDataSource] getBookingOffers called for bookingId: $bookingId');
       final response = await _dio.get('/bookings/$bookingId/offers');
-      final List<dynamic> data = response.data['offers'] ?? [];
-      return data.map((json) => BookingOffer.fromJson(json)).toList();
+      print('[BookingsDataSource] getBookingOffers response: ${response.data}');
+
+      // Handle nested response format: {statusCode, message, data: {offers: [...]}}
+      // OR direct format: {offers: [...]}
+      final responseBody = response.data;
+      List<dynamic> offersData = [];
+
+      if (responseBody is Map) {
+        if (responseBody.containsKey('data') && responseBody['data'] is Map) {
+          // Nested format
+          offersData = responseBody['data']['offers'] as List<dynamic>? ?? [];
+        } else if (responseBody.containsKey('offers')) {
+          // Direct format
+          offersData = responseBody['offers'] as List<dynamic>? ?? [];
+        }
+      }
+
+      print('[BookingsDataSource] Found ${offersData.length} offers');
+      return offersData
+          .map((json) => BookingOffer.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      print('[BookingsDataSource] DioException loading offers: ${e.message}');
+      print('[BookingsDataSource] Error response: ${e.response?.data}');
+      throw Exception('Failed to load offers: ${e.message}');
     } catch (e) {
+      print('[BookingsDataSource] Error loading offers: $e');
       throw Exception('Failed to load offers: $e');
     }
   }

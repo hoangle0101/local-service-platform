@@ -16,6 +16,8 @@ import { ConversationsModule } from './modules/conversations/conversations.modul
 import { DisputesModule } from './modules/disputes/disputes.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
+import { PaymentModule } from './modules/payment/payment.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -38,8 +40,10 @@ import configuration from './config/configuration';
     DisputesModule,
     AdminModule,
     ReviewsModule,
+    PaymentModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

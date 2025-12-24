@@ -8,6 +8,8 @@ import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../widgets/review_dialog.dart';
 import '../../widgets/minimalist_widgets.dart';
+import '../../widgets/booking_offers_dialog.dart';
+import '../booking/invoice_screen.dart';
 
 class UserBookingsScreen extends StatefulWidget {
   const UserBookingsScreen({super.key});
@@ -39,10 +41,85 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
     context.read<BookingsBloc>().add(const LoadBookings());
   }
 
+  void _showOffersDialog(String bookingId) {
+    showDialog(
+      context: context,
+      builder: (context) => BookingOffersDialog(
+        bookingId: bookingId,
+        onProviderSelected: _refreshBookings,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.backgroundPrimary,
+      appBar: AppBar(
+        title: const Text('My Bookings'),
+        backgroundColor: AppColors.white,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshBookings,
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: BlocBuilder<BookingsBloc, BookingsState>(
+            builder: (context, state) {
+              int pendingCount = 0;
+              int acceptedCount = 0;
+              int completedCount = 0;
+              int cancelledCount = 0;
+
+              if (state is BookingsLoaded) {
+                final bookings = state.bookings;
+                pendingCount =
+                    bookings.where((b) => b.status == 'pending').length;
+                acceptedCount = bookings
+                    .where((b) =>
+                        b.status == 'accepted' ||
+                        b.status == 'confirmed' ||
+                        b.status == 'in_progress' ||
+                        b.status == 'pending_completion' ||
+                        b.status == 'pending_payment')
+                    .length;
+                completedCount =
+                    bookings.where((b) => b.status == 'completed').length;
+                cancelledCount = bookings
+                    .where((b) =>
+                        b.status == 'cancelled' || b.status == 'disputed')
+                    .length;
+              }
+
+              return TabBar(
+                controller: _tabController,
+                labelColor: AppColors.primaryDark,
+                unselectedLabelColor: AppColors.textSecondary,
+                indicatorColor: AppColors.primaryDark,
+                isScrollable: true,
+                tabs: [
+                  Tab(
+                      text:
+                          'Pending${pendingCount > 0 ? " ($pendingCount)" : ""}'),
+                  Tab(
+                      text:
+                          'Accepted${acceptedCount > 0 ? " ($acceptedCount)" : ""}'),
+                  Tab(
+                      text:
+                          'Completed${completedCount > 0 ? " ($completedCount)" : ""}'),
+                  Tab(
+                      text:
+                          'Cancelled${cancelledCount > 0 ? " ($cancelledCount)" : ""}'),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
       body: BlocConsumer<BookingsBloc, BookingsState>(
         listener: (context, state) {
           if (state is BookingActionSuccess) {
@@ -415,6 +492,10 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
         color = AppColors.success;
         label = 'Hoàn tất?';
         break;
+      case 'pending_payment':
+        color = Colors.orange;
+        label = 'CHỜ THANH TOÁN';
+        break;
       case 'completed':
         color = AppColors.success;
         label = 'Xây xong';
@@ -445,8 +526,25 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
     if (status == 'pending') {
       return Row(
         children: [
-          _buildSmallButton('Hủy', () => _showCancelDialog(booking.id),
-              isError: true),
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => _showCancelDialog(booking.id),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error,
+                side: const BorderSide(color: AppColors.error),
+              ),
+              child: const Text('Cancel'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () {
+                // TODO: View offers
+              },
+              child: const Text('View Offers'),
+            ),
+          ),
         ],
       );
     } else if (status == 'pending_completion') {
@@ -459,10 +557,90 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
               isPrimary: true),
         ],
       );
-    } else if (status == 'completed' && !booking.hasReview) {
-      return _buildSmallButton('Đánh giá',
-          () => _showReviewDialog(booking.id, serviceName: booking.serviceName),
-          isPrimary: true);
+    } else if (status == 'pending_payment') {
+      // Customer needs to pay
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => InvoiceScreen(bookingId: booking.id),
+              ),
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+          icon: const Icon(Icons.payment),
+          label: const Text('Thanh toán'),
+        ),
+      );
+    } else if (status == 'completed') {
+      // Check if already reviewed
+      if (booking.hasReview) {
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.success.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.success.withOpacity(0.3)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.check_circle,
+                  color: AppColors.success, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Đã đánh giá ${booking.review?.rating ?? 0}★',
+                style: const TextStyle(
+                  color: AppColors.success,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      // Not reviewed yet - show review button
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () => _showReviewDialog(
+            booking.id,
+            serviceName: booking.serviceName,
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primaryDark,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          icon: const Icon(Icons.star_rounded),
+          label: const Text(
+            'Đánh giá dịch vụ',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
+      );
+    } else if (status == 'cancelled' || status == 'disputed') {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: () {
+            // TODO: Rebook
+          },
+          icon: const Icon(Icons.refresh),
+          label: const Text('Book Again'),
+        ),
+      );
     }
 
     return const SizedBox.shrink();
@@ -583,5 +761,28 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
         ],
       ),
     );
+  }
+
+  Future<void> _submitDispute(String bookingId, String reason) async {
+    try {
+      final datasource = BookingsDataSource();
+      await datasource.disputeBooking(bookingId, reason);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã gửi khiếu nại. Chúng tôi sẽ liên hệ với bạn sớm.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+
+      _refreshBookings();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
