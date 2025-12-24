@@ -643,7 +643,8 @@ class _AddServiceSheetState extends State<_AddServiceSheet> {
                       color: AppColors.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.add_circle, color: AppColors.primary),
+                    child:
+                        const Icon(Icons.add_circle, color: AppColors.primary),
                   ),
                   const SizedBox(width: 12),
                   const Text(
@@ -779,7 +780,7 @@ class _AddServiceSheetState extends State<_AddServiceSheet> {
     required void Function(T?)? onChanged,
   }) {
     return DropdownButtonFormField<T>(
-      initialValue: value,
+      value: value,
       decoration: InputDecoration(
         hintText: hint,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -928,7 +929,8 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   hintText: 'Nhập giá mới',
-                  prefixIcon: const Icon(Icons.attach_money, color: Colors.blue),
+                  prefixIcon:
+                      const Icon(Icons.attach_money, color: Colors.blue),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
                   filled: true,

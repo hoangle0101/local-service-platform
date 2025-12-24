@@ -472,7 +472,7 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
               border: Border.all(color: Colors.grey.shade300),
             ),
             child: DropdownButtonFormField<Category>(
-              initialValue: _selectedCategory,
+              value: _selectedCategory,
               decoration: const InputDecoration(
                 contentPadding:
                     EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -601,7 +601,8 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
                             ),
                             Row(
                               children: [
-                                const Icon(Icons.star, size: 14, color: Colors.amber),
+                                const Icon(Icons.star,
+                                    size: 14, color: Colors.amber),
                                 Text(
                                   ' ${service.provider.ratingAvg.toStringAsFixed(1)}',
                                   style: const TextStyle(fontSize: 12),

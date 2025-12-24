@@ -3,8 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../bloc/auth/auth_bloc.dart';
-import '../../widgets/atoms/custom_button.dart';
-import '../../widgets/atoms/custom_text_field.dart';
+import '../../widgets/minimalist_widgets.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -28,7 +27,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _handleLogin() {
     if (_formKey.currentState!.validate()) {
-      // Format phone number with +84 if not present
       String phone = _phoneController.text.trim();
       if (!phone.startsWith('+')) {
         if (phone.startsWith('0')) {
@@ -41,7 +39,6 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (_useOtp) {
-        // Send OTP
         context.read<AuthBloc>().add(
               OtpSendRequested(
                 phone: phone,
@@ -49,7 +46,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             );
       } else {
-        // Login with password
         context.read<AuthBloc>().add(
               LoginRequested(
                 phone: phone,
@@ -63,16 +59,21 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Login'),
-        centerTitle: true,
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.background,
         elevation: 0,
+        leading: context.canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new,
+                    size: 20, color: AppColors.textPrimary),
+                onPressed: () => context.pop(),
+              )
+            : null,
       ),
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is Authenticated) {
-            // Navigate based on user role
             if (state.user != null) {
               if (state.user!.isProvider) {
                 context.go('/provider/home');
@@ -80,25 +81,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 context.go('/user/home');
               }
             } else {
-              // Fallback to guest home if no user data
               context.go('/');
             }
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Login successful!')),
+              const SnackBar(
+                content: Text('Đăng nhập thành công!'),
+                behavior: SnackBarBehavior.floating,
+              ),
             );
           } else if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
                 backgroundColor: AppColors.error,
+                behavior: SnackBarBehavior.floating,
               ),
             );
           } else if (state is OtpSent) {
-            // Navigate to OTP verification
             context.push('/verify-otp', extra: {
               'phone': state.phone,
               'purpose': 'login',
-              'code': state.code, // For development
+              'code': state.code,
             });
           }
         },
@@ -107,127 +110,146 @@ class _LoginScreenState extends State<LoginScreen> {
 
           return SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.symmetric(horizontal: 28.0),
               child: Form(
                 key: _formKey,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 20),
-                    // Logo
+                    const SizedBox(height: 12),
+                    // Minimalist Logo/Icon
                     Container(
-                      width: 80,
-                      height: 80,
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryLight,
-                        borderRadius: BorderRadius.circular(16),
+                        color: AppColors.primary.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Icon(
-                        Icons.home_repair_service,
-                        size: 40,
-                        color: AppColors.primaryDark,
+                        Icons.bolt_rounded,
+                        size: 32,
+                        color: AppColors.primary,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
                     Text(
-                      'Welcome Back',
-                      style: Theme.of(context).textTheme.headlineLarge,
+                      'Chào mừng\nbạn quay lại',
+                      style: Theme.of(context).textTheme.displayLarge,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Text(
-                      'Login to continue',
-                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                      'Đăng nhập để tiếp tục sử dụng các dịch vụ tiện ích của chúng tôi.',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             color: AppColors.textSecondary,
+                            height: 1.5,
                           ),
                     ),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 48),
 
                     // Phone Number
-                    CustomTextField(
-                      label: 'Phone Number',
-                      hint: '0987654321 or +84987654321',
-                      type: TextFieldType.phone,
+                    MinTextField(
+                      label: 'Số điện thoại',
+                      hint: 'Nhập số điện thoại của bạn',
                       controller: _phoneController,
-                      prefixIcon: const Icon(Icons.phone_outlined),
+                      keyboardType: TextInputType.phone,
+                      prefixIcon:
+                          const Icon(Icons.phone_iphone_rounded, size: 20),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Please enter your phone number';
+                          return 'Vui lòng nhập số điện thoại';
                         }
                         return null;
                       },
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
                     // Password (only if not using OTP)
                     if (!_useOtp) ...[
-                      CustomTextField(
-                        label: 'Password',
-                        hint: 'Enter your password',
-                        type: TextFieldType.password,
+                      MinTextField(
+                        label: 'Mật khẩu',
+                        hint: 'Nhập mật khẩu của bạn',
+                        obscureText: true,
                         controller: _passwordController,
-                        prefixIcon: const Icon(Icons.lock_outline),
+                        prefixIcon:
+                            const Icon(Icons.lock_outline_rounded, size: 20),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter your password';
+                            return 'Vui lòng nhập mật khẩu';
                           }
                           return null;
                         },
                       ),
-                      const SizedBox(height: 12),
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: () {
                             // TODO: Implement forgot password
                           },
-                          child: const Text('Forgot Password?'),
+                          child: Text(
+                            'Quên mật khẩu?',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
                       ),
                     ],
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
 
                     // Login Button
-                    CustomButton(
-                      text: _useOtp ? 'Send OTP' : 'Login',
+                    MinButton(
+                      text: _useOtp ? 'Gửi mã OTP' : 'Đăng nhập',
                       onPressed: isLoading ? null : _handleLogin,
                       isLoading: isLoading,
                       isFullWidth: true,
-                      size: ButtonSize.large,
                     ),
 
                     const SizedBox(height: 16),
 
                     // Toggle OTP/Password
-                    CustomButton(
-                      text: _useOtp ? 'Use Password Instead' : 'Login with OTP',
-                      variant: ButtonVariant.outline,
-                      onPressed: () {
-                        setState(() {
-                          _useOtp = !_useOtp;
-                        });
-                      },
-                      isFullWidth: true,
+                    SizedBox(
+                      width: double.infinity,
+                      child: MinButton(
+                        text:
+                            _useOtp ? 'Sử dụng mật khẩu' : 'Đăng nhập bằng OTP',
+                        isPrimary: false,
+                        onPressed: () {
+                          setState(() {
+                            _useOtp = !_useOtp;
+                          });
+                        },
+                        isFullWidth: true,
+                      ),
                     ),
 
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 40),
 
                     // Sign Up Link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Don\'t have an account? ',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            context.push('/register/role');
-                          },
-                          child: const Text('Sign Up'),
-                        ),
-                      ],
+                    Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Chưa có tài khoản? ',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          GestureDetector(
+                            onTap: () => context.push('/register/role'),
+                            child: Text(
+                              'Đăng ký ngay',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),

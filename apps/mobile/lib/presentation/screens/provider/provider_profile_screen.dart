@@ -4,8 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../bloc/auth/auth_bloc.dart';
 import '../../widgets/user_avatar.dart';
-import '../../widgets/profile_menu_item.dart';
-import '../../widgets/gradient_header.dart';
+import '../../widgets/minimalist_widgets.dart';
 
 class ProviderProfileScreen extends StatelessWidget {
   const ProviderProfileScreen({super.key});
@@ -13,7 +12,7 @@ class ProviderProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundSecondary,
+      backgroundColor: AppColors.background,
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is Unauthenticated) {
@@ -36,366 +35,301 @@ class ProviderProfileScreen extends StatelessWidget {
     final profile = user.profile;
     final providerProfile = user.providerProfile;
     final avatarUrl = profile?.avatarUrl;
-    final address = providerProfile?.address;
-    final bio = providerProfile?.bio ?? profile?.bio;
+    // Build full avatar URL
+    String? fullAvatarUrl;
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      fullAvatarUrl = avatarUrl.startsWith('http')
+          ? avatarUrl
+          : 'http://10.0.2.2:3000$avatarUrl';
+    }
 
-    return CustomScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      slivers: [
-        SliverToBoxAdapter(
-          child: GradientHeader(
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: () async {
+        context.read<AuthBloc>().add(ProfileFetchRequested());
+      },
+      child: CustomScrollView(
+        physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics()),
+        slivers: [
+          _buildSliverAppBar(context),
+          SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Top bar
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      HeaderActionButton(
-                        icon: Icons.arrow_back,
-                        onTap: () => context.pop(),
-                      ),
-                      HeaderActionButton(
-                        icon: Icons.edit_outlined,
-                        onTap: () => context.push('/provider/profile/edit'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Avatar
-                  UserAvatar(
-                    avatarUrl: avatarUrl != null
-                        ? 'http://10.0.2.2:3000$avatarUrl'
-                        : null,
-                    fullName: user.fullName,
-                    size: 100,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Name
-                  Text(
-                    providerProfile?.displayName ?? user.fullName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-
-                  // Phone
-                  _buildInfoRow(Icons.phone_outlined, user.phone),
-
-                  // Address
-                  if (address != null && address.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    _buildInfoRow(Icons.location_on_outlined, address,
-                        maxLines: 2),
-                  ],
-
                   const SizedBox(height: 12),
-
-                  // Role & Verification badge
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildBadge(
-                        icon: Icons.verified,
-                        label: 'PROVIDER',
-                        color: Colors.amber,
-                      ),
-                      if (providerProfile?.serviceRadiusM != null) ...[
-                        const SizedBox(width: 8),
-                        _buildBadge(
-                          icon: Icons.radar,
-                          label:
-                              '${(providerProfile!.serviceRadiusM! / 1000).toStringAsFixed(0)} km',
-                          color: Colors.lightBlue,
-                        ),
-                      ],
-                    ],
+                  _buildProfileHeader(context, user, fullAvatarUrl),
+                  const SizedBox(height: 32),
+                  _buildStatsSection(context, providerProfile),
+                  const SizedBox(height: 32),
+                  _buildSectionLabel('Công việc'),
+                  const SizedBox(height: 16),
+                  _buildWorkCard(context),
+                  const SizedBox(height: 32),
+                  _buildSectionLabel('Cài đặt'),
+                  const SizedBox(height: 16),
+                  _buildSettingsCard(context),
+                  const SizedBox(height: 48),
+                  MinButton(
+                    text: 'Đăng xuất',
+                    isPrimary: false,
+                    onPressed: () => _showLogoutDialog(context),
                   ),
-
-                  // Bio
-                  if (bio != null && bio.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      bio,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.85),
-                        fontSize: 14,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                  const SizedBox(height: 100),
                 ],
               ),
             ),
           ),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                // Stats card
-                _buildStatsCard(context, providerProfile),
-                const SizedBox(height: 16),
-                _buildWorkCard(context),
-                const SizedBox(height: 16),
-                _buildSettingsCard(context),
-                const SizedBox(height: 16),
-                _buildLogoutButton(context),
-                const SizedBox(height: 32),
-              ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSliverAppBar(BuildContext context) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+      sliver: SliverToBoxAdapter(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            GestureDetector(
+              onTap: () => context.pop(),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.shelf,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.divider),
+                ),
+                child: const Icon(Icons.arrow_back_ios_new_rounded,
+                    size: 20, color: AppColors.textPrimary),
+              ),
             ),
-          ),
+            GestureDetector(
+              onTap: () => context.push('/provider/profile/edit'),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryDark,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Text(
+                  'Sửa hồ sơ',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileHeader(
+      BuildContext context, dynamic user, String? avatarUrl) {
+    final providerProfile = user.providerProfile;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            UserAvatar(
+              avatarUrl: avatarUrl,
+              fullName: user.fullName,
+              size: 80,
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    providerProfile?.displayName ?? user.fullName,
+                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      MinBadge(
+                        label: 'PROVIDER',
+                        color: AppColors.primary.withOpacity(0.1),
+                        textColor: AppColors.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      if (providerProfile?.serviceRadiusM != null)
+                        MinBadge(
+                          label:
+                              '${(providerProfile!.serviceRadiusM! / 1000).toStringAsFixed(0)} km',
+                          color: AppColors.accent.withOpacity(0.1),
+                          textColor: AppColors.accent,
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String text, {int maxLines = 1}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: Colors.white.withOpacity(0.9), size: 16),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              text,
-              style:
-                  TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14),
-              maxLines: maxLines,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBadge({
-    required IconData icon,
-    required String label,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatsCard(BuildContext context, dynamic providerProfile) {
+  Widget _buildStatsSection(BuildContext context, dynamic providerProfile) {
     final rating = providerProfile?.ratingAvg?.toStringAsFixed(1) ?? '0.0';
     final reviews = providerProfile?.ratingCount?.toString() ?? '0';
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
+    return MinCard(
+      padding: const EdgeInsets.symmetric(vertical: 24),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildStatItem(context, '0', 'Hoàn thành', Colors.green),
-          _buildDivider(),
-          _buildStatItem(context, rating, 'Đánh giá', Colors.amber),
-          _buildDivider(),
-          _buildStatItem(context, reviews, 'Reviews', Colors.blue),
+          _buildStatItem('0', 'Xong', AppColors.success),
+          _buildStatDivider(),
+          _buildStatItem(rating, 'Đánh giá', AppColors.warning),
+          _buildStatDivider(),
+          _buildStatItem(reviews, 'Phản hồi', AppColors.primary),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(
-      BuildContext context, String value, String label, Color color) {
+  Widget _buildStatItem(String value, String label, Color color) {
     return Column(
       children: [
         Text(
           value,
           style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
             color: color,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           label,
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+          style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textTertiary,
+              fontWeight: FontWeight.w600),
         ),
       ],
     );
   }
 
-  Widget _buildDivider() {
-    return Container(
-      width: 1,
-      height: 40,
-      color: Colors.grey.shade200,
+  Widget _buildStatDivider() {
+    return Container(width: 1, height: 32, color: AppColors.divider);
+  }
+
+  Widget _buildSectionLabel(String label) {
+    return Text(
+      label,
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w800,
+        color: AppColors.textTertiary,
+        letterSpacing: 1.2,
+      ),
     );
   }
 
   Widget _buildWorkCard(BuildContext context) {
-    return _buildCard([
-      ProfileMenuItem(
-        icon: Icons.person_outline,
-        iconColor: Colors.blue,
-        title: 'Chỉnh sửa hồ sơ',
-        subtitle: 'Cập nhật thông tin cá nhân',
-        onTap: () => context.push('/provider/profile/edit'),
-      ),
-      ProfileMenuItem(
-        icon: Icons.build_outlined,
-        iconColor: Colors.orange,
-        title: 'Dịch vụ của tôi',
-        subtitle: 'Quản lý dịch vụ cung cấp',
-        onTap: () => context.push('/provider/services'),
-      ),
-      ProfileMenuItem(
-        icon: Icons.calendar_today_outlined,
-        iconColor: Colors.green,
-        title: 'Lịch đặt',
-        subtitle: 'Xem và quản lý booking',
-        onTap: () => context.push('/provider/bookings'),
-      ),
-      ProfileMenuItem(
-        icon: Icons.payments_outlined,
-        iconColor: Colors.purple,
-        title: 'Thu nhập',
-        subtitle: 'Xem thống kê thu nhập',
-        onTap: () {},
-      ),
-    ]);
-  }
-
-  Widget _buildSettingsCard(BuildContext context) {
-    return _buildCard([
-      ProfileMenuItem(
-        icon: Icons.notifications_outlined,
-        iconColor: Colors.red,
-        title: 'Thông báo',
-        subtitle: 'Cài đặt thông báo',
-        onTap: () {},
-      ),
-      ProfileMenuItem(
-        icon: Icons.lock_outline,
-        iconColor: Colors.teal,
-        title: 'Bảo mật',
-        subtitle: 'Đổi mật khẩu',
-        onTap: () {},
-      ),
-      ProfileMenuItem(
-        icon: Icons.help_outline,
-        iconColor: Colors.indigo,
-        title: 'Trợ giúp',
-        subtitle: 'Hỗ trợ & FAQ',
-        onTap: () {},
-      ),
-    ]);
-  }
-
-  Widget _buildCard(List<Widget> children) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
+    return MinCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          _buildMenuRow(
+            icon: Icons.build_circle_outlined,
+            title: 'Dịch vụ của tôi',
+            onTap: () => context.push('/provider/services'),
+          ),
+          _buildMenuDivider(),
+          _buildMenuRow(
+            icon: Icons.calendar_today_rounded,
+            title: 'Lịch công việc',
+            onTap: () => context.push('/provider/bookings'),
+          ),
+          _buildMenuDivider(),
+          _buildMenuRow(
+            icon: Icons.account_balance_wallet_outlined,
+            title: 'Ví của tôi',
+            onTap: () {},
           ),
         ],
-      ),
-      child: Column(
-        children: children.expand((w) sync* {
-          if (children.indexOf(w) > 0) {
-            yield Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Divider(height: 1, color: Colors.grey.shade100),
-            );
-          }
-          yield w;
-        }).toList(),
       ),
     );
   }
 
-  Widget _buildLogoutButton(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.red.shade400, Colors.red.shade600],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.red.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+  Widget _buildSettingsCard(BuildContext context) {
+    return MinCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          _buildMenuRow(
+            icon: Icons.notifications_none_rounded,
+            title: 'Thông báo',
+            onTap: () {},
+          ),
+          _buildMenuDivider(),
+          _buildMenuRow(
+            icon: Icons.star_outline_rounded,
+            title: 'Đánh giá từ khách',
+            onTap: () => context.push('/provider/my-reviews'),
+          ),
+          _buildMenuDivider(),
+          _buildMenuRow(
+            icon: Icons.help_outline_rounded,
+            title: 'Trợ giúp & Hỗ trợ',
+            onTap: () {},
           ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _showLogoutDialog(context),
-          borderRadius: BorderRadius.circular(16),
-          child: const Padding(
-            padding: EdgeInsets.symmetric(vertical: 18),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.logout, color: Colors.white, size: 22),
-                SizedBox(width: 10),
-                Text(
-                  'Đăng xuất',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
+    );
+  }
+
+  Widget _buildMenuRow({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: AppColors.shelf,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: AppColors.textPrimary, size: 20),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
         ),
       ),
+      trailing: const Icon(Icons.chevron_right_rounded,
+          color: AppColors.textTertiary, size: 20),
+    );
+  }
+
+  Widget _buildMenuDivider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Divider(height: 1, color: AppColors.divider),
     );
   }
 
@@ -403,21 +337,39 @@ class ProviderProfileScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Đăng xuất'),
-        content: const Text('Bạn có chắc muốn đăng xuất?'),
+        backgroundColor: AppColors.background,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text(
+          'Đăng xuất',
+          style: Theme.of(context).textTheme.headlineMedium,
+        ),
+        content: const Text('Bạn có chắc chắn muốn đăng xuất khỏi ứng dụng?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Hủy'),
+            child: const Text('Hủy bỏ',
+                style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w700)),
           ),
-          TextButton(
-            onPressed: () {
+          GestureDetector(
+            onTap: () {
               Navigator.of(dialogContext).pop();
               context.read<AuthBloc>().add(LogoutRequested());
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Đăng xuất'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Đăng xuất',
+                style: TextStyle(
+                    color: AppColors.error, fontWeight: FontWeight.w800),
+              ),
+            ),
           ),
         ],
       ),
