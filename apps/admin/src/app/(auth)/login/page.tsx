@@ -1,24 +1,31 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { useRouter } from 'next/navigation';
-import Cookies from 'js-cookie';
-import { motion } from 'framer-motion';
-import { Loader2, Lock, Mail } from 'lucide-react';
-import { toast } from 'sonner';
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useRouter } from "next/navigation";
+import Cookies from "js-cookie";
+import { motion } from "framer-motion";
+import { Loader2, Lock, Mail } from "lucide-react";
+import { toast } from "sonner";
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { api, setAuthToken } from '@/lib/api';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { api, setAuthToken } from "@/lib/api";
 
 const loginSchema = z.object({
-  phone: z.string().min(10, 'Phone number is required'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  phone: z.string().min(10, "Phone number is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -34,33 +41,35 @@ export default function LoginPage() {
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      phone: '',
-      password: '',
+      phone: "",
+      password: "",
     },
   });
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     try {
-      const response = await api.post('/auth/login', data);
-      console.log('Login response:', response.data);
-      
+      const response = await api.post("/auth/login", data);
+      console.log("Login response:", response.data);
+
       // Backend wraps response in { statusCode, message, data }
-      const { accessToken } = response.data.data || response.data;
-      
+      const { accessToken, refreshToken } = response.data.data || response.data;
+
       if (!accessToken) {
-        throw new Error('No access token received from server');
+        throw new Error("No access token received from server");
       }
-      
-      setAuthToken(accessToken);
-      toast.success('Login successful');
-      
+
+      // Save both tokens for better session persistence
+      setAuthToken(accessToken, refreshToken);
+      toast.success("Login successful");
+
       // Force reload to ensure middleware picks up the new cookie
-      window.location.href = '/';
-      
+      window.location.href = "/";
     } catch (error: any) {
-      console.error('Login error:', error);
-      toast.error(error.response?.data?.message || error.message || 'Failed to login');
+      console.error("Login error:", error);
+      toast.error(
+        error.response?.data?.message || error.message || "Failed to login"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +103,7 @@ export default function LoginPage() {
                     placeholder="0123456789"
                     type="text"
                     className="pl-9"
-                    {...register('phone')}
+                    {...register("phone")}
                   />
                 </div>
                 {errors.phone && (
@@ -109,25 +118,23 @@ export default function LoginPage() {
                     id="password"
                     type="password"
                     className="pl-9"
-                    {...register('password')}
+                    {...register("password")}
                   />
                 </div>
                 {errors.password && (
-                  <p className="text-xs text-red-500">{errors.password.message}</p>
+                  <p className="text-xs text-red-500">
+                    {errors.password.message}
+                  </p>
                 )}
               </div>
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Signing in...
                   </>
                 ) : (
-                  'Sign In'
+                  "Sign In"
                 )}
               </Button>
             </form>

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   CreateCategoryDto,
@@ -76,7 +80,9 @@ export class ServicesService {
     });
 
     if (existing) {
-      throw new BadRequestException(`Category with code '${dto.code}' already exists`);
+      throw new BadRequestException(
+        `Category with code '${dto.code}' already exists`,
+      );
     }
 
     // Auto-generate slug if not provided
@@ -89,7 +95,9 @@ export class ServicesService {
       });
 
       if (!parent) {
-        throw new NotFoundException(`Parent category with ID ${dto.parentId} not found`);
+        throw new NotFoundException(
+          `Parent category with ID ${dto.parentId} not found`,
+        );
       }
     }
 
@@ -120,7 +128,9 @@ export class ServicesService {
       });
 
       if (!parent) {
-        throw new NotFoundException(`Parent category with ID ${dto.parentId} not found`);
+        throw new NotFoundException(
+          `Parent category with ID ${dto.parentId} not found`,
+        );
       }
     }
 
@@ -137,7 +147,9 @@ export class ServicesService {
     });
 
     if (children > 0) {
-      throw new BadRequestException('Cannot delete category with subcategories');
+      throw new BadRequestException(
+        'Cannot delete category with subcategories',
+      );
     }
 
     // Check if category has services
@@ -146,7 +158,9 @@ export class ServicesService {
     });
 
     if (services > 0) {
-      throw new BadRequestException('Cannot delete category with existing services');
+      throw new BadRequestException(
+        'Cannot delete category with existing services',
+      );
     }
 
     await this.prisma.serviceCategory.delete({
@@ -220,16 +234,20 @@ export class ServicesService {
     ]);
 
     return {
-      items: services.map((s) => ({
+      data: services.map((s) => ({
         id: s.id,
         name: s.name,
         description: s.description,
         basePrice: s.basePrice.toString(),
         durationMinutes: s.durationMinutes,
+        imageUrl: s.imageUrl,
+        isActive: s.isActive,
+        categoryId: s.categoryId,
         category: s.category,
         createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
       })),
-      meta: {
+      pagination: {
         total,
         page,
         limit,
@@ -256,6 +274,9 @@ export class ServicesService {
       description: service.description,
       basePrice: service.basePrice.toString(),
       durationMinutes: service.durationMinutes,
+      imageUrl: service.imageUrl,
+      isActive: service.isActive,
+      categoryId: service.categoryId,
       category: service.category,
       createdAt: service.createdAt,
       updatedAt: service.updatedAt,
@@ -269,7 +290,9 @@ export class ServicesService {
     });
 
     if (!category) {
-      throw new NotFoundException(`Category with ID ${dto.categoryId} not found`);
+      throw new NotFoundException(
+        `Category with ID ${dto.categoryId} not found`,
+      );
     }
 
     const service = await this.prisma.service.create({
@@ -279,6 +302,8 @@ export class ServicesService {
         basePrice: dto.basePrice,
         description: dto.description,
         durationMinutes: dto.durationMinutes,
+        imageUrl: dto.imageUrl,
+        isActive: dto.isActive ?? true,
       },
       include: {
         category: true,
@@ -291,6 +316,8 @@ export class ServicesService {
       description: service.description,
       basePrice: service.basePrice.toString(),
       durationMinutes: service.durationMinutes,
+      imageUrl: service.imageUrl,
+      isActive: service.isActive,
       category: service.category,
       message: 'Service created successfully',
     };
@@ -307,7 +334,9 @@ export class ServicesService {
       });
 
       if (!category) {
-        throw new NotFoundException(`Category with ID ${dto.categoryId} not found`);
+        throw new NotFoundException(
+          `Category with ID ${dto.categoryId} not found`,
+        );
       }
     }
 
@@ -349,4 +378,3 @@ export class ServicesService {
     return { message: 'Service deleted successfully' };
   }
 }
-

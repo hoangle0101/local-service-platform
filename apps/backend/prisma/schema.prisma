@@ -48,8 +48,54 @@ enum ProviderVerificationStatus {
 enum DisputeStatus {
   open
   under_review
+  awaiting_response
+  escalated
   resolved
   closed
+  cancelled
+}
+
+enum DisputeCategory {
+  service_not_completed
+  poor_quality
+  price_disagreement
+  no_show_provider
+  no_show_customer
+  damage_caused
+  unprofessional_behavior
+  payment_issue
+  other
+}
+
+enum DisputeResolutionType {
+  full_refund_to_customer
+  partial_refund_to_customer
+  full_payment_to_provider
+  mutual_cancellation
+  no_action
+}
+
+enum PenaltyType {
+  warning
+  temporary_ban
+  permanent_ban
+  fee_deduction
+  rating_penalty
+}
+
+enum PenaltySeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum EvidenceType {
+  image
+  video
+  audio
+  document
+  screenshot
 }
 
 enum TransactionStatus {
@@ -104,26 +150,30 @@ model User {
   wallet                Wallet?
   userRoles             UserRole[]
   addresses             Address[]
-  bookingsCustomer      Booking[]        @relation("CustomerBookings")
-  bookingsProvider      Booking[]        @relation("ProviderBookings")
+  bookingsCustomer      Booking[]         @relation("CustomerBookings")
+  bookingsProvider      Booking[]         @relation("ProviderBookings")
   sessions              Session[]
   notifications         Notification[]
-  reviewsGiven          Review[]         @relation("ReviewerReviews")
-  reviewsReceived       Review[]         @relation("RevieweeReviews")
-  disputesRaised        Dispute[]        @relation("DisputeRaisedBy")
-  disputesResolved      Dispute[]        @relation("DisputeResolvedBy")
-  conversationsCustomer Conversation[]   @relation("CustomerConversations")
-  conversationsProvider Conversation[]   @relation("ProviderConversations")
+  reviewsGiven          Review[]          @relation("ReviewerReviews")
+  reviewsReceived       Review[]          @relation("RevieweeReviews")
+  disputesRaised        Dispute[]         @relation("DisputeRaisedBy")
+  disputesResolved      Dispute[]         @relation("DisputeResolvedBy")
+  conversationsCustomer Conversation[]    @relation("CustomerConversations")
+  conversationsProvider Conversation[]    @relation("ProviderConversations")
   sentMessages          Message[]
   mediaUploads          Media[]
   auditLogs             AuditLog[]
   favorites             Favorite[]
   bookingOffers         BookingOffer[]
-  serviceQuotes         ServiceQuote[]   @relation("ProviderQuotes")
-  customerPayments      BookingPayment[] @relation("CustomerPayments")
-  providerPayments      BookingPayment[] @relation("ProviderPayments")
-  providerWithdrawals   Withdrawal[]     @relation("ProviderWithdrawals")
-  adminWithdrawals      Withdrawal[]     @relation("AdminWithdrawals")
+  serviceQuotes         ServiceQuote[]    @relation("ProviderQuotes")
+  customerPayments      BookingPayment[]  @relation("CustomerPayments")
+  providerPayments      BookingPayment[]  @relation("ProviderPayments")
+  providerWithdrawals   Withdrawal[]      @relation("ProviderWithdrawals")
+  adminWithdrawals      Withdrawal[]      @relation("AdminWithdrawals")
+  disputeTimelines      DisputeTimeline[]
+  disputeEvidences      DisputeEvidence[]
+  penaltiesReceived     Penalty[]         @relation("UserPenalties")
+  penaltiesCreated      Penalty[]         @relation("PenaltyCreatedBy")
 
   @@index([email])
   @@index([status])
@@ -287,6 +337,8 @@ model Service {
   description     String?  @db.Text
   basePrice       Decimal  @default(0) @map("base_price") @db.Decimal(12, 2)
   durationMinutes Int?     @map("duration_minutes")
+  imageUrl        String?  @map("image_url") @db.Text
+  isActive        Boolean  @default(true) @map("is_active")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -512,21 +564,93 @@ model Review {
 }
 
 model Dispute {
-  id                BigInt        @id @default(autoincrement())
-  bookingId         BigInt        @unique @map("booking_id")
-  raisedBy          BigInt        @map("raised_by")
-  reason            String        @db.Text
-  status            DisputeStatus @default(open)
-  resolution        String?       @db.Text
-  resolvedByAdminId BigInt?       @map("resolved_by_admin_id")
-  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  resolvedAt        DateTime?     @map("resolved_at") @db.Timestamptz(6)
+  id                BigInt                 @id @default(autoincrement())
+  bookingId         BigInt                 @unique @map("booking_id")
+  raisedBy          BigInt                 @map("raised_by")
+  category          DisputeCategory        @default(other)
+  reason            String                 @db.Text
+  status            DisputeStatus          @default(open)
+  resolutionType    DisputeResolutionType? @map("resolution_type")
+  resolution        String?                @db.Text
+  refundAmount      Decimal?               @map("refund_amount") @db.Decimal(15, 2)
+  adminNotes        String?                @map("admin_notes") @db.Text
+  resolvedByAdminId BigInt?                @map("resolved_by_admin_id")
+  escalatedAt       DateTime?              @map("escalated_at") @db.Timestamptz(6)
+  respondedAt       DateTime?              @map("responded_at") @db.Timestamptz(6)
+  appealCount       Int                    @default(0) @map("appeal_count")
+  lastAppealAt      DateTime?              @map("last_appeal_at") @db.Timestamptz(6)
+  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  resolvedAt        DateTime?              @map("resolved_at") @db.Timestamptz(6)
 
-  booking    Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
-  raiser     User    @relation("DisputeRaisedBy", fields: [raisedBy], references: [id])
-  resolvedBy User?   @relation("DisputeResolvedBy", fields: [resolvedByAdminId], references: [id])
+  booking    Booking           @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  raiser     User              @relation("DisputeRaisedBy", fields: [raisedBy], references: [id])
+  resolvedBy User?             @relation("DisputeResolvedBy", fields: [resolvedByAdminId], references: [id])
+  timeline   DisputeTimeline[]
+  evidence   DisputeEvidence[]
+  penalties  Penalty[]
 
+  @@index([status])
+  @@index([category])
+  @@index([createdAt(sort: Desc)])
   @@map("disputes")
+}
+
+// Dispute timeline for tracking all actions
+model DisputeTimeline {
+  id          BigInt   @id @default(autoincrement())
+  disputeId   BigInt   @map("dispute_id")
+  action      String   @db.VarChar(50)
+  description String   @db.Text
+  actorUserId BigInt?  @map("actor_user_id")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  actor   User?   @relation(fields: [actorUserId], references: [id])
+
+  @@index([disputeId])
+  @@map("dispute_timeline")
+}
+
+// Evidence/attachments for disputes
+model DisputeEvidence {
+  id          BigInt       @id @default(autoincrement())
+  disputeId   BigInt       @map("dispute_id")
+  uploaderId  BigInt       @map("uploader_id")
+  type        EvidenceType
+  url         String       @db.VarChar(500)
+  description String?      @db.Text
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  dispute  Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  uploader User    @relation(fields: [uploaderId], references: [id])
+
+  @@index([disputeId])
+  @@map("dispute_evidence")
+}
+
+// Penalty system
+model Penalty {
+  id               BigInt          @id @default(autoincrement())
+  userId           BigInt          @map("user_id")
+  disputeId        BigInt?         @map("dispute_id")
+  type             PenaltyType
+  severity         PenaltySeverity
+  reason           String          @db.Text
+  amount           Decimal?        @db.Decimal(15, 2)
+  expiresAt        DateTime?       @map("expires_at") @db.Timestamptz(6)
+  isActive         Boolean         @default(true) @map("is_active")
+  createdByAdminId BigInt          @map("created_by_admin_id")
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user      User     @relation("UserPenalties", fields: [userId], references: [id])
+  dispute   Dispute? @relation(fields: [disputeId], references: [id])
+  createdBy User     @relation("PenaltyCreatedBy", fields: [createdByAdminId], references: [id])
+
+  @@index([userId])
+  @@index([disputeId])
+  @@index([isActive])
+  @@map("penalties")
 }
 
 model Conversation {

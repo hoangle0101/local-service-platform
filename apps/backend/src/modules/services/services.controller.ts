@@ -43,7 +43,7 @@ export class ServicesController {
 
   @Post('categories')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin: Create category' })
   async createCategory(@Body() dto: CreateCategoryDto) {
@@ -52,16 +52,19 @@ export class ServicesController {
 
   @Put('categories/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin: Update category' })
-  async updateCategory(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
+  async updateCategory(
+    @Param('id') id: string,
+    @Body() dto: UpdateCategoryDto,
+  ) {
     return this.servicesService.updateCategory(parseInt(id), dto);
   }
 
   @Delete('categories/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin: Delete category' })
   async deleteCategory(@Param('id') id: string) {
@@ -84,7 +87,7 @@ export class ServicesController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin: Create service' })
   async createService(@Body() dto: CreateServiceDto) {
@@ -93,7 +96,7 @@ export class ServicesController {
 
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin: Update service' })
   async updateService(@Param('id') id: string, @Body() dto: UpdateServiceDto) {
@@ -102,11 +105,10 @@ export class ServicesController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin')
+  @Roles('admin', 'super_admin')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin: Delete service' })
   async deleteService(@Param('id') id: string) {
     return this.servicesService.deleteService(parseInt(id));
   }
 }
-

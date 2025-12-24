@@ -63,22 +63,14 @@ async function main() {
         create: { name: 'admin', description: 'Platform administrator' },
     });
 
-    const superAdminRole = await prisma.role.upsert({
-        where: { name: 'super_admin' },
-        update: {},
-        create: { name: 'super_admin', description: 'Super administrator with full access' },
-    });
-
     console.log('✅ Roles created!\n');
 
     // ============================================
-    // STEP 2: Create Admin Users
+    // STEP 2: Create Admin User
     // ============================================
-    console.log('👨‍💼 Creating admin users...');
+    console.log('👨‍💼 Creating admin user...');
 
     const adminPassword = await bcrypt.hash('Admin@123', 10);
-
-    // Regular Admin User
     const admin = await prisma.user.create({
         data: {
             phone: '0123456789',
@@ -94,30 +86,7 @@ async function main() {
             },
         },
     });
-    console.log(`✅ Admin created: ${admin.phone}`);
-
-    // Super Admin User
-    const superAdmin = await prisma.user.create({
-        data: {
-            phone: '0111111111',
-            email: 'superadmin@localservice.com',
-            passwordHash: adminPassword,
-            status: 'active',
-            isVerified: true,
-            profile: {
-                create: { fullName: 'Super Admin', gender: 'male' },
-            },
-            userRoles: {
-                createMany: {
-                    data: [
-                        { roleId: adminRole.id },
-                        { roleId: superAdminRole.id },
-                    ],
-                },
-            },
-        },
-    });
-    console.log(`✅ Super Admin created: ${superAdmin.phone}\n`);
+    console.log(`✅ Admin created: ${admin.phone}\n`);
 
     // ============================================
     // STEP 3: Create Service Categories & Services
@@ -545,9 +514,9 @@ async function main() {
     console.log('📊 SEED COMPLETED - DATA SUMMARY');
     console.log('═══════════════════════════════════════════════════════════════════');
     console.log('');
-    console.log('👨‍💼 ADMIN ACCOUNTS:');
-    console.log('   Admin:       Phone: 0123456789  | Password: Admin@123');
-    console.log('   Super Admin: Phone: 0111111111  | Password: Admin@123');
+    console.log('👨‍💼 ADMIN ACCOUNT:');
+    console.log('   Phone: 0123456789');
+    console.log('   Password: Admin@123');
     console.log('');
     console.log('🙎 CUSTOMERS (30 total):');
     console.log('   - Active: 24 (phones: 0900000001 - 0900000024)');

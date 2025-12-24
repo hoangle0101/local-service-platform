@@ -1,263 +1,443 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { ArrowLeft, AlertTriangle } from 'lucide-react';
-import { api } from '@/lib/api';
-import { Dispute } from '@/types/dispute';
-import { ApiResponse } from '@/types/system';
-import { toast } from 'sonner';
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useParams, useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  ArrowLeft,
+  AlertTriangle,
+  Clock,
+  CheckCircle,
+  MessageCircle,
+  ArrowUp,
+  Loader2,
+} from "lucide-react";
+import { api } from "@/lib/api";
+import {
+  Dispute,
+  ResolveDisputeInput,
+  DISPUTE_CATEGORY_LABELS,
+  RESOLUTION_TYPE_LABELS,
+} from "@/types/dispute";
+import { ApiResponse } from "@/types/system";
+import { toast } from "sonner";
+import {
+  DisputeStatusBadge,
+  DisputeCategoryBadge,
+  DisputeTimeline,
+  EvidenceViewer,
+  ResolveDisputeModal,
+} from "@/components/disputes";
 
 export default function DisputeDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const disputeId = params.id as string;
-  const [resolution, setResolution] = useState<'customer_favor' | 'provider_favor' | 'split'>('customer_favor');
-  const [notes, setNotes] = useState('');
-  const [refundAmount, setRefundAmount] = useState('0');
-  const [isResolving, setIsResolving] = useState(false);
 
-  const { data: response, isLoading, refetch } = useQuery({
-    queryKey: ['admin-dispute-detail', disputeId],
+  const [isResolveModalOpen, setIsResolveModalOpen] = useState(false);
+
+  // Fetch dispute detail with timeline and evidence
+  const {
+    data: dispute,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["admin-dispute-detail", disputeId],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<Dispute>>(`/admin/disputes/${disputeId}`);
-      return res.data;
+      const res = await api.get(`/admin/disputes/${disputeId}`, {
+        params: {
+          includeTimeline: "true",
+          includeEvidence: "true",
+        },
+      });
+      // Backend returns { data: { data: dispute } } or { data: dispute }
+      const outerData = res.data?.data;
+      const disputeData = outerData?.data || outerData;
+      console.log("Dispute API response:", disputeData);
+      return disputeData as Dispute;
     },
   });
 
-  const dispute = response?.data;
+  // Resolve mutation
+  const resolveMutation = useMutation({
+    mutationFn: async (data: ResolveDisputeInput) => {
+      const res = await api.post(`/admin/disputes/${disputeId}/resolve`, data);
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success("Đã giải quyết tranh chấp thành công");
+      setIsResolveModalOpen(false);
+      queryClient.invalidateQueries({
+        queryKey: ["admin-dispute-detail", disputeId],
+      });
+    },
+    onError: (error: any) => {
+      toast.error(
+        error.response?.data?.message || "Không thể giải quyết tranh chấp"
+      );
+    },
+  });
+
+  // Escalate mutation
+  const escalateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.post(`/admin/disputes/${disputeId}/escalate`, {
+        reason: "Escalated by admin",
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success("Đã leo thang tranh chấp");
+      queryClient.invalidateQueries({
+        queryKey: ["admin-dispute-detail", disputeId],
+      });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || "Không thể leo thang");
+    },
+  });
+
+  // Request response mutation
+  const requestResponseMutation = useMutation({
+    mutationFn: async (targetParty: "customer" | "provider") => {
+      const res = await api.post(
+        `/admin/disputes/${disputeId}/request-response`,
+        {
+          targetParty,
+          deadlineHours: 48,
+        }
+      );
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success("Đã yêu cầu phản hồi");
+      queryClient.invalidateQueries({
+        queryKey: ["admin-dispute-detail", disputeId],
+      });
+    },
+    onError: (error: any) => {
+      toast.error(
+        error.response?.data?.message || "Không thể yêu cầu phản hồi"
+      );
+    },
+  });
 
   // Format currency
-  const formatCurrency = (amount: number | string) => {
-    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
+  const formatCurrency = (amount: number | string | null | undefined) => {
+    if (amount === null || amount === undefined) return "₫0";
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
     }).format(numAmount);
-  };
-
-  const handleResolve = async () => {
-    setIsResolving(true);
-    try {
-      await api.post(`/admin/disputes/${disputeId}/resolve`, {
-        resolution,
-        refundAmount: parseFloat(refundAmount) || 0,
-        notes: notes.trim() || undefined,
-      });
-      toast.success('Dispute resolved successfully');
-      refetch();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to resolve dispute');
-    } finally {
-      setIsResolving(false);
-    }
   };
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="h-8 w-48 bg-zinc-200 animate-pulse rounded" />
-        <div className="grid gap-6 md:grid-cols-2">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-48 bg-zinc-100 animate-pulse rounded-lg" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (!dispute) {
-    return (
       <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <p className="text-lg text-zinc-600">Dispute not found</p>
-          <Button onClick={() => router.push('/disputes')} className="mt-4">
-            Back to Disputes
-          </Button>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
       </div>
     );
   }
 
-  const canResolve = dispute.status === 'open' || dispute.status === 'under_review';
+  if (isError || !dispute) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96">
+        <AlertTriangle className="h-12 w-12 text-red-500 mb-4" />
+        <p className="text-lg text-zinc-600">Không tìm thấy tranh chấp</p>
+        <Button onClick={() => router.push("/disputes")} className="mt-4">
+          Quay lại danh sách
+        </Button>
+      </div>
+    );
+  }
+
+  const canResolve = [
+    "open",
+    "under_review",
+    "awaiting_response",
+    "escalated",
+  ].includes(dispute.status);
+  const canEscalate = ["open", "under_review"].includes(dispute.status);
+  const canRequestResponse = ["open", "under_review"].includes(dispute.status);
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-4">
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => router.push('/disputes')}
+          onClick={() => router.push("/disputes")}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <AlertTriangle className="h-8 w-8 text-yellow-500" />
-            Dispute Details
+        <div className="flex-1">
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <AlertTriangle className="h-6 w-6 text-yellow-500" />
+            Tranh chấp #{String(dispute.id).slice(0, 8)}
           </h2>
-          <p className="text-zinc-600">#{dispute.id.slice(0, 8)}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <DisputeStatusBadge status={dispute.status} />
+            <DisputeCategoryBadge category={dispute.category} />
+            {dispute.appealCount > 0 && (
+              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
+                Kháng cáo #{dispute.appealCount}
+              </span>
+            )}
+          </div>
         </div>
-        <div className="ml-auto">
-          <StatusBadge status={dispute.status} />
+
+        {/* Action Buttons - Redesigned */}
+        <div className="flex flex-wrap gap-3">
+          {canRequestResponse && (
+            <Button
+              variant="outline"
+              className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300"
+              onClick={() => requestResponseMutation.mutate("provider")}
+              disabled={requestResponseMutation.isPending}
+            >
+              {requestResponseMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <MessageCircle className="h-4 w-4 mr-2" />
+              )}
+              Yêu cầu phản hồi
+            </Button>
+          )}
+          {canEscalate && (
+            <Button
+              variant="outline"
+              className="border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 hover:border-orange-300"
+              onClick={() => escalateMutation.mutate()}
+              disabled={escalateMutation.isPending}
+            >
+              {escalateMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <ArrowUp className="h-4 w-4 mr-2" />
+              )}
+              Ưu tiên xử lý
+            </Button>
+          )}
+          {canResolve && (
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white shadow-md"
+              onClick={() => setIsResolveModalOpen(true)}
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Giải quyết tranh chấp
+            </Button>
+          )}
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Dispute Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Dispute Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <span className="text-sm text-zinc-600">Booking ID</span>
-              <p className="font-mono text-sm font-medium">
-                #{dispute.bookingId.slice(0, 8)}
-              </p>
-              <p className="text-sm text-zinc-500">{dispute.booking?.service?.name}</p>
-            </div>
-            <div>
-              <span className="text-sm text-zinc-600">Amount</span>
-              <p className="font-medium">{formatCurrency(dispute.booking?.actualPrice || 0)}</p>
-            </div>
-            <div>
-              <span className="text-sm text-zinc-600">Created</span>
-              <p className="text-sm">{new Date(dispute.createdAt).toLocaleString('vi-VN')}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Reporter */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Reporter</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <span className="text-sm text-zinc-600">Name</span>
-              <p className="font-medium">
-                {dispute.reporter?.profile?.fullName || 'N/A'}
-              </p>
-            </div>
-            <div>
-              <span className="text-sm text-zinc-600">Phone</span>
-              <p className="font-mono text-sm">{dispute.reporter?.phone}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Reason & Description */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Dispute Reason</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <span className="text-sm font-medium text-zinc-600">Reason</span>
-              <p className="mt-1">{dispute.reason}</p>
-            </div>
-            {dispute.description && (
-              <div>
-                <span className="text-sm font-medium text-zinc-600">Description</span>
-                <p className="mt-1 text-zinc-600">{dispute.description}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Resolution */}
-        {dispute.resolution ? (
-          <Card className="md:col-span-2 bg-green-50 border-green-200">
+      {/* Content Grid */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Main Content - 2 columns */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Dispute Reason */}
+          <Card>
             <CardHeader>
-              <CardTitle className="text-green-600">Resolution</CardTitle>
+              <CardTitle>Lý do tranh chấp</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <span className="text-sm text-green-900 font-medium">Resolution Type:</span>
-                <p className="capitalize">{dispute.resolution.replace('_', ' ')}</p>
-              </div>
-              {dispute.refundAmount && (
+            <CardContent>
+              <p className="whitespace-pre-wrap">{dispute.reason}</p>
+            </CardContent>
+          </Card>
+
+          {/* Tabs for Timeline and Evidence */}
+          <Tabs defaultValue="timeline">
+            <TabsList>
+              <TabsTrigger value="timeline" className="flex items-center gap-1">
+                <Clock className="h-4 w-4" />
+                Lịch sử (
+                {dispute.timeline?.length || dispute._count?.timeline || 0})
+              </TabsTrigger>
+              <TabsTrigger value="evidence" className="flex items-center gap-1">
+                <AlertTriangle className="h-4 w-4" />
+                Bằng chứng (
+                {dispute.evidence?.length || dispute._count?.evidence || 0})
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="timeline" className="mt-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <DisputeTimeline timeline={dispute.timeline || []} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="evidence" className="mt-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <EvidenceViewer evidence={dispute.evidence || []} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          {/* Resolution (if resolved) */}
+          {dispute.resolution && (
+            <Card className="bg-green-50 border-green-200">
+              <CardHeader>
+                <CardTitle className="text-green-700">
+                  Kết quả giải quyết
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
                 <div>
-                  <span className="text-sm text-green-900 font-medium">Refund Amount:</span>
-                  <p className="font-semibold">{formatCurrency(dispute.refundAmount)}</p>
+                  <span className="text-sm text-green-800 font-medium">
+                    Quyết định:
+                  </span>
+                  <p className="text-green-900">
+                    {dispute.resolutionType
+                      ? RESOLUTION_TYPE_LABELS[dispute.resolutionType]
+                      : dispute.resolution}
+                  </p>
                 </div>
-              )}
-              {dispute.adminNotes && (
-                <div>
-                  <span className="text-sm text-green-900 font-medium">Admin Notes:</span>
-                  <p className="text-sm text-green-900">{dispute.adminNotes}</p>
+                {dispute.refundAmount && (
+                  <div>
+                    <span className="text-sm text-green-800 font-medium">
+                      Số tiền hoàn:
+                    </span>
+                    <p className="text-lg font-semibold text-green-900">
+                      {formatCurrency(dispute.refundAmount)}
+                    </p>
+                  </div>
+                )}
+                {dispute.adminNotes && (
+                  <div>
+                    <span className="text-sm text-green-800 font-medium">
+                      Ghi chú admin:
+                    </span>
+                    <p className="text-green-800">{dispute.adminNotes}</p>
+                  </div>
+                )}
+                {dispute.resolvedAt && (
+                  <p className="text-xs text-green-600">
+                    Giải quyết lúc{" "}
+                    {new Date(dispute.resolvedAt).toLocaleString("vi-VN")}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Sidebar - 1 column */}
+        <div className="space-y-6">
+          {/* Booking Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Thông tin Booking</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div>
+                <span className="text-zinc-500">ID:</span>
+                <p className="font-mono">
+                  #{String(dispute.bookingId).slice(0, 8)}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Dịch vụ:</span>
+                <p className="font-medium">
+                  {dispute.booking?.service?.name || "N/A"}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Giá trị:</span>
+                <p className="font-semibold">
+                  {formatCurrency(dispute.booking?.actualPrice)}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Trạng thái booking:</span>
+                <p>{dispute.booking?.status || "N/A"}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Customer Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Khách hàng</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p className="font-medium">
+                {dispute.booking?.customer?.profile?.fullName || "N/A"}
+              </p>
+              <p className="font-mono text-zinc-600">
+                {dispute.booking?.customer?.phone ||
+                  dispute.booking?.customerPhone ||
+                  "N/A"}
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Provider Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Nhà cung cấp</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p className="font-medium">
+                {dispute.booking?.providerUser?.profile?.fullName || "N/A"}
+              </p>
+              <p className="font-mono text-zinc-600">
+                {dispute.booking?.providerUser?.phone ||
+                  dispute.booking?.providerPhone ||
+                  "N/A"}
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Timestamps */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Thời gian</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-zinc-600">
+              <div className="flex justify-between">
+                <span>Tạo lúc:</span>
+                <span>
+                  {new Date(dispute.createdAt).toLocaleString("vi-VN")}
+                </span>
+              </div>
+              {dispute.escalatedAt && (
+                <div className="flex justify-between">
+                  <span>Leo thang:</span>
+                  <span>
+                    {new Date(dispute.escalatedAt).toLocaleString("vi-VN")}
+                  </span>
                 </div>
               )}
               {dispute.resolvedAt && (
-                <p className="text-xs text-green-700">
-                  Resolved on {new Date(dispute.resolvedAt).toLocaleString('vi-VN')}
-                </p>
+                <div className="flex justify-between">
+                  <span>Giải quyết:</span>
+                  <span>
+                    {new Date(dispute.resolvedAt).toLocaleString("vi-VN")}
+                  </span>
+                </div>
               )}
             </CardContent>
           </Card>
-        ) : canResolve ? (
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <CardTitle>Resolve Dispute</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="resolution">Resolution Type</Label>
-                <Select value={resolution} onValueChange={(value: any) => setResolution(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="customer_favor">Customer Favor</SelectItem>
-                    <SelectItem value="provider_favor">Provider Favor</SelectItem>
-                    <SelectItem value="split">Split</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="refundAmount">Refund Amount (VND)</Label>
-                <Input
-                  id="refundAmount"
-                  type="number"
-                  value={refundAmount}
-                  onChange={(e) => setRefundAmount(e.target.value)}
-                  placeholder="0"
-                  min="0"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="notes">Admin Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="min-h-[100px]"
-                  placeholder="Provide details about the resolution..."
-                />
-              </div>
-
-              <Button
-                onClick={handleResolve}
-                disabled={isResolving}
-                className="w-full"
-              >
-                {isResolving ? 'Resolving...' : 'Resolve Dispute'}
-              </Button>
-            </CardContent>
-          </Card>
-        ) : null}
+        </div>
       </div>
+
+      {/* Resolve Modal */}
+      {dispute && (
+        <ResolveDisputeModal
+          dispute={dispute}
+          open={isResolveModalOpen}
+          onOpenChange={setIsResolveModalOpen}
+          onResolve={resolveMutation.mutateAsync}
+          isLoading={resolveMutation.isPending}
+        />
+      )}
     </div>
   );
 }

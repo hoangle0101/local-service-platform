@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsOptional, IsString, IsNumber, IsEnum } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsNumber,
+  IsEnum,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -30,7 +36,10 @@ export class CreateCategoryDto {
   @IsString()
   iconUrl?: string;
 
-  @ApiPropertyOptional({ example: 1, description: 'Parent category ID for subcategories' })
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Parent category ID for subcategories',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -90,11 +99,24 @@ export class CreateServiceDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ example: 120, description: 'Estimated duration in minutes' })
+  @ApiPropertyOptional({
+    example: 120,
+    description:
+      'Estimated duration in minutes (optional for flexible services)',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   durationMinutes?: number;
+
+  @ApiPropertyOptional({ example: 'https://example.com/service-image.jpg' })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @ApiPropertyOptional({ example: true, default: true })
+  @IsOptional()
+  isActive?: boolean;
 }
 
 export class UpdateServiceDto {
@@ -125,6 +147,15 @@ export class UpdateServiceDto {
   @Type(() => Number)
   @IsNumber()
   durationMinutes?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  isActive?: boolean;
 }
 
 // ==================== SEARCH DTOs ====================
@@ -175,4 +206,3 @@ export class SearchServiceDto {
   @IsEnum(['asc', 'desc'])
   sortOrder?: string = 'desc';
 }
-

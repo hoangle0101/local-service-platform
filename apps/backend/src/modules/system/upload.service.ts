@@ -65,9 +65,13 @@ export class UploadService {
       },
     });
 
+    // Build full URL for frontend
+    const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+    const fullUrl = `${baseUrl}${media.url}`;
+
     return {
       id: media.id.toString(),
-      url: media.url,
+      url: fullUrl,
       category: media.category,
       size: media.size,
     };

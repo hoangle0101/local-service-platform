@@ -1,46 +1,51 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
-import { DataTable, Column } from '@/components/ui/data-table';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Plus, Edit, Trash2, Eye } from 'lucide-react';
-import { api } from '@/lib/api';
-import { Service } from '@/types/provider';
-import { ApiResponse, PaginatedResponse } from '@/types/system';
-import { toast } from 'sonner';
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { DataTable, Column } from "@/components/ui/data-table";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Plus, Trash2, Eye, Power, PowerOff, FolderOpen } from "lucide-react";
+import { api } from "@/lib/api";
+import { Service } from "@/types/provider";
+import { ApiResponse, PaginatedResponse } from "@/types/system";
+import { toast } from "sonner";
 
 export default function ServicesPage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [deleteDialog, setDeleteDialog] = useState(false);
 
-  const { data: response, isLoading, refetch } = useQuery({
-    queryKey: ['admin-services', page, searchQuery, statusFilter],
+  const {
+    data: response,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["admin-services", page, searchQuery, statusFilter],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<any>>('/services/search', {
+      const res = await api.get<ApiResponse<any>>("/services/search", {
         params: {
           page,
           limit: 20,
           keyword: searchQuery || undefined,
         },
       });
-      // Handle both response formats: { items, meta } or { data, pagination }
       const rawData = res.data.data || res.data;
       return {
         data: rawData.items || rawData.data || [],
-        pagination: rawData.meta ? {
-          total: rawData.meta.total,
-          limit: rawData.meta.limit,
-          page: rawData.meta.page,
-          totalPages: rawData.meta.totalPages,
-        } : rawData.pagination,
+        pagination: rawData.meta
+          ? {
+              total: rawData.meta.total,
+              limit: rawData.meta.limit,
+              page: rawData.meta.page,
+              totalPages: rawData.meta.totalPages,
+            }
+          : rawData.pagination,
       };
     },
   });
@@ -48,10 +53,10 @@ export default function ServicesPage() {
   const handleDelete = async (serviceId: number) => {
     try {
       await api.delete(`/services/${serviceId}`);
-      toast.success('Service deleted successfully');
+      toast.success("Đã xóa dịch vụ thành công");
       refetch();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to delete service');
+      toast.error(error.response?.data?.message || "Xóa dịch vụ thất bại");
     }
   };
 
@@ -61,31 +66,32 @@ export default function ServicesPage() {
         ...service,
         isActive: !service.isActive,
       });
-      toast.success(`Service ${!service.isActive ? 'activated' : 'deactivated'}`);
+      toast.success(`Đã ${!service.isActive ? "kích hoạt" : "tắt"} dịch vụ`);
       refetch();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to update service');
+      toast.error(error.response?.data?.message || "Cập nhật dịch vụ thất bại");
     }
   };
 
-  // Format currency
   const formatCurrency = (amount: number | string) => {
-    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
     }).format(numAmount);
   };
 
   const columns: Column<Service>[] = [
     {
-      key: 'id',
-      label: 'ID',
-      render: (service) => <span className="font-mono text-sm">#{service.id}</span>,
+      key: "id",
+      label: "ID",
+      render: (service) => (
+        <span className="font-mono text-sm">#{service.id}</span>
+      ),
     },
     {
-      key: 'name',
-      label: 'Service Name',
+      key: "name",
+      label: "Tên dịch vụ",
       sortable: true,
       render: (service) => (
         <div className="flex items-center gap-2">
@@ -108,58 +114,80 @@ export default function ServicesPage() {
       ),
     },
     {
-      key: 'category',
-      label: 'Category',
-      render: (service) => service.category?.name || '—',
+      key: "category",
+      label: "Danh mục",
+      render: (service) => service.category?.name || "—",
     },
     {
-      key: 'basePrice',
-      label: 'Base Price',
-      sortable: true,
-      render: (service) => <span className="font-medium">{formatCurrency(service.basePrice)}</span>,
-    },
-    {
-      key: 'durationMinutes',
-      label: 'Duration',
-      render: (service) => <span>{service.durationMinutes} min</span>,
-    },
-    {
-      key: 'isActive',
-      label: 'Status',
+      key: "basePrice",
+      label: "Giá cơ bản",
       sortable: true,
       render: (service) => (
-        <StatusBadge status={service.isActive ? 'active' : 'inactive'} />
+        <span className="font-medium">{formatCurrency(service.basePrice)}</span>
       ),
     },
     {
-      key: 'actions',
-      label: 'Actions',
+      key: "durationMinutes",
+      label: "Thời lượng",
+      render: (service) => <span>{service.durationMinutes} phút</span>,
+    },
+    {
+      key: "isActive",
+      label: "Trạng thái",
+      sortable: true,
+      render: (service) => (
+        <StatusBadge status={service.isActive ? "active" : "inactive"} />
+      ),
+    },
+    {
+      key: "actions",
+      label: "Thao tác",
       render: (service) => (
         <div className="flex items-center gap-2">
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
+            className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
             onClick={() => router.push(`/services/${service.id}`)}
           >
-            <Eye className="h-4 w-4" />
+            <Eye className="h-4 w-4 mr-1.5" />
+            Xem
           </Button>
+
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
+            className={
+              service.isActive
+                ? "border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100"
+                : "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+            }
             onClick={() => handleToggleActive(service)}
-            title={service.isActive ? 'Deactivate' : 'Activate'}
           >
-            {service.isActive ? '✓' : '✗'}
+            {service.isActive ? (
+              <>
+                <PowerOff className="h-4 w-4 mr-1.5" />
+                Tắt
+              </>
+            ) : (
+              <>
+                <Power className="h-4 w-4 mr-1.5" />
+                Bật
+              </>
+            )}
           </Button>
+
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
+            className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
             onClick={() => {
               setSelectedService(service);
               setDeleteDialog(true);
             }}
           >
-            <Trash2 className="h-4 w-4 text-red-500" />
+            <Trash2 className="h-4 w-4 mr-1.5" />
+            Xóa
           </Button>
         </div>
       ),
@@ -170,41 +198,45 @@ export default function ServicesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Services Management</h2>
-          <p className="text-zinc-600">Manage all available services</p>
+          <h2 className="text-3xl font-bold tracking-tight">Quản lý Dịch vụ</h2>
+          <p className="text-zinc-600">Quản lý tất cả dịch vụ trên nền tảng</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push('/services/categories')}>
-            Manage Categories
+          <Button
+            variant="outline"
+            onClick={() => router.push("/services/categories")}
+          >
+            <FolderOpen className="h-4 w-4 mr-2" />
+            Quản lý danh mục
           </Button>
-          <Button onClick={() => router.push('/services/new')}>
+          <Button onClick={() => router.push("/services/new")}>
             <Plus className="h-4 w-4 mr-2" />
-            Add Service
+            Thêm dịch vụ
           </Button>
         </div>
       </div>
 
       <div className="flex gap-2">
         <Button
-          variant={statusFilter === '' ? 'default' : 'outline'}
+          variant={statusFilter === "" ? "default" : "outline"}
           size="sm"
-          onClick={() => setStatusFilter('')}
+          onClick={() => setStatusFilter("")}
         >
-          All
+          Tất cả
         </Button>
         <Button
-          variant={statusFilter === 'active' ? 'default' : 'outline'}
+          variant={statusFilter === "active" ? "default" : "outline"}
           size="sm"
-          onClick={() => setStatusFilter('active')}
+          onClick={() => setStatusFilter("active")}
         >
-          Active
+          Đang hoạt động
         </Button>
         <Button
-          variant={statusFilter === 'inactive' ? 'default' : 'outline'}
+          variant={statusFilter === "inactive" ? "default" : "outline"}
           size="sm"
-          onClick={() => setStatusFilter('inactive')}
+          onClick={() => setStatusFilter("inactive")}
         >
-          Inactive
+          Không hoạt động
         </Button>
       </div>
 
@@ -212,28 +244,28 @@ export default function ServicesPage() {
         data={response?.data || []}
         columns={columns}
         searchable
-        searchPlaceholder="Search services..."
+        searchPlaceholder="Tìm kiếm dịch vụ..."
         onSearch={setSearchQuery}
         pagination={
           response?.pagination
             ? {
-              page,
-              pageSize: response.pagination.limit,
-              total: response.pagination.total,
-              onPageChange: setPage,
-            }
+                page,
+                pageSize: response.pagination.limit,
+                total: response.pagination.total,
+                onPageChange: setPage,
+              }
             : undefined
         }
         isLoading={isLoading}
-        emptyMessage="No services found"
+        emptyMessage="Không tìm thấy dịch vụ nào"
       />
 
       <ConfirmDialog
         open={deleteDialog}
         onOpenChange={setDeleteDialog}
-        title="Delete Service"
-        description={`Are you sure you want to delete "${selectedService?.name}"? This action cannot be undone.`}
-        confirmLabel="Delete"
+        title="Xóa dịch vụ"
+        description={`Bạn có chắc muốn xóa "${selectedService?.name}"? Hành động này không thể hoàn tác.`}
+        confirmLabel="Xóa"
         variant="destructive"
         onConfirm={async () => {
           if (selectedService) {
