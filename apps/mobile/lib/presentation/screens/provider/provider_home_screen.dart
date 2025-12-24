@@ -444,6 +444,22 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.account_balance_wallet,
+                  title: 'Ví tiền',
+                  subtitle: 'Thu nhập & Rút tiền',
+                  color: Colors.green,
+                  onTap: () => context.push('/provider/wallet'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(child: SizedBox()), // Placeholder for balance
+            ],
+          ),
         ],
       ),
     );

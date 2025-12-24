@@ -14,6 +14,7 @@ import '../../bloc/services/services_bloc.dart';
 import '../../bloc/services/services_event_state.dart';
 import '../../bloc/categories/categories_bloc.dart';
 import '../../bloc/categories/categories_event_state.dart';
+import '../../widgets/payment_method_selector.dart';
 
 class CompleteBookingScreen extends StatefulWidget {
   const CompleteBookingScreen({super.key});
@@ -56,6 +57,9 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
   Timer? _debounceTimer;
   bool _showPredictions = false;
   bool _isSearching = false;
+
+  // Payment method
+  String _selectedPaymentMethod = 'COD';
 
   @override
   void initState() {
@@ -431,6 +435,10 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
                 const SizedBox(height: 12),
                 _buildNotesInput(),
                 const SizedBox(height: 24),
+                _buildSectionTitle('6. Phương thức thanh toán', Icons.payment),
+                const SizedBox(height: 12),
+                _buildPaymentMethodSelector(),
+                const SizedBox(height: 24),
                 _buildPriceSummary(),
                 const SizedBox(height: 24),
                 _buildSubmitButton(),
@@ -601,7 +609,8 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
                             ),
                             Row(
                               children: [
-                                const Icon(Icons.star, size: 14, color: Colors.amber),
+                                const Icon(Icons.star,
+                                    size: 14, color: Colors.amber),
                                 Text(
                                   ' ${service.provider.ratingAvg.toStringAsFixed(1)}',
                                   style: const TextStyle(fontSize: 12),
@@ -1105,6 +1114,15 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
     );
   }
 
+  Widget _buildPaymentMethodSelector() {
+    return PaymentMethodSelector(
+      selectedMethod: _selectedPaymentMethod,
+      onMethodSelected: (method) {
+        setState(() => _selectedPaymentMethod = method);
+      },
+    );
+  }
+
   Widget _buildPriceSummary() {
     if (_selectedService == null) {
       return Container(
@@ -1114,26 +1132,53 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
           borderRadius: BorderRadius.circular(12),
         ),
         child: const Center(
-          child: Text('Select a service to see the price',
+          child: Text('Chọn dịch vụ để xem giá',
               style: TextStyle(color: Colors.grey)),
         ),
       );
     }
 
+    final servicePrice = _selectedService!.price;
+    final platformFee = servicePrice * 0.10; // 10%
+    final totalPrice = servicePrice + platformFee;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.primaryLight.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primaryLight.withOpacity(0.5),
+            AppColors.primaryLight.withOpacity(0.2),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
       ),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Service'),
-              Text(_selectedService!.service.name,
+              Text('Dịch vụ', style: TextStyle(color: Colors.grey.shade700)),
+              Flexible(
+                child: Text(
+                  _selectedService!.service.name,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                  textAlign: TextAlign.right,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Nhà cung cấp',
+                  style: TextStyle(color: Colors.grey.shade700)),
+              Text(_selectedService!.provider.displayName,
                   style: const TextStyle(fontWeight: FontWeight.w500)),
             ],
           ),
@@ -1141,21 +1186,65 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Provider'),
-              Text(_selectedService!.provider.displayName),
+              Text('Thanh toán', style: TextStyle(color: Colors.grey.shade700)),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _selectedPaymentMethod == 'COD'
+                      ? Colors.green.shade100
+                      : const Color(0xFFAE2070).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _selectedPaymentMethod == 'COD' ? 'Tiền mặt' : 'MoMo',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: _selectedPaymentMethod == 'COD'
+                        ? Colors.green.shade700
+                        : const Color(0xFFAE2070),
+                    fontSize: 13,
+                  ),
+                ),
+              ),
             ],
           ),
-          const Divider(height: 24),
+          const Divider(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Estimated Price',
+              const Text('Giá dịch vụ'),
+              Text(
+                NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
+                    .format(servicePrice),
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Phí nền tảng (10%)',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+              Text(
+                NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
+                    .format(platformFee),
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              ),
+            ],
+          ),
+          const Divider(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Tổng ước tính',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               Text(
                 NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
-                    .format(_selectedService!.price),
+                    .format(totalPrice),
                 style: const TextStyle(
-                  color: AppColors.primary,
+                  color: AppColors.primaryDark,
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
                 ),
@@ -1194,9 +1283,7 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
                   SizedBox(width: 12),
                   Text('Finding Providers...'),
                 ],
-              )
-            : const Text('Find Providers & Book',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              )           : const Text('Đặt dịch vụ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ),
     );
   }

@@ -21,6 +21,10 @@ import '../screens/provider/provider_services_screen.dart';
 import '../screens/provider/provider_bookings_screen.dart';
 import '../screens/provider/provider_edit_profile_screen.dart';
 import '../screens/provider/provider_my_reviews_screen.dart';
+import '../screens/provider/provider_wallet_screen.dart';
+import '../screens/provider/provider_withdraw_screen.dart';
+import '../screens/provider/provider_complete_job_screen.dart';
+import '../screens/booking/invoice_screen.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -105,6 +109,28 @@ final router = GoRouter(
     GoRoute(
       path: '/provider/reviews',
       builder: (context, state) => const ProviderMyReviewsScreen(),
+    ),
+    GoRoute(
+      path: '/provider/wallet',
+      builder: (context, state) => const ProviderWalletScreen(),
+    ),
+    GoRoute(
+      path: '/provider/withdraw',
+      builder: (context, state) => const ProviderWithdrawScreen(),
+    ),
+    GoRoute(
+      path: '/provider/complete-job/:id',
+      builder: (context, state) {
+        final bookingId = state.pathParameters['id']!;
+        return ProviderCompleteJobScreen(bookingId: bookingId);
+      },
+    ),
+    GoRoute(
+      path: '/booking/invoice/:id',
+      builder: (context, state) {
+        final bookingId = state.pathParameters['id']!;
+        return InvoiceScreen(bookingId: bookingId);
+      },
     ),
 
     // Service Routes

@@ -6,6 +6,8 @@ import '../../../data/datasources/bookings_datasource.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../widgets/review_dialog.dart';
+import '../../widgets/booking_offers_dialog.dart';
+import '../booking/invoice_screen.dart';
 
 class UserBookingsScreen extends StatefulWidget {
   const UserBookingsScreen({super.key});
@@ -36,6 +38,16 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
 
   void _refreshBookings() {
     context.read<BookingsBloc>().add(const LoadBookings());
+  }
+
+  void _showOffersDialog(String bookingId) {
+    showDialog(
+      context: context,
+      builder: (context) => BookingOffersDialog(
+        bookingId: bookingId,
+        onProviderSelected: _refreshBookings,
+      ),
+    );
   }
 
   @override
@@ -71,7 +83,8 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
                         b.status == 'accepted' ||
                         b.status == 'confirmed' ||
                         b.status == 'in_progress' ||
-                        b.status == 'pending_completion')
+                        b.status == 'pending_completion' ||
+                        b.status == 'pending_payment')
                     .length;
                 completedCount =
                     bookings.where((b) => b.status == 'completed').length;
@@ -148,7 +161,8 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
                           b.status == 'accepted' ||
                           b.status == 'confirmed' ||
                           b.status == 'in_progress' ||
-                          b.status == 'pending_completion')
+                          b.status == 'pending_completion' ||
+                          b.status == 'pending_payment')
                       .toList(),
                 ),
                 _buildBookingsList(
@@ -353,6 +367,10 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
         color = Colors.teal;
         displayStatus = 'CHỜ XÁC NHẬN';
         break;
+      case 'pending_payment':
+        color = Colors.orange;
+        displayStatus = 'CHỜ THANH TOÁN';
+        break;
       case 'completed':
         color = Colors.green;
         displayStatus = 'COMPLETED';
@@ -407,10 +425,8 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
-              onPressed: () {
-                // TODO: View offers
-              },
-              child: const Text('View Offers'),
+              onPressed: () => _showOffersDialog(booking.id),
+              child: const Text('Xem báo giá'),
             ),
           ),
         ],
@@ -443,6 +459,27 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
             ),
           ),
         ],
+      );
+    } else if (status == 'pending_payment') {
+      // Customer needs to pay
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => InvoiceScreen(bookingId: booking.id),
+              ),
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+          icon: const Icon(Icons.payment),
+          label: const Text('Thanh toán'),
+        ),
       );
     } else if (status == 'completed') {
       // Check if already reviewed
