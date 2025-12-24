@@ -62,9 +62,8 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   Widget _buildSliverHeader() {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+        padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -77,24 +76,22 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                         children: [
                           Text(
                             _getGreeting(),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  color: AppColors.textTertiary,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                            style: const TextStyle(
+                              color: AppColors.textTertiary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             state.user!.fullName,
-                            style: Theme.of(context)
-                                .textTheme
-                                .displaySmall
-                                ?.copyWith(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w800,
-                                ),
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary,
+                              letterSpacing: -0.8,
+                            ),
                           ),
                         ],
                       );
@@ -117,30 +114,51 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         BlocBuilder<AuthBloc, AuthState>(
           builder: (context, state) {
             if (state is Authenticated && state.user?.isProvider == true) {
-              return _buildIconButton(
-                  Icons.sync_rounded, () => context.go('/provider/home'));
+              return GestureDetector(
+                onTap: () => context.go('/provider/home'),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.sync_rounded,
+                          color: AppColors.primary, size: 16),
+                      SizedBox(width: 8),
+                      Text(
+                        'Đối tác',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
             }
             return const SizedBox.shrink();
           },
         ),
-        const SizedBox(width: 8),
-        _buildIconButton(Icons.notifications_none_rounded, () {}),
+        const SizedBox(width: 12),
+        GestureDetector(
+          onTap: () {},
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+            ),
+            child: const Icon(Icons.notifications_none_rounded,
+                size: 22, color: AppColors.textPrimary),
+          ),
+        ),
       ],
-    );
-  }
-
-  Widget _buildIconButton(IconData icon, VoidCallback onTap) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.shelf,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: IconButton(
-        icon: Icon(icon, color: AppColors.textPrimary, size: 20),
-        onPressed: onTap,
-        splashRadius: 24,
-      ),
     );
   }
 
@@ -189,10 +207,22 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   Widget _buildSearchBox() {
     return FadeInAnimation(
       delay: const Duration(milliseconds: 100),
-      child: MinTextField(
-        hint: 'Bạn đang tìm dịch vụ gì?',
-        prefixIcon:
-            const Icon(Icons.search_rounded, color: AppColors.textTertiary),
+      child: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.black.withOpacity(0.03),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: MinTextField(
+          hint: 'Bạn cần giúp gì hôm nay?',
+          prefixIcon: const Icon(Icons.search_rounded,
+              color: AppColors.primary, size: 22),
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
@@ -203,12 +233,12 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       child: Row(
         children: [
           Expanded(
-              child: _buildStatItem('Lịch hẹn', '0',
+              child: _buildStatItem('Đặt chỗ ngay', 'Lên lịch',
                   Icons.calendar_today_rounded, AppColors.primary)),
           const SizedBox(width: 16),
           Expanded(
-              child: _buildStatItem(
-                  'Yêu thích', '0', Icons.favorite_rounded, AppColors.error)),
+              child: _buildStatItem('Dịch vụ ưu đãi', 'Khuyến mãi',
+                  Icons.local_offer_rounded, AppColors.secondary)),
         ],
       ),
     );
@@ -218,23 +248,31 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       String label, String value, IconData icon, Color color) {
     return MinCard(
       padding: const EdgeInsets.all(20),
-      color: AppColors.shelf,
-      border: const BorderSide(color: AppColors.divider),
-      child: Row(
+      backgroundColor: AppColors.white,
+      onTap: () {},
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(value,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800, fontSize: 18)),
-              Text(label,
-                  style: const TextStyle(
-                      color: AppColors.textTertiary, fontSize: 12)),
-            ],
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 20),
           ),
+          const SizedBox(height: 16),
+          Text(value,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                  color: AppColors.textPrimary)),
+          const SizedBox(height: 2),
+          Text(label,
+              style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -245,12 +283,32 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: Theme.of(context).textTheme.headlineMedium),
-          TextButton(
-            onPressed: onTap,
-            child: const Text('Xem thêm',
-                style: TextStyle(
-                    color: AppColors.primary, fontWeight: FontWeight.w600)),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.5,
+            ),
+          ),
+          GestureDetector(
+            onTap: onTap,
+            child: const Row(
+              children: [
+                Text(
+                  'Tất cả',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+                SizedBox(width: 4),
+                Icon(Icons.arrow_forward_ios_rounded,
+                    size: 12, color: AppColors.primary),
+              ],
+            ),
           ),
         ],
       ),
@@ -259,12 +317,13 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
 
   Widget _buildCategoriesList() {
     return SizedBox(
-      height: 104,
+      height: 110,
       child: BlocBuilder<CategoriesBloc, CategoriesState>(
         builder: (context, state) {
           if (state is CategoriesLoading) {
             return ListView.builder(
               scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.only(left: 4),
               itemCount: 5,
               itemBuilder: (context, _) => const ShimmerCategoryCard(),
             );
@@ -272,8 +331,8 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           if (state is CategoriesLoaded) {
             return ListView.builder(
               scrollDirection: Axis.horizontal,
-              clipBehavior:
-                  Colors.transparent == null ? Clip.hardEdge : Clip.none,
+              padding: const EdgeInsets.only(left: 4),
+              clipBehavior: Clip.none,
               itemCount: state.categories.length,
               itemBuilder: (context, index) {
                 final category = state.categories[index];
@@ -300,18 +359,30 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: AppColors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.divider),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.black.withOpacity(0.02),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            child: Icon(icon, color: AppColors.textPrimary, size: 24),
+            child: Icon(icon, color: AppColors.primary, size: 28),
           ),
-          const SizedBox(height: 8),
-          Text(title,
-              style:
-                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
         ],
       ),
     );

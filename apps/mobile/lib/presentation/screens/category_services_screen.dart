@@ -68,7 +68,7 @@ class _CategoryServicesScreenState extends State<CategoryServicesScreen> {
 
   Widget _buildModernAppBar(BuildContext context) {
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+      padding: const EdgeInsets.fromLTRB(24, 64, 24, 32),
       sliver: SliverToBoxAdapter(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,35 +81,55 @@ class _CategoryServicesScreenState extends State<CategoryServicesScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: AppColors.shelf,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.divider),
+                      color: AppColors.white,
+                      shape: BoxShape.circle,
+                      border:
+                          Border.all(color: AppColors.divider.withOpacity(0.5)),
                     ),
                     child: const Icon(Icons.arrow_back_ios_new_rounded,
-                        size: 20, color: AppColors.textPrimary),
+                        size: 18, color: AppColors.textPrimary),
                   ),
                 ),
-                MinBadge(
-                    label: 'Danh mục',
-                    color: AppColors.primary.withOpacity(0.1)),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'DANH MỤC',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             Text(
               widget.category?.name ?? 'Dịch vụ',
-              style: Theme.of(context)
-                  .textTheme
-                  .displayLarge
-                  ?.copyWith(fontSize: 32, letterSpacing: -1),
+              style: const TextStyle(
+                fontSize: 34,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+                letterSpacing: -1,
+                height: 1.1,
+              ),
             ),
             if (widget.category?.description != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Text(
                 widget.category!.description!,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: AppColors.textSecondary, height: 1.5),
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 15,
+                  height: 1.6,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ],
@@ -129,7 +149,7 @@ class _CategoryServicesScreenState extends State<CategoryServicesScreen> {
                 List.generate(
                     3,
                     (index) => const Padding(
-                        padding: EdgeInsets.only(bottom: 20),
+                        padding: EdgeInsets.only(bottom: 24),
                         child: ShimmerServiceCard())),
               ),
             ),
@@ -149,22 +169,29 @@ class _CategoryServicesScreenState extends State<CategoryServicesScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Tìm thấy ${state.services.length} dịch vụ',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textTertiary),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.shelf,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'PHÁT HIỆN ${state.services.length} DỊCH VỤ',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 10,
+                                letterSpacing: 0.5,
+                                color: AppColors.textTertiary),
+                          ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
                         ServiceCardWidget(service: state.services[index]),
                       ],
                     );
                   }
                   return Padding(
-                    padding: const EdgeInsets.only(top: 20),
+                    padding: const EdgeInsets.only(top: 24),
                     child: ServiceCardWidget(service: state.services[index]),
                   );
                 },
@@ -186,26 +213,38 @@ class _CategoryServicesScreenState extends State<CategoryServicesScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(32),
-              decoration:
-                  BoxDecoration(color: AppColors.shelf, shape: BoxShape.circle),
+              padding: const EdgeInsets.all(40),
+              decoration: const BoxDecoration(
+                color: AppColors.shelf,
+                shape: BoxShape.circle,
+              ),
               child: const Icon(Icons.search_off_rounded,
                   size: 64, color: AppColors.textTertiary),
             ),
-            const SizedBox(height: 32),
-            Text('Chưa có dịch vụ nào',
-                style: Theme.of(context).textTheme.headlineMedium),
+            const SizedBox(height: 40),
+            const Text(
+              'Chưa có dịch vụ nào',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+              ),
+            ),
             const SizedBox(height: 12),
-            Text(
+            const Text(
               'Hiện tại chưa có đối tác nào cung cấp dịch vụ trong danh mục này. Hãy quay lại sau nhé!',
               textAlign: TextAlign.center,
-              style:
-                  Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.5),
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 15,
+                height: 1.6,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 48),
             MinButton(
-                text: 'Quay lại',
-                isPrimary: false,
+                text: 'Quay lại Trang chủ',
+                isPrimary: true,
                 onPressed: () => context.pop()),
           ],
         ),

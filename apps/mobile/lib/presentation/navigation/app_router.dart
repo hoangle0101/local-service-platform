@@ -18,7 +18,6 @@ import '../screens/user/user_favorites_screen.dart';
 import '../screens/user/user_edit_profile_screen.dart';
 import '../screens/provider/provider_home_screen.dart';
 import '../screens/provider/provider_profile_screen.dart';
-import '../screens/provider/provider_services_screen.dart';
 import '../screens/provider/provider_bookings_screen.dart';
 import '../screens/provider/provider_edit_profile_screen.dart';
 import '../screens/provider/provider_my_reviews_screen.dart';
@@ -26,6 +25,8 @@ import '../screens/provider/provider_wallet_screen.dart';
 import '../screens/provider/provider_withdraw_screen.dart';
 import '../screens/provider/provider_complete_job_screen.dart';
 import '../screens/booking/invoice_screen.dart';
+import '../screens/provider/provider_shell_screen.dart';
+import '../screens/provider/provider_earnings_screen.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -140,30 +141,60 @@ final router = GoRouter(
       ],
     ),
 
-    // Provider Routes
-    GoRoute(
-      path: '/provider/home',
-      builder: (context, state) => const ProviderHomeScreen(),
-    ),
-    GoRoute(
-      path: '/provider/profile',
-      builder: (context, state) => const ProviderProfileScreen(),
-    ),
-    GoRoute(
-      path: '/provider/services',
-      builder: (context, state) => const ProviderServicesScreen(),
-    ),
-    GoRoute(
-      path: '/provider/bookings',
-      builder: (context, state) => const ProviderBookingsScreen(),
-    ),
-    GoRoute(
-      path: '/provider/profile/edit',
-      builder: (context, state) => const ProviderEditProfileScreen(),
-    ),
-    GoRoute(
-      path: '/provider/reviews',
-      builder: (context, state) => const ProviderMyReviewsScreen(),
+    // Provider Shell with Bottom Navigation
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, navigationShell) {
+        return ProviderShellScreen(navigationShell: navigationShell);
+      },
+      branches: [
+        // Home Branch (Map)
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/provider/home',
+              builder: (context, state) => const ProviderHomeScreen(),
+            ),
+          ],
+        ),
+        // Earnings Branch
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/provider/earnings',
+              builder: (context, state) => const ProviderEarningsScreen(),
+            ),
+          ],
+        ),
+        // Bookings/Activity Branch
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/provider/bookings',
+              builder: (context, state) => const ProviderBookingsScreen(),
+            ),
+          ],
+        ),
+        // Profile/Account Branch
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/provider/profile',
+              builder: (context, state) => const ProviderProfileScreen(),
+              routes: [
+                GoRoute(
+                  path: 'edit',
+                  builder: (context, state) =>
+                      const ProviderEditProfileScreen(),
+                ),
+                GoRoute(
+                  path: 'reviews',
+                  builder: (context, state) => const ProviderMyReviewsScreen(),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
     ),
     GoRoute(
       path: '/provider/wallet',

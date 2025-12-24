@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import '../../core/entities/entities.dart';
 import '../bloc/favorites/favorites_bloc.dart';
 import '../../core/theme/app_colors.dart';
-import '../widgets/minimalist_widgets.dart';
 
 class ServiceCardWidget extends StatelessWidget {
   final ProviderService service;
@@ -17,136 +16,124 @@ class ServiceCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MinCard(
-      padding: EdgeInsets.zero,
-      onTap: () {
-        context.push('/service/${service.serviceId}', extra: service);
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _ProviderIdentity(
-                  provider: service.provider,
-                  serviceId: service.serviceId,
-                ),
-                const SizedBox(height: 16),
-                _ServiceInformation(
-                    name: service.service.name,
-                    description: service.service.description),
-              ],
-            ),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.black.withOpacity(0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
-          _MetricRibbon(service: service),
         ],
       ),
-    );
-  }
-}
-
-class _ProviderIdentity extends StatelessWidget {
-  final ProviderInfo provider;
-  final int serviceId;
-
-  const _ProviderIdentity({
-    required this.provider,
-    required this.serviceId,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Text(
-              provider.displayName[0].toUpperCase(),
-              style: const TextStyle(
-                  color: AppColors.primary, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+      child: InkWell(
+        onTap: () {
+          context.push('/service/${service.serviceId}', extra: service);
+        },
+        borderRadius: BorderRadius.circular(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Flexible(
-                    child: Text(
-                      provider.displayName,
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineSmall
-                          ?.copyWith(fontSize: 15),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            service.provider.displayName[0].toUpperCase(),
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    service.provider.displayName,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (service.provider.isVerified) ...[
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.verified_rounded,
+                                      size: 14, color: AppColors.primary),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Đã được xác thực',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textTertiary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      _FavoriteToggle(serviceId: service.serviceId),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    service.service.name,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.5,
                     ),
                   ),
-                  if (provider.isVerified) ...[
-                    const SizedBox(width: 4),
-                    const Icon(Icons.verified_rounded,
-                        size: 14, color: AppColors.primary),
+                  if (service.service.description != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      service.service.description!,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                        height: 1.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                'Đối tác uy tín',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: AppColors.textTertiary),
-              ),
-            ],
-          ),
+            ),
+            _MetricRibbon(service: service),
+          ],
         ),
-        _FavoriteToggle(serviceId: serviceId),
-      ],
-    );
-  }
-}
-
-class _ServiceInformation extends StatelessWidget {
-  final String name;
-  final String? description;
-
-  const _ServiceInformation({required this.name, this.description});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          name,
-          style: Theme.of(context)
-              .textTheme
-              .headlineMedium
-              ?.copyWith(fontSize: 18),
-        ),
-        if (description != null) ...[
-          const SizedBox(height: 6),
-          Text(
-            description!,
-            style:
-                Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.4),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ],
+      ),
     );
   }
 }
@@ -161,13 +148,15 @@ class _MetricRibbon extends StatelessWidget {
     final priceFormat = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      decoration: const BoxDecoration(
-        color: AppColors.shelf,
-        borderRadius: BorderRadius.only(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: AppColors.shelf.withOpacity(0.5),
+        borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(24),
           bottomRight: Radius.circular(24),
         ),
+        border:
+            Border(top: BorderSide(color: AppColors.divider.withOpacity(0.5))),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -177,16 +166,17 @@ class _MetricRibbon extends StatelessWidget {
               _buildMetric(context, Icons.star_rounded,
                   service.provider.ratingAvg.toStringAsFixed(1), Colors.orange),
               _buildVerticalDivider(),
-              _buildMetric(context, Icons.location_on_rounded, 'Cách 1.2 km',
+              _buildMetric(context, Icons.location_on_rounded, '1.2 km',
                   AppColors.primary),
             ],
           ),
           Text(
             priceFormat.format(service.price).replaceAll(',00', ''),
             style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
+              color: AppColors.primary,
+              fontWeight: FontWeight.w900,
+              fontSize: 18,
+              letterSpacing: -0.5,
             ),
           ),
         ],
@@ -202,10 +192,11 @@ class _MetricRibbon extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
         ),
       ],
     );
@@ -213,10 +204,10 @@ class _MetricRibbon extends StatelessWidget {
 
   Widget _buildVerticalDivider() {
     return Container(
-      height: 12,
-      width: 1,
+      height: 14,
+      width: 1.5,
       margin: const EdgeInsets.symmetric(horizontal: 12),
-      color: AppColors.borderMedium.withOpacity(0.5),
+      color: AppColors.divider,
     );
   }
 }
@@ -234,19 +225,25 @@ class _FavoriteToggle extends StatelessWidget {
         return GestureDetector(
           onTap: () =>
               context.read<FavoritesBloc>().add(ToggleFavorite(serviceId)),
-          child: Container(
-            padding: const EdgeInsets.all(8),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: isFavorite
                   ? AppColors.error.withOpacity(0.1)
-                  : AppColors.shelf,
+                  : AppColors.white,
               shape: BoxShape.circle,
+              border: Border.all(
+                color: isFavorite
+                    ? AppColors.error.withOpacity(0.2)
+                    : AppColors.divider.withOpacity(0.5),
+              ),
             ),
             child: Icon(
               isFavorite
                   ? Icons.favorite_rounded
                   : Icons.favorite_outline_rounded,
-              size: 18,
+              size: 20,
               color: isFavorite ? AppColors.error : AppColors.textTertiary,
             ),
           ),
