@@ -7,8 +7,8 @@ export default () => ({
   jwt: {
     accessSecret: process.env.JWT_SECRET || 'change-me-in-production',
     refreshSecret: process.env.JWT_REFRESH_SECRET || 'change-me-in-production',
-    accessExpiresIn: process.env.JWT_EXPIRES_IN || '15m',
-    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+    accessExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
+    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
   },
   otp: {
     expiresMinutes: parseInt(process.env.OTP_EXPIRES_MINUTES || '10', 10),

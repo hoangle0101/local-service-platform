@@ -1,50 +1,74 @@
-'use client';
+"use client";
 
-import { useQuery } from '@tanstack/react-query';
-import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Star, TrendingUp, CheckCircle, XCircle, Phone, Mail } from 'lucide-react';
-import { api } from '@/lib/api';
-import { Provider } from '@/types/provider';
-import { ApiResponse } from '@/types/system';
-import { toast } from 'sonner';
+import { useQuery } from "@tanstack/react-query";
+import { useParams, useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { Button } from "@/components/ui/button";
+import {
+  ArrowLeft,
+  Star,
+  TrendingUp,
+  CheckCircle,
+  XCircle,
+  Phone,
+  Mail,
+} from "lucide-react";
+import { api } from "@/lib/api";
+import { Provider } from "@/types/provider";
+import { ApiResponse } from "@/types/system";
+import { toast } from "sonner";
 
 export default function ProviderDetailPage() {
   const params = useParams();
   const router = useRouter();
   const providerId = params.id as string;
 
-  const { data: response, isLoading, refetch } = useQuery({
-    queryKey: ['admin-provider-detail', providerId],
+  const {
+    data: response,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["admin-provider-detail", providerId],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<Provider>>(`/admin/providers/${providerId}`);
+      const res = await api.get<ApiResponse<Provider>>(
+        `/admin/providers/${providerId}`
+      );
       return res.data;
     },
+    retry: false,
   });
 
   const provider = response?.data;
 
-  const handleAction = async (action: 'verified' | 'rejected') => {
+  const handleAction = async (action: "verified" | "rejected") => {
     try {
       await api.patch(`/admin/providers/${providerId}/verify`, {
         action,
-        adminNotes: `Provider ${action} by admin`
+        adminNotes: `Provider ${action} by admin`,
       });
-      toast.success(`Provider ${action === 'verified' ? 'approved' : 'rejected'} successfully`);
+      toast.success(
+        `Provider ${
+          action === "verified" ? "approved" : "rejected"
+        } successfully`
+      );
       refetch();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || `Failed to ${action} provider`);
+      toast.error(
+        error.response?.data?.message || `Failed to ${action} provider`
+      );
     }
   };
 
   // Format currency
-  const formatCurrency = (amount: number | string) => {
-    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
+  const formatCurrency = (amount: number | string | undefined | null) => {
+    if (amount === undefined || amount === null) return "₫0";
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
     }).format(numAmount);
   };
 
@@ -54,8 +78,27 @@ export default function ProviderDetailPage() {
         <div className="h-8 w-48 bg-zinc-200 animate-pulse rounded" />
         <div className="grid gap-6 md:grid-cols-2">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-48 bg-zinc-100 animate-pulse rounded-lg" />
+            <div
+              key={i}
+              className="h-48 bg-zinc-100 animate-pulse rounded-lg"
+            />
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <p className="text-lg text-red-600">Error loading provider data</p>
+          <p className="text-sm text-zinc-500 mt-2">
+            {(error as Error)?.message || "Please try again later"}
+          </p>
+          <Button onClick={() => router.push("/providers")} className="mt-4">
+            Back to Providers
+          </Button>
         </div>
       </div>
     );
@@ -66,7 +109,7 @@ export default function ProviderDetailPage() {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <p className="text-lg text-zinc-600">Provider not found</p>
-          <Button onClick={() => router.push('/providers')} className="mt-4">
+          <Button onClick={() => router.push("/providers")} className="mt-4">
             Back to Providers
           </Button>
         </div>
@@ -81,22 +124,29 @@ export default function ProviderDetailPage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => router.push('/providers')}
+            onClick={() => router.push("/providers")}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">{provider.displayName}</h2>
-            <p className="text-zinc-600">Provider #{provider.id.slice(0, 8)}</p>
+            <h2 className="text-3xl font-bold tracking-tight">
+              {provider.displayName || "Unknown Provider"}
+            </h2>
+            <p className="text-zinc-600">
+              Provider #{provider.id ? String(provider.id).slice(0, 8) : "N/A"}
+            </p>
           </div>
         </div>
-        {provider.verificationStatus === 'pending' && (
+        {provider.verificationStatus === "pending" && (
           <div className="flex gap-2">
-            <Button variant="default" onClick={() => handleAction('verified')}>
+            <Button variant="default" onClick={() => handleAction("verified")}>
               <CheckCircle className="h-4 w-4 mr-2" />
               Approve
             </Button>
-            <Button variant="destructive" onClick={() => handleAction('rejected')}>
+            <Button
+              variant="destructive"
+              onClick={() => handleAction("rejected")}
+            >
               <XCircle className="h-4 w-4 mr-2" />
               Reject
             </Button>
@@ -112,12 +162,11 @@ export default function ProviderDetailPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {typeof provider.rating === 'object' && provider.rating?.average
-                ? provider.rating.average.toFixed(1)
-                : typeof provider.rating === 'number'
+              {typeof provider.rating === "object" && provider.rating?.average
+                ? Number(provider.rating.average).toFixed(1)
+                : typeof provider.rating === "number"
                 ? provider.rating.toFixed(1)
-                : '0.0'
-              }
+                : "0.0"}
             </div>
             <p className="text-xs text-zinc-600">
               {provider.totalReviews || 0} reviews
@@ -132,7 +181,7 @@ export default function ProviderDetailPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {provider.responseTime ? `${provider.responseTime}m` : 'N/A'}
+              {provider.responseTime ? `${provider.responseTime}m` : "N/A"}
             </div>
             <p className="text-xs text-zinc-600">Average response</p>
           </CardContent>
@@ -140,12 +189,14 @@ export default function ProviderDetailPage() {
 
         <Card className="bg-gradient-to-br from-blue-50 to-indigo-50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Completion Rate
+            </CardTitle>
             <TrendingUp className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {provider.completionRate || '0%'}
+              {provider.completionRate || "0%"}
             </div>
             <p className="text-xs text-zinc-600">Jobs completed</p>
           </CardContent>
@@ -157,7 +208,9 @@ export default function ProviderDetailPage() {
             <TrendingUp className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{provider.services?.length || 0}</div>
+            <div className="text-2xl font-bold">
+              {provider.services?.length || 0}
+            </div>
             <p className="text-xs text-zinc-600">Active services</p>
           </CardContent>
         </Card>
@@ -174,7 +227,7 @@ export default function ProviderDetailPage() {
               <div className="flex justify-center">
                 <img
                   src={provider.avatarUrl}
-                  alt={provider.displayName}
+                  alt={provider.displayName || "Provider"}
                   className="h-24 w-24 rounded-full object-cover border-2 border-blue-500"
                 />
               </div>
@@ -182,7 +235,9 @@ export default function ProviderDetailPage() {
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-sm text-zinc-600">Business Name</span>
-                <span className="text-sm font-medium">{provider.displayName}</span>
+                <span className="text-sm font-medium">
+                  {provider.displayName || "—"}
+                </span>
               </div>
               {provider.bio && (
                 <div>
@@ -191,17 +246,25 @@ export default function ProviderDetailPage() {
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-sm text-zinc-600">Verification Status</span>
-                <StatusBadge status={provider.verificationStatus} />
+                <span className="text-sm text-zinc-600">
+                  Verification Status
+                </span>
+                <StatusBadge
+                  status={provider.verificationStatus || "unverified"}
+                />
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-zinc-600">Availability</span>
-                <StatusBadge status={provider.availabilityStatus} />
+                <StatusBadge
+                  status={provider.availabilityStatus || "offline"}
+                />
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-zinc-600">Joined</span>
                 <span className="text-sm font-medium">
-                  {new Date(provider.createdAt).toLocaleDateString('vi-VN')}
+                  {provider.createdAt
+                    ? new Date(provider.createdAt).toLocaleDateString("vi-VN")
+                    : "—"}
                 </span>
               </div>
             </div>
@@ -220,7 +283,7 @@ export default function ProviderDetailPage() {
                 <span className="text-sm text-zinc-600">Phone</span>
               </div>
               <p className="font-mono text-sm font-medium ml-6">
-                {provider.user?.phone || '—'}
+                {provider.user?.phone || "—"}
               </p>
             </div>
             <div className="space-y-2">
@@ -229,13 +292,13 @@ export default function ProviderDetailPage() {
                 <span className="text-sm text-zinc-600">Email</span>
               </div>
               <p className="text-sm font-medium ml-6">
-                {provider.user?.email || '—'}
+                {provider.user?.email || "—"}
               </p>
             </div>
             <div className="space-y-2">
               <span className="text-sm text-zinc-600">Full Name</span>
               <p className="text-sm font-medium">
-                {provider.user?.profile?.fullName || '—'}
+                {provider.user?.profile?.fullName || "—"}
               </p>
             </div>
           </CardContent>
@@ -249,14 +312,21 @@ export default function ProviderDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {provider.services.map((service) => (
-                  <div key={service.id} className="p-3 rounded-lg bg-zinc-50">
-                    <p className="font-medium">{service.service.name}</p>
+                {provider.services.map((service, index) => (
+                  <div
+                    key={service.id || index}
+                    className="p-3 rounded-lg bg-zinc-50"
+                  >
+                    <p className="font-medium">
+                      {service.service?.name || "Unknown Service"}
+                    </p>
                     <p className="text-sm text-zinc-600">
                       Base Price: {formatCurrency(service.basePrice)}
                     </p>
                     {service.description && (
-                      <p className="text-xs text-zinc-500 mt-1">{service.description}</p>
+                      <p className="text-xs text-zinc-500 mt-1">
+                        {service.description}
+                      </p>
                     )}
                   </div>
                 ))}

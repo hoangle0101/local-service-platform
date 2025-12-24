@@ -1,36 +1,48 @@
-'use client';
+"use client";
 
-import { useQuery } from '@tanstack/react-query';
-import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Calendar, User as UserIcon, Shield } from 'lucide-react';
-import { api } from '@/lib/api';
-import { UserDetail } from '@/types/user';
-import { ApiResponse } from '@/types/system';
+import { useQuery } from "@tanstack/react-query";
+import { useParams, useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Calendar, User as UserIcon, Shield } from "lucide-react";
+import { api } from "@/lib/api";
+import { UserDetail } from "@/types/user";
+import { ApiResponse } from "@/types/system";
 
 export default function CustomerDetailPage() {
   const params = useParams();
   const router = useRouter();
   const userId = params.id as string;
 
-  const { data: response, isLoading } = useQuery({
-    queryKey: ['admin-user-detail', userId],
+  const {
+    data: response,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["admin-user-detail", userId],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<UserDetail>>(`/admin/users/${userId}`);
+      console.log("Fetching user detail for:", userId);
+      const res = await api.get<ApiResponse<UserDetail>>(
+        `/admin/users/${userId}`
+      );
+      console.log("API Response:", res.data);
       return res.data;
     },
+    retry: false,
   });
 
   const user = response?.data;
+  console.log("Parsed user:", user);
 
   // Format currency
-  const formatCurrency = (amount: number | string) => {
-    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
+  const formatCurrency = (amount: number | string | undefined | null) => {
+    if (amount === undefined || amount === null) return "₫0";
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
     }).format(numAmount);
   };
 
@@ -40,8 +52,27 @@ export default function CustomerDetailPage() {
         <div className="h-8 w-48 bg-zinc-200 animate-pulse rounded" />
         <div className="grid gap-6 md:grid-cols-2">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-48 bg-zinc-100 animate-pulse rounded-lg" />
+            <div
+              key={i}
+              className="h-48 bg-zinc-100 animate-pulse rounded-lg"
+            />
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <p className="text-lg text-red-600">Error loading customer data</p>
+          <p className="text-sm text-zinc-500 mt-2">
+            {(error as Error)?.message || "Please try again later"}
+          </p>
+          <Button onClick={() => router.push("/customers")} className="mt-4">
+            Back to Customers
+          </Button>
         </div>
       </div>
     );
@@ -52,7 +83,7 @@ export default function CustomerDetailPage() {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <p className="text-lg text-zinc-600">Customer not found</p>
-          <Button onClick={() => router.push('/customers')} className="mt-4">
+          <Button onClick={() => router.push("/customers")} className="mt-4">
             Back to Customers
           </Button>
         </div>
@@ -66,13 +97,17 @@ export default function CustomerDetailPage() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => router.push('/customers')}
+          onClick={() => router.push("/customers")}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Customer Details</h2>
-          <p className="text-zinc-600">#{user.id.slice(0, 8)}</p>
+          <h2 className="text-3xl font-bold tracking-tight">
+            Customer Details
+          </h2>
+          <p className="text-zinc-600">
+            #{user.id ? String(user.id).slice(0, 8) : "N/A"}
+          </p>
         </div>
       </div>
 
@@ -99,29 +134,33 @@ export default function CustomerDetailPage() {
               <div className="flex justify-between">
                 <span className="text-sm text-zinc-600">Full Name</span>
                 <span className="text-sm font-medium">
-                  {user.profile?.fullName || 'Not set'}
+                  {user.profile?.fullName || "Not set"}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-zinc-600">Phone</span>
-                <span className="text-sm font-medium font-mono">{user.phone}</span>
+                <span className="text-sm font-medium font-mono">
+                  {user.phone || "—"}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-zinc-600">Email</span>
-                <span className="text-sm font-medium">{user.email || '—'}</span>
+                <span className="text-sm font-medium">{user.email || "—"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-zinc-600">Gender</span>
                 <span className="text-sm font-medium capitalize">
-                  {user.profile?.gender || '—'}
+                  {user.profile?.gender || "—"}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-zinc-600">Birth Date</span>
                 <span className="text-sm font-medium">
                   {user.profile?.dateOfBirth
-                    ? new Date(user.profile.dateOfBirth).toLocaleDateString('vi-VN')
-                    : '—'}
+                    ? new Date(user.profile.dateOfBirth).toLocaleDateString(
+                        "vi-VN"
+                      )
+                    : "—"}
                 </span>
               </div>
             </div>
@@ -141,34 +180,39 @@ export default function CustomerDetailPage() {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-zinc-600">Roles</span>
                 <div className="flex gap-1 flex-wrap justify-end">
-                  {user.roles.map((role) => (
-                    <span 
+                  {(user.roles || []).map((role) => (
+                    <span
                       key={role}
                       className="capitalize text-xs px-2 py-1 rounded bg-zinc-100 font-medium whitespace-nowrap"
                     >
-                      {role.replace('_', ' ')}
+                      {role.replace("_", " ")}
                     </span>
                   ))}
+                  {(!user.roles || user.roles.length === 0) && (
+                    <span className="text-xs text-zinc-400">No roles</span>
+                  )}
                 </div>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-zinc-600">Status</span>
-                <StatusBadge status={user.status} />
+                <StatusBadge status={user.status || "active"} />
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-zinc-600">Verified</span>
                 <span
                   className={`text-sm font-medium ${
-                    user.isVerified ? 'text-green-600' : 'text-red-600'
+                    user.isVerified ? "text-green-600" : "text-red-600"
                   }`}
                 >
-                  {user.isVerified ? '✓ Yes' : '✗ No'}
+                  {user.isVerified ? "✓ Yes" : "✗ No"}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-zinc-600">Joined</span>
                 <span className="text-sm font-medium">
-                  {new Date(user.createdAt).toLocaleDateString('vi-VN')}
+                  {user.createdAt
+                    ? new Date(user.createdAt).toLocaleDateString("vi-VN")
+                    : "—"}
                 </span>
               </div>
             </div>
@@ -202,7 +246,9 @@ export default function CustomerDetailPage() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-zinc-600">Total Withdrawals</span>
+                  <span className="text-sm text-zinc-600">
+                    Total Withdrawals
+                  </span>
                   <span className="text-sm font-medium text-red-600">
                     {formatCurrency(user.wallet.totalWithdrawals)}
                   </span>
@@ -243,15 +289,24 @@ export default function CustomerDetailPage() {
                   onClick={() => router.push(`/bookings/${booking.id}`)}
                 >
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">Booking #{booking.id.slice(0, 8)}</p>
-                    <p className="text-sm text-zinc-600">{booking.service?.name}</p>
+                    <p className="text-sm font-medium">
+                      Booking #
+                      {booking.id ? String(booking.id).slice(0, 8) : "N/A"}
+                    </p>
+                    <p className="text-sm text-zinc-600">
+                      {booking.service?.name || "Unknown service"}
+                    </p>
                     <p className="text-xs text-zinc-500">
-                      {new Date(booking.createdAt).toLocaleString('vi-VN')}
+                      {booking.createdAt
+                        ? new Date(booking.createdAt).toLocaleString("vi-VN")
+                        : "—"}
                     </p>
                   </div>
                   <div className="text-right space-y-1">
-                    <p className="text-sm font-medium">{formatCurrency(booking.totalAmount)}</p>
-                    <StatusBadge status={booking.status} />
+                    <p className="text-sm font-medium">
+                      {formatCurrency(booking.totalAmount)}
+                    </p>
+                    <StatusBadge status={booking.status || "pending"} />
                   </div>
                 </div>
               ))}
