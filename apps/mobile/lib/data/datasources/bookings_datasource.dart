@@ -316,12 +316,15 @@ class BookingsDataSource {
 
   /// Get global booking requests (optionally filtered by serviceId or categoryId)
   Future<List<Booking>> getGlobalRequests(
-      {int? serviceId, int? categoryId}) async {
+      {int? serviceId, int? categoryId, bool onlyFar = false}) async {
     try {
       final queryParams = <String, dynamic>{};
       if (serviceId != null) queryParams['serviceId'] = serviceId;
       if (categoryId != null) queryParams['categoryId'] = categoryId;
+      if (onlyFar) queryParams['onlyFar'] = 'true';
 
+      print(
+          '[BookingsDataSource] getGlobalRequests calling: /provider/bookings/global with params: $queryParams');
       final response = await _dio.get('/provider/bookings/global',
           queryParameters: queryParams);
 
@@ -338,6 +341,8 @@ class BookingsDataSource {
       }
 
       final List<dynamic> requestsList = dataObj['requests'] ?? [];
+      print(
+          '[BookingsDataSource] getGlobalRequests returned ${requestsList.length} items');
       return requestsList
           .map((json) => Booking.fromJson(json as Map<String, dynamic>))
           .toList();

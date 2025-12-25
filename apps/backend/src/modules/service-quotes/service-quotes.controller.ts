@@ -89,4 +89,16 @@ export class ServiceQuotesController {
       dto,
     );
   }
+
+  @Patch('quotes/:quoteId/agree-reject')
+  @ApiOperation({ summary: 'Provider agrees to rejection - cancels booking' })
+  async providerAgreeReject(
+    @Param('quoteId') quoteId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.serviceQuotesService.providerAgreeReject(
+      BigInt(quoteId),
+      BigInt(user.userId),
+    );
+  }
 }

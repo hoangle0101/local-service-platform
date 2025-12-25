@@ -40,6 +40,7 @@ export class ServiceQuotesService {
           include: { profile: true },
         },
         service: true,
+        selectedItems: true, // Get customer's pre-selected items
       },
     });
 
@@ -58,12 +59,29 @@ export class ServiceQuotesService {
       );
     }
 
+    // Check if quote differs from customer selection
+    const customerSelectedIds =
+      booking.selectedItems?.map((i) => i.providerServiceItemId.toString()) ||
+      [];
+    const quoteItemIds = dto.items
+      .filter((i) => i.serviceItemId)
+      .map((i) => i.serviceItemId);
+
+    // Detect changes: provider added items not in customer selection or removed customer items
+    const hasChangesFromCustomer =
+      customerSelectedIds.length > 0 &&
+      (dto.items.some(
+        (i) => !customerSelectedIds.includes(i.serviceItemId || ''),
+      ) ||
+        customerSelectedIds.some((id) => !quoteItemIds.includes(id)));
+
     // Calculate costs
     const partsCost = dto.items.reduce(
       (sum, item) => sum + item.price * item.quantity,
       0,
     );
-    const totalCost = partsCost + dto.laborCost;
+    const surcharge = dto.surcharge || 0;
+    const totalCost = partsCost + dto.laborCost + surcharge;
     const platformFee = Math.round(totalCost * this.PLATFORM_FEE_RATE);
     const finalPrice = totalCost + platformFee;
 
@@ -75,9 +93,10 @@ export class ServiceQuotesService {
         bookingId,
         providerId,
         diagnosis: dto.diagnosis,
-        items: dto.items as any, // Cast to Prisma JSON type
+        items: dto.items as any, // Legacy JSON field
         laborCost: dto.laborCost,
         partsCost,
+        surcharge,
         totalCost,
         platformFee,
         finalPrice,
@@ -85,8 +104,25 @@ export class ServiceQuotesService {
         estimatedTime: dto.estimatedTime,
         images: dto.images || [],
         notes: dto.notes,
+        providerNotes: dto.providerNotes,
+        hasChangesFromCustomer,
         status: QuoteStatus.pending,
         expiresAt,
+        // Create structured quote items
+        quoteItems: {
+          create: dto.items.map((item) => ({
+            serviceItemId: item.serviceItemId
+              ? BigInt(item.serviceItemId)
+              : null,
+            name: item.name,
+            description: item.description,
+            unitPrice: item.price,
+            quantity: item.quantity,
+            totalPrice: item.price * item.quantity,
+            isCustom: item.isCustom || !item.serviceItemId,
+            isFromCustomerSelection: item.isFromCustomerSelection || false,
+          })),
+        },
       },
       include: {
         provider: {
@@ -96,6 +132,7 @@ export class ServiceQuotesService {
             profile: { select: { fullName: true, avatarUrl: true } },
           },
         },
+        quoteItems: true,
       },
     });
 
@@ -112,8 +149,28 @@ export class ServiceQuotesService {
       },
     );
 
+    // Notify admin if provider changed from customer selection
+    if (hasChangesFromCustomer) {
+      console.log(
+        `[Quote] Provider ${providerId} changed quote from customer selection for booking ${bookingId}`,
+      );
+      // TODO: Send notification to admin via admin notification channel
+      this.chatGateway.notifyUser(
+        'admin', // Admin channel
+        'booking.quote_changed',
+        {
+          bookingId: booking.id.toString(),
+          quoteId: quote.id.toString(),
+          providerNotes: dto.providerNotes,
+          customerSelectedCount: customerSelectedIds.length,
+          quoteItemsCount: dto.items.length,
+        },
+      );
+    }
+
     return {
       ...this.serializeQuote(quote),
+      hasChangesFromCustomer,
       message: 'Báo giá đã được gửi cho khách hàng',
     };
   }
@@ -122,16 +179,26 @@ export class ServiceQuotesService {
    * Get quotes for a booking
    */
   async getQuotesForBooking(bookingId: bigint, userId: bigint) {
+    console.log(
+      `[Quote] getQuotesForBooking: bookingId=${bookingId}, userId=${userId}`,
+    );
+
     // Verify user has access to this booking
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
     });
 
     if (!booking) {
+      console.log(`[Quote] Booking not found: ${bookingId}`);
       throw new NotFoundException('Booking not found');
     }
 
+    console.log(
+      `[Quote] Booking found: customerId=${booking.customerId}, providerId=${booking.providerId}`,
+    );
+
     if (booking.customerId !== userId && booking.providerId !== userId) {
+      console.log(`[Quote] Access denied for user ${userId}`);
       throw new ForbiddenException('You do not have access to this booking');
     }
 
@@ -149,6 +216,10 @@ export class ServiceQuotesService {
       orderBy: { createdAt: 'desc' },
     });
 
+    console.log(
+      `[Quote] Found ${quotes.length} quotes for booking ${bookingId}`,
+    );
+
     return quotes.map(this.serializeQuote);
   }
 
@@ -158,7 +229,14 @@ export class ServiceQuotesService {
   async acceptQuote(quoteId: bigint, customerId: bigint, dto?: AcceptQuoteDto) {
     const quote = await this.prisma.serviceQuote.findUnique({
       where: { id: quoteId },
-      include: { booking: true },
+      include: {
+        booking: {
+          include: { service: true },
+        },
+        provider: {
+          select: { id: true, profile: { select: { fullName: true } } },
+        },
+      },
     });
 
     if (!quote) {
@@ -177,7 +255,7 @@ export class ServiceQuotesService {
       throw new BadRequestException('Quote has expired');
     }
 
-    // Update quote status and booking
+    // Update quote status and booking with actual price from quote
     const [updatedQuote] = await this.prisma.$transaction([
       this.prisma.serviceQuote.update({
         where: { id: quoteId },
@@ -191,6 +269,7 @@ export class ServiceQuotesService {
         data: {
           status: BookingStatus.in_progress,
           estimatedPrice: quote.finalPrice,
+          actualPrice: quote.finalPrice, // Set actual price from accepted quote
           additionalNotes: dto?.customerNote
             ? `Khách hàng: ${dto.customerNote}`
             : undefined,
@@ -207,7 +286,23 @@ export class ServiceQuotesService {
       }),
     ]);
 
-    // TODO: Send notification to provider
+    // Notify provider that quote was accepted
+    this.chatGateway.notifyUser(
+      quote.providerId.toString(),
+      'booking.quote_accepted',
+      {
+        bookingId: quote.bookingId.toString(),
+        quoteId: quoteId.toString(),
+        serviceName: quote.booking.service?.name,
+        finalPrice: quote.finalPrice.toString(),
+        message:
+          'Khách hàng đã chấp nhận báo giá. Bạn có thể thực hiện dịch vụ.',
+      },
+    );
+
+    console.log(
+      `[Quote] Customer ${customerId} accepted quote ${quoteId}, price: ${quote.finalPrice}`,
+    );
 
     return {
       ...this.serializeQuote(updatedQuote),
@@ -221,7 +316,11 @@ export class ServiceQuotesService {
   async rejectQuote(quoteId: bigint, customerId: bigint, dto: RejectQuoteDto) {
     const quote = await this.prisma.serviceQuote.findUnique({
       where: { id: quoteId },
-      include: { booking: true },
+      include: {
+        booking: {
+          include: { service: true },
+        },
+      },
     });
 
     if (!quote) {
@@ -236,21 +335,114 @@ export class ServiceQuotesService {
       throw new BadRequestException(`Quote is already ${quote.status}`);
     }
 
-    const updatedQuote = await this.prisma.serviceQuote.update({
-      where: { id: quoteId },
-      data: {
-        status: QuoteStatus.rejected,
-        notes: quote.notes
-          ? `${quote.notes}\n---\nLý do từ chối: ${dto.reason}`
-          : `Lý do từ chối: ${dto.reason}`,
+    // Update quote and booking status
+    const [updatedQuote] = await this.prisma.$transaction([
+      this.prisma.serviceQuote.update({
+        where: { id: quoteId },
+        data: {
+          status: QuoteStatus.rejected,
+          notes: quote.notes
+            ? `${quote.notes}\n---\nLý do từ chối: ${dto.reason}`
+            : `Lý do từ chối: ${dto.reason}`,
+        },
+      }),
+      // Change booking status to disputed/quote_rejected
+      this.prisma.booking.update({
+        where: { id: quote.bookingId },
+        data: {
+          status: 'disputed', // Using disputed as quote_rejected state
+          additionalNotes: `Báo giá bị từ chối: ${dto.reason}`,
+        },
+      }),
+    ]);
+
+    // Notify provider about rejection
+    this.chatGateway.notifyUser(
+      quote.providerId.toString(),
+      'booking.quote_rejected',
+      {
+        bookingId: quote.bookingId.toString(),
+        quoteId: quoteId.toString(),
+        serviceName: quote.booking.service?.name,
+        reason: dto.reason,
+        message:
+          'Khách hàng đã từ chối báo giá. Vui lòng xem xét hoặc đồng ý hủy.',
       },
+    );
+
+    // Notify admin for dispute resolution
+    this.chatGateway.notifyUser('admin', 'booking.quote_disputed', {
+      bookingId: quote.bookingId.toString(),
+      quoteId: quoteId.toString(),
+      providerId: quote.providerId.toString(),
+      customerId: customerId.toString(),
+      reason: dto.reason,
+      message: 'Khách hàng từ chối báo giá, cần xem xét.',
     });
 
-    // TODO: Send notification to provider
+    console.log(
+      `[Quote] Customer ${customerId} rejected quote ${quoteId}, reason: ${dto.reason}`,
+    );
 
     return {
       ...this.serializeQuote(updatedQuote),
-      message: 'Đã từ chối báo giá.',
+      message:
+        'Đã từ chối báo giá. Admin sẽ xem xét hoặc thợ có thể đồng ý hủy.',
+    };
+  }
+
+  /**
+   * Provider agrees to customer rejection - cancels the booking
+   */
+  async providerAgreeReject(quoteId: bigint, providerId: bigint) {
+    const quote = await this.prisma.serviceQuote.findUnique({
+      where: { id: quoteId },
+      include: {
+        booking: {
+          include: { service: true },
+        },
+      },
+    });
+
+    if (!quote) {
+      throw new NotFoundException('Quote not found');
+    }
+
+    if (quote.providerId !== providerId) {
+      throw new ForbiddenException('Only the provider can agree to rejection');
+    }
+
+    if (quote.status !== QuoteStatus.rejected) {
+      throw new BadRequestException('Quote is not rejected');
+    }
+
+    // Cancel the booking
+    await this.prisma.booking.update({
+      where: { id: quote.bookingId },
+      data: {
+        status: BookingStatus.cancelled,
+        additionalNotes: 'Thợ đồng ý hủy sau khi báo giá bị từ chối',
+      },
+    });
+
+    // Notify customer
+    this.chatGateway.notifyUser(
+      quote.booking.customerId.toString(),
+      'booking.cancelled',
+      {
+        bookingId: quote.bookingId.toString(),
+        serviceName: quote.booking.service?.name,
+        message: 'Đơn hàng đã được hủy do thợ đồng ý với từ chối báo giá.',
+      },
+    );
+
+    console.log(
+      `[Quote] Provider ${providerId} agreed to reject quote ${quoteId}, booking cancelled`,
+    );
+
+    return {
+      message: 'Đã đồng ý hủy. Đơn hàng đã được hủy bỏ.',
+      bookingId: quote.bookingId.toString(),
     };
   }
 

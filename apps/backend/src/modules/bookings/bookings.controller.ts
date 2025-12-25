@@ -189,11 +189,13 @@ export class ProviderBookingsController {
     @CurrentUser() user: any,
     @Query('serviceId') serviceId?: string,
     @Query('categoryId') categoryId?: string,
+    @Query('onlyFar') onlyFar?: string,
   ) {
     return this.bookingsService.getGlobalRequests(
       BigInt(user.userId),
       serviceId ? parseInt(serviceId) : undefined,
       categoryId ? parseInt(categoryId) : undefined,
+      onlyFar === 'true',
     );
   }
 
@@ -209,6 +211,14 @@ export class ProviderBookingsController {
       BigInt(id),
     );
 
+    if (result.customerId) {
+      this.realtimeGateway.notifyUser(
+        result.customerId,
+        'booking.new_offer',
+        result,
+      );
+    }
+
     return result;
   }
 
@@ -219,7 +229,9 @@ export class ProviderBookingsController {
     @CurrentUser() user: any,
     @Param('id') id: string, // Change to string to see raw value
   ) {
-    console.log(`[ProviderBookingsController] acceptBooking called with id: ${id} (raw string)`);
+    console.log(
+      `[ProviderBookingsController] acceptBooking called with id: ${id} (raw string)`,
+    );
     const result = await this.bookingsService.acceptBooking(
       BigInt(user.userId),
       BigInt(id),
@@ -236,10 +248,7 @@ export class ProviderBookingsController {
     @Param('id', ParseIntPipe) id: number,
   ) {
     // NOTE: booking_status_changed event is already emitted by service
-    return this.bookingsService.startBooking(
-      BigInt(user.userId),
-      BigInt(id),
-    );
+    return this.bookingsService.startBooking(BigInt(user.userId), BigInt(id));
   }
 
   @Patch(':id/complete')
@@ -250,9 +259,19 @@ export class ProviderBookingsController {
     @Param('id', ParseIntPipe) id: number,
   ) {
     // NOTE: booking_status_changed event is already emitted by service
-    return this.bookingsService.completeBooking(
+    const result = await this.bookingsService.completeBooking(
       BigInt(user.userId),
       BigInt(id),
     );
+
+    if (result.customerId) {
+      this.realtimeGateway.notifyUser(
+        result.customerId,
+        'booking.completed',
+        result,
+      );
+    }
+
+    return result;
   }
 }

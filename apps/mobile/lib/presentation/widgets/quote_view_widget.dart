@@ -34,9 +34,11 @@ class _QuoteViewWidgetState extends State<QuoteViewWidget> {
 
   Future<void> _loadQuotes() async {
     setState(() => _isLoading = true);
+    debugPrint('[QuoteView] Loading quotes for booking: ${widget.bookingId}');
     try {
       final quotes =
           await _quoteDataSource.getQuotesForBooking(widget.bookingId);
+      debugPrint('[QuoteView] Loaded ${quotes.length} quotes: $quotes');
       if (mounted) {
         setState(() {
           _quotes = quotes;
@@ -44,6 +46,7 @@ class _QuoteViewWidgetState extends State<QuoteViewWidget> {
         });
       }
     } catch (e) {
+      debugPrint('[QuoteView] Error loading quotes: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -155,7 +158,29 @@ class _QuoteViewWidgetState extends State<QuoteViewWidget> {
     }
 
     if (_quotes.isEmpty) {
-      return const SizedBox.shrink();
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.receipt_long_outlined,
+                size: 60, color: AppColors.textTertiary),
+            const SizedBox(height: 16),
+            Text(
+              'Chưa có báo giá',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Thợ chưa gửi báo giá cho đơn này',
+              style: TextStyle(color: AppColors.textTertiary),
+            ),
+          ],
+        ),
+      );
     }
 
     final pendingQuotes =
