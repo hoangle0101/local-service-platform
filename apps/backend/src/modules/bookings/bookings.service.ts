@@ -78,8 +78,17 @@ export class BookingsService {
       // If providerId is specified, this is a Direct Booking (assigned to specific provider)
       // Otherwise, it's a General Booking (providers in that category will see it)
       const code = `BK${Date.now()}`;
-      const basePrice = Number(service.basePrice); // Initial estimate
       const isDirectBooking = dto.providerId != null;
+
+      // If direct booking without selectedItems → price = 0 (will be quoted by provider)
+      // If direct booking with selectedItems → price calculated from items
+      // If general booking → use service basePrice as estimate
+      const hasSelectedItems =
+        dto.selectedItems && dto.selectedItems.length > 0;
+      const basePrice =
+        isDirectBooking && !hasSelectedItems
+          ? 0 // Let provider quote
+          : Number(service.basePrice); // Initial estimate
 
       // Debug logging
       console.log('[createBooking] DTO received:', {
@@ -715,10 +724,20 @@ export class BookingsService {
       WHERE pp.user_id = $1
         AND b.status = 'pending'
         AND (
+          -- Include if within radius OR if location data is missing (be flexible)
+          b.location IS NULL 
+          OR pp.location IS NULL
+          OR ST_DWithin(
+            b.location::geography,
+            pp.location::geography,
+            COALESCE(pp.service_radius_m, 5000)
+          )
+        )
+        AND (
           -- Case 1: Direct booking - provider was specifically chosen
           b.provider_id = $1
           
-          -- Case 2: General booking - match by category + radius
+          -- Case 2: General booking - match by category 
           OR (
             b.provider_id IS NULL
             AND EXISTS (
@@ -728,17 +747,6 @@ export class BookingsService {
                 AND ps.is_active = true
                 AND ps.deleted_at IS NULL
                 AND ps_svc.category_id = s.category_id
-            )
-            AND (
-              -- Check radius if both locations available
-              (b.location IS NOT NULL AND pp.location IS NOT NULL AND ST_DWithin(
-                b.location::geography,
-                pp.location::geography,
-                COALESCE(pp.service_radius_m, 5000)
-              ))
-              -- Or if no location data, still show (flexible)
-              OR b.location IS NULL 
-              OR pp.location IS NULL
             )
           )
         )
@@ -754,9 +762,17 @@ export class BookingsService {
     );
 
     console.log('[getProviderRequests] providerId:', providerId.toString());
-    console.log('[getProviderRequests] Found', requests.length, 'requests');
+    console.log(
+      '[getProviderRequests] Found',
+      requests.length,
+      'requests within radius',
+    );
     if (requests.length > 0) {
-      console.log('[getProviderRequests] First request:', requests[0]);
+      requests.forEach((r) => {
+        console.log(
+          `[getProviderRequests] Booking ${r.code}: distance=${r.distance}m, radius=${r.service_radius_m || 5000}m`,
+        );
+      });
     }
 
     return {
@@ -784,6 +800,7 @@ export class BookingsService {
     providerId: bigint,
     serviceId?: number,
     categoryId?: number,
+    onlyFar?: boolean,
   ) {
     const requests = await this.prisma.$queryRawUnsafe<any[]>(
       `
@@ -809,19 +826,37 @@ export class BookingsService {
       JOIN provider_profiles pp ON pp.user_id = $1
       LEFT JOIN booking_offers bo ON bo.booking_id = b.id AND bo.provider_id = $1
       WHERE b.status = 'pending'
-        AND b.provider_id IS NULL
         AND bo.id IS NULL
+        -- Distance filter if onlyFar is true
         AND (
-          -- Filter by specific selected Service or Category
-          ($2::int IS NOT NULL AND b.service_id = $2::int)
-          OR ($3::int IS NOT NULL AND $2::int IS NULL AND s.category_id = $3::int)
-          -- DEFAULT: Only show jobs in categories the provider already works in
-          OR ($2::int IS NULL AND $3::int IS NULL AND EXISTS (
-            SELECT 1 FROM provider_services ps2
-            JOIN services s2 ON ps2.service_id = s2.id
-            WHERE ps2.provider_user_id = $1
-              AND s2.category_id = s.category_id
-          ))
+          NOT $4::boolean OR (
+            b.location IS NOT NULL 
+            AND pp.location IS NOT NULL 
+            AND ST_Distance(b.location::geography, pp.location::geography) > COALESCE(pp.service_radius_m, 5000)
+          )
+        )
+        AND (
+          -- My far direct bookings
+          b.provider_id = $1
+          -- General bookings matching my categories
+          OR (
+            b.provider_id IS NULL
+            AND (
+              -- Filter by specific selected Service or Category
+              ($2::int IS NOT NULL AND b.service_id = $2::int)
+              OR ($3::int IS NOT NULL AND $2::int IS NULL AND s.category_id = $3::int)
+              -- DEFAULT: Show jobs in any category for GLOBAL exploration, 
+              -- but if we want strictly "work" category competency, we keep this:
+              OR ($2::int IS NULL AND $3::int IS NULL AND EXISTS (
+                SELECT 1 FROM provider_services ps2
+                JOIN services s2 ON ps2.service_id = s2.id
+                WHERE ps2.provider_user_id = $1
+                  AND s2.category_id = s.category_id
+                  AND ps2.is_active = true
+                  AND ps2.deleted_at IS NULL
+              ))
+            )
+          )
         )
       ORDER BY ST_Distance(b.location::geography, pp.location::geography) ASC
       LIMIT 50
@@ -829,7 +864,23 @@ export class BookingsService {
       providerId,
       serviceId || null,
       categoryId || null,
+      onlyFar || false,
     );
+
+    console.log(
+      `[getGlobalRequests] providerId: ${providerId}, onlyFar: ${onlyFar}, serviceId: ${serviceId}, categoryId: ${categoryId}`,
+    );
+    console.log(
+      `[getGlobalRequests] Found ${requests.length} total results from SQL`,
+    );
+
+    if (requests.length > 0) {
+      requests.forEach((r) => {
+        console.log(
+          `[getGlobalRequests] Booking ${r.code}: distance=${r.distance}m, provider_radius=${r.service_radius_m || 5000}m, isOutside=${r.distance > (r.service_radius_m || 5000)}`,
+        );
+      });
+    }
 
     return {
       requests: requests.map((r) => ({
@@ -841,10 +892,11 @@ export class BookingsService {
         estimatedPrice: r.estimated_price?.toString(),
         serviceName: r.service_name,
         customerName: r.customer_name,
-        distance: Math.round(r.distance),
+        distance: r.distance != null ? Math.round(r.distance) : null,
         longitude: r.longitude,
         latitude: r.latitude,
-        isOutsideRadius: true,
+        isOutsideRadius:
+          r.distance != null && r.distance > (r.service_radius_m || 5000),
       })),
     };
   }
@@ -881,6 +933,13 @@ export class BookingsService {
               profile: {
                 select: { fullName: true, avatarUrl: true },
               },
+              providerProfile: {
+                select: {
+                  address: true,
+                  latitude: true,
+                  longitude: true,
+                },
+              },
             },
           },
           review: {
@@ -889,6 +948,13 @@ export class BookingsService {
               rating: true,
               comment: true,
               createdAt: true,
+            },
+          },
+          selectedItems: {
+            include: {
+              providerServiceItem: {
+                select: { id: true, name: true, price: true },
+              },
             },
           },
           _count: {
@@ -943,6 +1009,8 @@ export class BookingsService {
           longitude: loc?.longitude ?? null,
           estimatedPrice: b.estimatedPrice?.toString(),
           actualPrice: b.actualPrice?.toString(),
+          serviceId: b.serviceId,
+          providerId: b.providerId ? b.providerId.toString() : null,
           service: {
             id: b.service.id,
             name: b.service.name,
@@ -957,9 +1025,37 @@ export class BookingsService {
                 id: b.providerUser.id.toString(),
                 fullName: b.providerUser.profile?.fullName,
                 avatarUrl: b.providerUser.profile?.avatarUrl,
+                address: b.providerUser.providerProfile?.address || null,
               }
             : null,
+          // Calculate distance between provider and booking location
+          distance: (() => {
+            const providerLat = b.providerUser?.providerProfile?.latitude;
+            const providerLng = b.providerUser?.providerProfile?.longitude;
+            if (!providerLat || !providerLng || !loc) return null;
+
+            // Haversine formula to calculate distance in meters
+            const R = 6371000; // Earth radius in meters
+            const dLat = ((loc.latitude - providerLat) * Math.PI) / 180;
+            const dLon = ((loc.longitude - providerLng) * Math.PI) / 180;
+            const a =
+              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos((providerLat * Math.PI) / 180) *
+                Math.cos((loc.latitude * Math.PI) / 180) *
+                Math.sin(dLon / 2) *
+                Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return Math.round(R * c);
+          })(),
           offersCount: b._count?.bookingOffers || 0,
+          // Customer pre-selected items for quote
+          selectedItems:
+            b.selectedItems?.map((item: any) => ({
+              id: item.providerServiceItemId?.toString(),
+              name: item.providerServiceItem?.name || 'Item',
+              price: parseFloat(item.unitPrice?.toString() || '0'),
+              quantity: item.quantity || 1,
+            })) || [],
         };
       }),
       meta: {

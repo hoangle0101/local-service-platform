@@ -3,12 +3,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/bookings_datasource.dart';
+import '../../../data/datasources/quote_datasource.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../widgets/minimalist_widgets.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import 'create_quote_screen.dart';
+import '../booking/booking_detail_screen.dart';
 
 class ProviderBookingsScreen extends StatefulWidget {
   const ProviderBookingsScreen({super.key});
@@ -21,6 +23,7 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final BookingsDataSource _bookingsDataSource = BookingsDataSource();
+  final QuoteDataSource _quoteDataSource = QuoteDataSource();
 
   List<Booking> _myRequests = [];
   List<Booking> _globalRequests = [];
@@ -68,12 +71,19 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
     if (!mounted) return;
     setState(() => _isLoadingGlobalRequests = true);
     try {
-      final requests = await _bookingsDataSource.getGlobalRequests();
+      final requests =
+          await _bookingsDataSource.getGlobalRequests(onlyFar: true);
       if (mounted) {
         setState(() {
           _globalRequests = requests;
           _isLoadingGlobalRequests = false;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã tải ${requests.length} đơn hàng ở xa'),
+            duration: const Duration(seconds: 1),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -275,7 +285,8 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
               b.status == 'accepted' ||
               b.status == 'confirmed' ||
               b.status == 'in_progress' ||
-              b.status == 'pending_completion')
+              b.status == 'pending_completion' ||
+              b.status == 'disputed') // Quote rejected - provider can see
           .toList();
 
       if (inProgress.isEmpty) {
@@ -409,6 +420,13 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
       padding: const EdgeInsets.only(bottom: 20),
       child: MinCard(
         padding: const EdgeInsets.all(20),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                BookingDetailScreen(booking: booking, isProvider: true),
+          ),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -439,6 +457,11 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
             const Divider(height: 32, color: AppColors.divider),
             _buildInfoRow(
                 Icons.location_on_rounded, booking.addressText ?? 'N/A'),
+            if (booking.distance != null) ...[
+              const SizedBox(height: 10),
+              _buildInfoRow(Icons.directions_car_rounded,
+                  'Khoảng cách: ${booking.distance! < 1000 ? "${booking.distance} m" : "${(booking.distance! / 1000).toStringAsFixed(1)} km"}'),
+            ],
             const SizedBox(height: 10),
             _buildInfoRow(
                 Icons.access_time_filled_rounded,
@@ -495,6 +518,10 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
       case 'completed':
         color = AppColors.success;
         label = 'Hoàn thành';
+        break;
+      case 'disputed':
+        color = AppColors.error;
+        label = 'Báo giá bị từ chối';
         break;
     }
 
@@ -579,6 +606,45 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
         onPressed: () => _showCustomerReviewDialog(booking.review!,
             customerName: booking.customerName),
         icon: Icons.star_rounded,
+      );
+    }
+    // Quote rejected - show agree to cancel button
+    if (booking.status == 'disputed') {
+      return Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: AppColors.warning, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Khách hàng đã từ chối báo giá',
+                    style: TextStyle(
+                      color: AppColors.warning,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          MinButton(
+            text: 'Đồng ý hủy đơn',
+            isFullWidth: true,
+            isPrimary: false,
+            onPressed: () => _agreeRejectQuote(booking),
+            icon: Icons.cancel_rounded,
+          ),
+        ],
       );
     }
     return const SizedBox.shrink();
@@ -688,6 +754,68 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
     }
   }
 
+  /// Provider agrees to quote rejection - cancels booking
+  Future<void> _agreeRejectQuote(Booking booking) async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Xác nhận hủy đơn'),
+        content: const Text(
+          'Bạn có chắc chắn muốn đồng ý hủy đơn này?\n\nĐơn hàng sẽ bị hủy và không thể hoàn tác.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Không'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child:
+                const Text('Đồng ý hủy', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      // Need to get quote ID - we'll use the latest rejected quote for this booking
+      final quotes = await _quoteDataSource.getQuotesForBooking(booking.id);
+      final rejectedQuote = quotes.firstWhere(
+        (q) => q['status'] == 'rejected',
+        orElse: () => <String, dynamic>{},
+      );
+
+      if (rejectedQuote.isEmpty || rejectedQuote['id'] == null) {
+        throw Exception('Không tìm thấy báo giá bị từ chối');
+      }
+
+      await _quoteDataSource
+          .providerAgreeReject(rejectedQuote['id'].toString());
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã hủy đơn hàng thành công'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+      _loadAllData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
   /// Opens quote creation screen
   void _openCreateQuote(Booking booking) async {
     final result = await Navigator.of(context).push(
@@ -695,6 +823,9 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
         builder: (_) => CreateQuoteScreen(
           bookingId: booking.id,
           serviceName: booking.serviceName,
+          serviceId: booking.serviceId,
+          providerId: booking.providerId,
+          customerSelectedItems: booking.selectedItems,
         ),
       ),
     );

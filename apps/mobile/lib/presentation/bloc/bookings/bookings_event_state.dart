@@ -321,10 +321,12 @@ class Booking {
   final String status;
   final DateTime? scheduledAt;
   final String? addressText;
+  final String? notes; // Customer instructions
   final String? estimatedPrice;
   final String? serviceName;
   final String? categoryName;
   final String? providerName;
+  final String? providerAddress; // Provider's work address
   final String? customerName;
   final int? distance; // Distance in meters from provider
   final double? latitude;
@@ -334,6 +336,10 @@ class Booking {
   final bool hasReview;
   final BookingReview? review;
   final int offersCount;
+  final int? serviceId;
+  final int? providerId;
+  final List<Map<String, dynamic>>?
+      selectedItems; // Items pre-selected by customer
 
   Booking({
     required this.id,
@@ -341,10 +347,12 @@ class Booking {
     required this.status,
     this.scheduledAt,
     this.addressText,
+    this.notes,
     this.estimatedPrice,
     this.serviceName,
     this.categoryName,
     this.providerName,
+    this.providerAddress,
     this.customerName,
     this.distance,
     this.latitude,
@@ -354,9 +362,20 @@ class Booking {
     this.hasReview = false,
     this.review,
     this.offersCount = 0,
+    this.serviceId,
+    this.providerId,
+    this.selectedItems,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) {
+    // Parse selectedItems if present
+    List<Map<String, dynamic>>? selectedItems;
+    if (json['selectedItems'] != null && json['selectedItems'] is List) {
+      selectedItems = (json['selectedItems'] as List)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+    }
+
     return Booking(
       id: json['id'].toString(),
       code: json['code'] ?? '',
@@ -365,10 +384,12 @@ class Booking {
           ? DateTime.tryParse(json['scheduledAt'].toString())
           : null,
       addressText: json['addressText'] as String?,
+      notes: json['notes'] as String?,
       estimatedPrice: json['estimatedPrice']?.toString(),
       serviceName: json['service']?['name'] ?? json['serviceName'] ?? 'Dịch vụ',
       categoryName: json['categoryName'] as String?,
       providerName: json['provider']?['fullName'] ?? json['providerName'],
+      providerAddress: json['provider']?['address'] as String?,
       customerName: json['customer']?['fullName'] ?? json['customerName'],
       distance:
           json['distance'] != null ? (json['distance'] as num).toInt() : null,
@@ -385,7 +406,18 @@ class Booking {
           ? BookingReview.fromJson(json['review'])
           : null,
       offersCount: json['offersCount'] ?? 0,
+      serviceId: _parseIntSafe(json['serviceId'] ?? json['service']?['id']),
+      providerId: _parseIntSafe(json['providerId'] ?? json['provider']?['id']),
+      selectedItems: selectedItems,
     );
+  }
+
+  static int? _parseIntSafe(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 }
 

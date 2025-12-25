@@ -8,14 +8,29 @@ import {
   ValidateNested,
   Min,
   IsInt,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
+// Enhanced QuoteItem with structured linking to service items
 export class QuoteItemDto {
+  @ApiPropertyOptional({
+    example: '1',
+    description: 'Provider service item ID if from price list',
+  })
+  @IsOptional()
+  @IsString()
+  serviceItemId?: string;
+
   @ApiProperty({ example: 'Thay gas máy lạnh' })
   @IsNotEmpty()
   @IsString()
   name: string;
+
+  @ApiPropertyOptional({ example: 'Gas R32 chính hãng' })
+  @IsOptional()
+  @IsString()
+  description?: string;
 
   @ApiProperty({ example: 350000 })
   @IsNotEmpty()
@@ -28,6 +43,22 @@ export class QuoteItemDto {
   @IsInt()
   @Min(1)
   quantity: number;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Custom item not in price list',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isCustom?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Was selected by customer during booking',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isFromCustomerSelection?: boolean;
 }
 
 export class CreateServiceQuoteDto {
@@ -41,7 +72,9 @@ export class CreateServiceQuoteDto {
 
   @ApiProperty({
     type: [QuoteItemDto],
-    example: [{ name: 'Bơm gas R32', price: 400000, quantity: 1 }],
+    example: [
+      { name: 'Bơm gas R32', price: 400000, quantity: 1, serviceItemId: '1' },
+    ],
   })
   @IsArray()
   @ValidateNested({ each: true })
@@ -53,6 +86,15 @@ export class CreateServiceQuoteDto {
   @IsNumber()
   @Min(0)
   laborCost: number;
+
+  @ApiPropertyOptional({
+    example: 50000,
+    description: 'Phụ phí (di chuyển, ngoài giờ...)',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  surcharge?: number;
 
   @ApiPropertyOptional({ example: '3 tháng bảo hành gas' })
   @IsOptional()
@@ -80,6 +122,15 @@ export class CreateServiceQuoteDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({
+    example:
+      'Khách chọn thay gas nhưng sau khi kiểm tra cần thêm vệ sinh dàn lạnh',
+    description: 'Ghi chú nếu có thay đổi so với customer chọn',
+  })
+  @IsOptional()
+  @IsString()
+  providerNotes?: string;
 }
 
 export class AcceptQuoteDto {

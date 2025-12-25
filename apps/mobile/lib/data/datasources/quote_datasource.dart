@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../storage/secure_storage.dart';
 
 class QuoteDataSource {
@@ -27,10 +28,12 @@ class QuoteDataSource {
     required String diagnosis,
     required List<Map<String, dynamic>> items,
     required int laborCost,
+    int? surcharge,
     String? warranty,
     int? estimatedTime,
     List<String>? images,
     String? notes,
+    String? providerNotes, // Notes about changes from customer selection
   }) async {
     try {
       final response = await _dio.post(
@@ -39,10 +42,12 @@ class QuoteDataSource {
           'diagnosis': diagnosis,
           'items': items,
           'laborCost': laborCost,
+          if (surcharge != null && surcharge > 0) 'surcharge': surcharge,
           if (warranty != null) 'warranty': warranty,
           if (estimatedTime != null) 'estimatedTime': estimatedTime,
           if (images != null && images.isNotEmpty) 'images': images,
           if (notes != null) 'notes': notes,
+          if (providerNotes != null) 'providerNotes': providerNotes,
         },
         options: Options(headers: await _getAuthHeaders()),
       );
@@ -55,13 +60,25 @@ class QuoteDataSource {
   /// Get quotes for a booking
   Future<List<Map<String, dynamic>>> getQuotesForBooking(
       String bookingId) async {
+    debugPrint('[QuoteDS] Calling GET /bookings/$bookingId/quotes');
     try {
       final response = await _dio.get(
         '/bookings/$bookingId/quotes',
         options: Options(headers: await _getAuthHeaders()),
       );
-      return List<Map<String, dynamic>>.from(response.data ?? []);
+      debugPrint('[QuoteDS] Response: ${response.statusCode}');
+
+      // Handle wrapped response {statusCode, message, data: [...]}
+      final responseData = response.data;
+      final List<dynamic> quotes = responseData is Map
+          ? (responseData['data'] ?? [])
+          : (responseData ?? []);
+
+      debugPrint('[QuoteDS] Parsed ${quotes.length} quotes');
+      return List<Map<String, dynamic>>.from(quotes);
     } on DioException catch (e) {
+      debugPrint(
+          '[QuoteDS] Error: ${e.response?.statusCode} - ${e.response?.data}');
       throw Exception(e.response?.data?['message'] ?? 'Failed to get quotes');
     }
   }
@@ -112,6 +129,19 @@ class QuoteDataSource {
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       throw Exception(e.response?.data?['message'] ?? 'Failed to reject quote');
+    }
+  }
+
+  /// Provider agrees to rejection - cancels booking
+  Future<Map<String, dynamic>> providerAgreeReject(String quoteId) async {
+    try {
+      final response = await _dio.patch(
+        '/quotes/$quoteId/agree-reject',
+        options: Options(headers: await _getAuthHeaders()),
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw Exception(e.response?.data?['message'] ?? 'Failed to agree reject');
     }
   }
 }

@@ -1,16 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/quote_datasource.dart';
+import '../../../data/storage/secure_storage.dart';
 import '../../widgets/minimalist_widgets.dart';
 
 class CreateQuoteScreen extends StatefulWidget {
   final String bookingId;
   final String? serviceName;
+  final int? serviceId;
+  final int? providerId;
+  final List<Map<String, dynamic>>?
+      customerSelectedItems; // Items selected by customer
 
   const CreateQuoteScreen({
     super.key,
     required this.bookingId,
     this.serviceName,
+    this.serviceId,
+    this.providerId,
+    this.customerSelectedItems,
   });
 
   @override
@@ -21,27 +30,79 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
   final _formKey = GlobalKey<FormState>();
   final _diagnosisController = TextEditingController();
   final _laborCostController = TextEditingController(text: '0');
+  final _surchargeController = TextEditingController(text: '0');
   final _warrantyController = TextEditingController();
   final _estimatedTimeController = TextEditingController();
   final _notesController = TextEditingController();
+  final _providerNotesController = TextEditingController();
 
   List<QuoteItem> _items = [];
+  List<Map<String, dynamic>> _providerServiceItems =
+      []; // Provider's price list
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-populate items from customer selection
+    if (widget.customerSelectedItems != null) {
+      for (final item in widget.customerSelectedItems!) {
+        _items.add(QuoteItem(
+          name: item['name'] ?? '',
+          price: (item['price'] is num)
+              ? (item['price'] as num).toInt()
+              : int.tryParse(item['price'].toString()) ?? 0,
+          quantity: item['quantity'] ?? 1,
+          serviceItemId: item['id']?.toString(),
+          isFromCustomer: true,
+        ));
+      }
+    }
+    // Load provider's service items
+    _loadProviderServiceItems();
+  }
+
+  Future<void> _loadProviderServiceItems() async {
+    if (widget.serviceId == null || widget.providerId == null) return;
+    try {
+      final dio = Dio(BaseOptions(baseUrl: 'http://10.0.2.2:3000'));
+      final token = await SecureStorage.getAccessToken();
+      final response = await dio.get(
+        '/services/${widget.serviceId}/provider/${widget.providerId}/items',
+        options: token != null
+            ? Options(headers: {'Authorization': 'Bearer $token'})
+            : null,
+      );
+      if (mounted) {
+        List<dynamic> rawItems = response.data is List
+            ? response.data
+            : (response.data['data'] ?? []);
+        setState(() {
+          _providerServiceItems = List<Map<String, dynamic>>.from(rawItems);
+        });
+      }
+    } catch (e) {
+      debugPrint('[CreateQuote] Load service items error: $e');
+    }
+  }
 
   @override
   void dispose() {
     _diagnosisController.dispose();
     _laborCostController.dispose();
+    _surchargeController.dispose();
     _warrantyController.dispose();
     _estimatedTimeController.dispose();
     _notesController.dispose();
+    _providerNotesController.dispose();
     super.dispose();
   }
 
   int get _partsCost =>
       _items.fold(0, (sum, item) => sum + (item.price * item.quantity));
   int get _laborCost => int.tryParse(_laborCostController.text) ?? 0;
-  int get _totalCost => _partsCost + _laborCost;
+  int get _surcharge => int.tryParse(_surchargeController.text) ?? 0;
+  int get _totalCost => _partsCost + _laborCost + _surcharge;
   int get _platformFee => (_totalCost * 0.1).round();
   int get _finalPrice => _totalCost + _platformFee;
 
@@ -51,6 +112,7 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _AddItemSheet(
+        providerServiceItems: _providerServiceItems,
         onAdd: (item) {
           setState(() => _items.add(item));
         },
@@ -86,14 +148,21 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
                   'name': i.name,
                   'price': i.price,
                   'quantity': i.quantity,
+                  'serviceItemId': i.serviceItemId,
+                  'isCustom': i.isCustom,
+                  'isFromCustomerSelection': i.isFromCustomer,
                 })
             .toList(),
         laborCost: _laborCost,
+        surcharge: _surcharge,
         warranty: _warrantyController.text.isNotEmpty
             ? _warrantyController.text
             : null,
         estimatedTime: int.tryParse(_estimatedTimeController.text),
         notes: _notesController.text.isNotEmpty ? _notesController.text : null,
+        providerNotes: _providerNotesController.text.isNotEmpty
+            ? _providerNotesController.text
+            : null,
       );
 
       if (mounted) {
@@ -284,6 +353,26 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
 
             const SizedBox(height: 24),
 
+            // Surcharge
+            _buildSectionTitle('Phụ phí (di chuyển, ngoài giờ...)'),
+            const SizedBox(height: 8),
+            MinTextField(
+              controller: _surchargeController,
+              hint: '0',
+              keyboardType: TextInputType.number,
+              onChanged: (_) => setState(() {}),
+              prefixIcon: const Icon(Icons.add_circle_outline, size: 20),
+              suffixIcon: const Padding(
+                padding: EdgeInsets.only(right: 12),
+                child: Text('VNĐ',
+                    style: TextStyle(
+                        color: AppColors.textTertiary,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
             // Warranty & Time
             Row(
               children: [
@@ -329,6 +418,44 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
               maxLines: 2,
             ),
 
+            // Provider notes (for changes from customer selection)
+            if (widget.customerSelectedItems?.isNotEmpty ?? false) ...[
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline,
+                            size: 18, color: AppColors.warning),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Ghi chú thay đổi',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.warning,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    MinTextField(
+                      controller: _providerNotesController,
+                      hint: 'Khách chọn X nhưng sau kiểm tra cần thêm Y...',
+                      maxLines: 2,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             const SizedBox(height: 32),
 
             // Summary
@@ -343,6 +470,7 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
                 children: [
                   _buildSummaryRow('Linh kiện / Dịch vụ', _partsCost),
                   _buildSummaryRow('Công sửa chữa', _laborCost),
+                  if (_surcharge > 0) _buildSummaryRow('Phụ phí', _surcharge),
                   const Divider(height: 24),
                   _buildSummaryRow('Tạm tính', _totalCost),
                   _buildSummaryRow('Phí nền tảng (10%)', _platformFee,
@@ -432,15 +560,29 @@ class QuoteItem {
   final String name;
   final int price;
   final int quantity;
+  final String? serviceItemId;
+  final bool isCustom;
+  final bool isFromCustomer;
 
-  QuoteItem({required this.name, required this.price, required this.quantity});
+  QuoteItem({
+    required this.name,
+    required this.price,
+    required this.quantity,
+    this.serviceItemId,
+    this.isCustom = false,
+    this.isFromCustomer = false,
+  });
 }
 
 // Add item sheet
 class _AddItemSheet extends StatefulWidget {
   final Function(QuoteItem) onAdd;
+  final List<Map<String, dynamic>> providerServiceItems;
 
-  const _AddItemSheet({required this.onAdd});
+  const _AddItemSheet({
+    required this.onAdd,
+    this.providerServiceItems = const [],
+  });
 
   @override
   State<_AddItemSheet> createState() => _AddItemSheetState();

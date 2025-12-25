@@ -383,6 +383,7 @@ model ProviderServiceItem {
 
   providerService      ProviderService       @relation(fields: [providerUserId, serviceId], references: [providerUserId, serviceId], onDelete: Cascade)
   bookingSelectedItems BookingSelectedItem[]
+  quoteItems           QuoteItem[]
 
   @@index([providerUserId, serviceId])
   @@map("provider_service_items")
@@ -839,9 +840,10 @@ model ServiceQuote {
   providerId BigInt @map("provider_id")
 
   diagnosis   String  @db.Text // Mô tả lỗi
-  items       Json    @db.JsonB // [{name, price, qty}]
+  items       Json    @db.JsonB // [{name, price, qty}] - legacy
   laborCost   Decimal @map("labor_cost") @db.Decimal(18, 2) // Công sửa
   partsCost   Decimal @map("parts_cost") @db.Decimal(18, 2) // Linh kiện
+  surcharge   Decimal @default(0) @db.Decimal(18, 2) // Phụ phí
   totalCost   Decimal @map("total_cost") @db.Decimal(18, 2) // Tổng
   platformFee Decimal @map("platform_fee") @db.Decimal(18, 2) // 10%
   finalPrice  Decimal @map("final_price") @db.Decimal(18, 2) // Khách trả
@@ -851,18 +853,46 @@ model ServiceQuote {
   images        String[] @db.VarChar(500) // URL ảnh hư hỏng
   notes         String?  @db.Text
 
+  // New fields for quote tracking
+  providerNotes          String? @map("provider_notes") @db.Text // Ghi chú thay đổi
+  hasChangesFromCustomer Boolean @default(false) @map("has_changes_from_customer") // Khác với customer chọn
+
   status     QuoteStatus @default(pending)
   createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   expiresAt  DateTime    @map("expires_at") @db.Timestamptz(6) // Hết hạn 24h
   acceptedAt DateTime?   @map("accepted_at") @db.Timestamptz(6)
 
-  booking  Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  provider User    @relation("ProviderQuotes", fields: [providerId], references: [id])
+  booking    Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  provider   User        @relation("ProviderQuotes", fields: [providerId], references: [id])
+  quoteItems QuoteItem[]
 
   @@index([bookingId])
   @@index([providerId])
   @@index([status])
   @@map("service_quotes")
+}
+
+// Chi tiết items trong báo giá
+model QuoteItem {
+  id      BigInt @id @default(autoincrement())
+  quoteId BigInt @map("quote_id")
+
+  serviceItemId           BigInt? @map("service_item_id") // Null if custom
+  name                    String  @db.VarChar(200)
+  description             String? @db.Text
+  unitPrice               Decimal @map("unit_price") @db.Decimal(12, 2)
+  quantity                Int     @default(1)
+  totalPrice              Decimal @map("total_price") @db.Decimal(12, 2)
+  isCustom                Boolean @default(false) @map("is_custom") // Custom item not in price list
+  isFromCustomerSelection Boolean @default(false) @map("is_from_customer") // Was selected by customer
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  quote       ServiceQuote         @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  serviceItem ProviderServiceItem? @relation(fields: [serviceItemId], references: [id], onDelete: SetNull)
+
+  @@index([quoteId])
+  @@map("quote_items")
 }
 
 // Theo dõi thanh toán booking với escrow

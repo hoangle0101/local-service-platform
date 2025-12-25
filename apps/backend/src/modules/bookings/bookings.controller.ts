@@ -213,11 +213,13 @@ export class ProviderBookingsController {
     @CurrentUser() user: any,
     @Query('serviceId') serviceId?: string,
     @Query('categoryId') categoryId?: string,
+    @Query('onlyFar') onlyFar?: string,
   ) {
     return this.bookingsService.getGlobalRequests(
       BigInt(user.userId),
       serviceId ? parseInt(serviceId) : undefined,
       categoryId ? parseInt(categoryId) : undefined,
+      onlyFar === 'true',
     );
   }
 
@@ -234,7 +236,11 @@ export class ProviderBookingsController {
     );
 
     if (result.customerId) {
-      this.chatGateway.notifyUser(result.customerId, 'booking.new_offer', result);
+      this.chatGateway.notifyUser(
+        result.customerId,
+        'booking.new_offer',
+        result,
+      );
     }
 
     return result;
@@ -291,7 +297,11 @@ export class ProviderBookingsController {
       BigInt(id),
     );
     if (result.customerId) {
-      this.chatGateway.notifyUser(result.customerId, 'booking.completed', result);
+      this.chatGateway.notifyUser(
+        result.customerId,
+        'booking.completed',
+        result,
+      );
     }
     return result;
   }

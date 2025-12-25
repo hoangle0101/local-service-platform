@@ -11,6 +11,7 @@ import '../../widgets/minimalist_widgets.dart';
 import '../../widgets/booking_offers_dialog.dart';
 import '../../widgets/quote_view_widget.dart';
 import '../booking/invoice_screen.dart';
+import '../booking/booking_detail_screen.dart';
 
 class UserBookingsScreen extends StatefulWidget {
   const UserBookingsScreen({super.key});
@@ -263,6 +264,12 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
       padding: const EdgeInsets.only(bottom: 24),
       child: MinCard(
         padding: EdgeInsets.zero,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BookingDetailScreen(booking: booking),
+          ),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -310,6 +317,16 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
                     _buildInfoItem(Icons.person_rounded,
                         'Đối tác: ${booking.providerName}'),
                   ],
+                  if (booking.providerAddress != null) ...[
+                    const SizedBox(height: 10),
+                    _buildInfoItem(Icons.store_rounded,
+                        'Địa chỉ thợ: ${booking.providerAddress}'),
+                  ],
+                  if (booking.distance != null) ...[
+                    const SizedBox(height: 10),
+                    _buildInfoItem(Icons.directions_car_rounded,
+                        'Khoảng cách: ${booking.distance! < 1000 ? "${booking.distance} m" : "${(booking.distance! / 1000).toStringAsFixed(1)} km"}'),
+                  ],
                 ],
               ),
             ),
@@ -337,9 +354,13 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.5)),
                       Text(
-                        currencyFormat.format(price).replaceAll(',00', ''),
-                        style: const TextStyle(
-                            color: AppColors.success,
+                        price > 0
+                            ? currencyFormat.format(price).replaceAll(',00', '')
+                            : 'Chờ báo giá',
+                        style: TextStyle(
+                            color: price > 0
+                                ? AppColors.success
+                                : AppColors.warning,
                             fontWeight: FontWeight.w900,
                             fontSize: 16),
                       ),
@@ -468,9 +489,9 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           if (chatButton != null) ...[chatButton, const SizedBox(width: 8)],
-          if (status == 'in_progress')
-            _buildActionButton('Báo giá', () => _showQuotesDialog(booking.id)),
-          if (status == 'in_progress') const SizedBox(width: 8),
+          // Show quote button for any active status (provider may send quote)
+          _buildActionButton('Báo giá', () => _showQuotesDialog(booking.id)),
+          const SizedBox(width: 8),
           _buildActionButton('Hủy', () => _showCancelDialog(booking.id),
               isPrimary: false, isError: true),
         ],
