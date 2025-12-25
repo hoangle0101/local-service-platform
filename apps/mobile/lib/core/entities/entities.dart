@@ -220,3 +220,41 @@ class ProviderInfo extends Equatable {
         ratingCount
       ];
 }
+
+class NotificationEntry extends Equatable {
+  final String id;
+  final String type;
+  final String title;
+  final String body;
+  final Map<String, dynamic> payload;
+  final bool isRead;
+  final DateTime createdAt;
+
+  const NotificationEntry({
+    required this.id,
+    required this.type,
+    required this.title,
+    required this.body,
+    required this.payload,
+    this.isRead = false,
+    required this.createdAt,
+  });
+
+  factory NotificationEntry.fromJson(Map<String, dynamic> json) {
+    return NotificationEntry(
+      id: json['id'].toString(),
+      type: json['type']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      body: json['body']?.toString() ?? '',
+      payload: (json['payload'] as Map<String, dynamic>?) ?? {},
+      isRead: (json['isRead'] as bool? ?? json['is_read'] as bool? ?? false),
+      createdAt: DateTime.parse(json['createdAt']?.toString() ??
+          json['created_at']?.toString() ??
+          DateTime.now().toIso8601String()),
+    );
+  }
+
+  @override
+  List<Object?> get props =>
+      [id, type, title, body, payload, isRead, createdAt];
+}

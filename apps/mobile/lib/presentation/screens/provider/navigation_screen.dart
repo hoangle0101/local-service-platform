@@ -47,6 +47,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
   @override
   void initState() {
     super.initState();
+    // Show map immediately, load location and route in background
+    _isLoading = false;
     _initLocationAndRoute();
   }
 
@@ -57,45 +59,41 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   Future<void> _initLocationAndRoute() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
     try {
       // Check location permission
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          throw Exception('Vui lòng cấp quyền truy cập vị trí');
+          debugPrint('[NavigationScreen] Location permission denied');
+          return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        throw Exception(
-            'Quyền vị trí bị từ chối vĩnh viễn. Vui lòng vào Cài đặt để bật.');
+        debugPrint('[NavigationScreen] Location permission denied forever');
+        return;
       }
 
-      // Get current position
+      // Get current position (don't block UI)
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 5),
       );
 
-      _currentPosition = LatLng(position.latitude, position.longitude);
+      if (!mounted) return;
+      setState(() {
+        _currentPosition = LatLng(position.latitude, position.longitude);
+      });
 
-      // Get route
+      // Get route in background
       await _fetchRoute();
 
       // Start listening to position updates
       _startPositionStream();
-
-      setState(() => _isLoading = false);
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      debugPrint('[NavigationScreen] Location error: $e');
+      // Don't show error - just proceed without current position
     }
   }
 
@@ -143,8 +141,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
     if (_currentPosition == null) return;
 
     final bounds = LatLngBounds.fromPoints([_currentPosition!, _destination]);
-    _mapController.fitCamera(
-      CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(80)),
+    _mapController.move(
+      bounds.center,
+      15,
     );
   }
 

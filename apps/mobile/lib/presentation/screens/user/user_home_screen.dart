@@ -18,6 +18,8 @@ import '../../widgets/animations/slide_in_animation.dart';
 import '../../widgets/loading/shimmer_loading.dart';
 import '../../widgets/phone_verification_card.dart';
 import '../../widgets/mini_map_widget.dart';
+import '../../bloc/notifications/notifications_bloc.dart';
+import '../../bloc/notifications/notifications_state.dart';
 
 class UserHomeScreen extends StatefulWidget {
   const UserHomeScreen({super.key});
@@ -246,10 +248,24 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                         return const SizedBox.shrink();
                       },
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.notifications_none_rounded,
-                          color: AppColors.textPrimary),
-                      onPressed: () {},
+                    BlocBuilder<NotificationsBloc, NotificationsState>(
+                      builder: (context, state) {
+                        int unreadCount = 0;
+                        if (state is NotificationsLoaded) {
+                          unreadCount = state.unreadCount;
+                        }
+
+                        return Badge(
+                          label: unreadCount > 0 ? Text('$unreadCount') : null,
+                          isLabelVisible: unreadCount > 0,
+                          backgroundColor: AppColors.error,
+                          child: IconButton(
+                            icon: const Icon(Icons.notifications_none_rounded,
+                                color: AppColors.textPrimary),
+                            onPressed: () => context.push('/notifications'),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),

@@ -6,6 +6,9 @@ import '../../../core/services/socket_service.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../theme/app_colors.dart';
+import '../../bloc/notifications/notifications_bloc.dart';
+import '../../bloc/notifications/notifications_event.dart';
+import '../../../core/entities/entities.dart';
 
 class UserShellScreen extends StatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -37,27 +40,59 @@ class _UserShellScreenState extends State<UserShellScreen> {
         color: Colors.blue,
       );
       context.read<BookingsBloc>().add(const LoadUserBookingsEvent());
+
+      // Dispatch notification event
+      try {
+        if (data != null && data['type'] == 'booking_offer') {
+          final notification = NotificationEntry.fromJson({
+            'id': DateTime.now().millisecondsSinceEpoch.toString(), // Temp ID
+            'type': 'OFFER_RECEIVED',
+            'title': 'Báo giá mới',
+            'body': 'Bạn có một báo giá mới cho đơn hàng.',
+            'isRead': false,
+            'createdAt': DateTime.now().toIso8601String(),
+            'payload': data,
+          });
+          context
+              .read<NotificationsBloc>()
+              .add(NewNotificationReceived(notification));
+        }
+      } catch (e) {
+        debugPrint('Error dispatching notification: $e');
+      }
     });
 
-    socket.on('booking.started', (data) {
+    // Unified handling via bookingStatusStream to avoid duplicates
+
+    // Listen to global status updates from stream
+    socket.bookingStatusStream.listen((update) {
       if (!mounted) return;
-      _showNotification(
-        'Thợ đã bắt đầu công việc!',
-        icon: Icons.play_arrow_rounded,
-        color: Colors.green,
-      );
+
+      // Refresh bookings data
       context.read<BookingsBloc>().add(const LoadUserBookingsEvent());
+
+      // Show notification if theatre action was by someone else
+      if (update.actorId != socket.currentUserId) {
+        String message =
+            update.message ?? 'Trạng thái đơn hàng: ${update.status}';
+        IconData icon = Icons.info_outline_rounded;
+        Color color = AppColors.primary;
+
+        if (update.status == 'cancelled') {
+          icon = Icons.cancel_outlined;
+          color = AppColors.error;
+        }
+
+        _showNotification(
+          message,
+          icon: icon,
+          color: color,
+        );
+      }
     });
 
-    socket.on('booking.completed', (data) {
-      if (!mounted) return;
-      _showNotification(
-        'Công việc đã hoàn thành. Hãy xác nhận!',
-        icon: Icons.check_circle_rounded,
-        color: Colors.green,
-      );
-      context.read<BookingsBloc>().add(const LoadUserBookingsEvent());
-    });
+    // NOTE: Real-time notifications are handled by NotificationsBloc itself
+    // to avoid duplicate notifications. Do NOT add another listener here.
   }
 
   void _showNotification(String message, {IconData? icon, Color? color}) {
@@ -90,8 +125,6 @@ class _UserShellScreenState extends State<UserShellScreen> {
   void dispose() {
     final socket = SocketService();
     socket.off('booking.new_offer');
-    socket.off('booking.started');
-    socket.off('booking.completed');
     super.dispose();
   }
 

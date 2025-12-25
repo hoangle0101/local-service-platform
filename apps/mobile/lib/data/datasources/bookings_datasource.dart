@@ -370,7 +370,8 @@ class BookingsDataSource {
         'in_progress',
         'pending_completion',
         'accepted',
-        'confirmed'
+        'confirmed',
+        'pending'
       ];
 
       for (final bookingJson in bookingsData) {
@@ -456,6 +457,10 @@ class BookingsDataSource {
   Future<void> acceptBookingLegacy(String bookingId) async {
     try {
       await _dio.patch('/provider/bookings/$bookingId/accept');
+    } on DioException catch (e) {
+      print(
+          '[BookingsDataSource] ERROR acceptBookingLegacy: ${e.response?.data}');
+      rethrow;
     } catch (e) {
       throw Exception('Failed to accept booking: $e');
     }

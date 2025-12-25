@@ -18,6 +18,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { GatewayModule } from './modules/gateway/gateway.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -26,6 +27,7 @@ import configuration from './config/configuration';
       isGlobal: true,
       load: [configuration],
     }),
+    GatewayModule,
     PrismaModule,
     AuthModule,
     UsersModule,

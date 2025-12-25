@@ -7,6 +7,12 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
+  RealtimeGateway,
+  SocketEvents,
+  BookingStatusPayload,
+  NewJobPayload,
+} from '../gateway/realtime.gateway';
+import {
   EstimateDto,
   CreateBookingDto,
   CancelBookingDto,
@@ -19,6 +25,7 @@ export class BookingsService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
+    private realtimeGateway: RealtimeGateway,
   ) {}
 
   // POST /bookings/estimate
@@ -227,6 +234,31 @@ export class BookingsService {
       if (isDirectBooking) {
         // Direct booking: Only notify the chosen provider
         providerIdsToNotify = [dto.providerId!.toString()];
+
+        // Get customer profile for display name
+        const customerProfile = await tx.userProfile.findUnique({
+          where: { userId: customerId },
+        });
+
+        // Emit socket event for real-time notification to the selected provider
+        this.realtimeGateway.emitBookingStatusChange(
+          customerId.toString(),
+          dto.providerId!.toString(),
+          {
+            bookingId: booking.id.toString(),
+            status: 'pending',
+            providerId: dto.providerId!.toString(),
+            message: `Bạn có một yêu cầu đặt lịch mới từ ${customerProfile?.fullName || 'Khách hàng'}!`,
+            customerName: customerProfile?.fullName || 'Khách hàng',
+            estimatedPrice: basePrice.toString(),
+            serviceName: service.name,
+            scheduledAt: new Date(dto.scheduledAt).toISOString(),
+            addressText: dto.addressText,
+            latitude: dto.latitude,
+            longitude: dto.longitude,
+            actorId: customerId.toString(),
+          },
+        );
       } else {
         // General booking: Find nearby providers by category
         const providers = await this.findNearbyProviders(
@@ -238,6 +270,21 @@ export class BookingsService {
         providerIdsToNotify = providers.map((p) =>
           (p as any).user_id.toString(),
         );
+
+        // Emit new_job_available to job market for providers
+        this.realtimeGateway.emitNewJob(service.categoryId || 0, {
+          bookingId: booking.id.toString(),
+          serviceId: dto.serviceId,
+          serviceName: service.name,
+          categoryId: service.categoryId || 0,
+          categoryName: '', // Will be enriched on client
+          customerName: undefined,
+          addressText: dto.addressText,
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+          scheduledAt: new Date(dto.scheduledAt).toISOString(),
+          estimatedPrice: booking.estimated_price ? Number(booking.estimated_price) : undefined,
+        });
       }
 
       // 3. Return booking info with provider IDs for notification
@@ -533,7 +580,22 @@ export class BookingsService {
       );
       const loc = locations[0];
 
-      return {
+      // Get service category for emission
+      const bookingDetails = await tx.booking.findUnique({
+        where: { id: bookingId },
+        include: { service: true },
+      });
+
+      // Emit job_taken to job market to remove from other providers' lists
+      if (bookingDetails?.service?.categoryId) {
+        this.realtimeGateway.emitJobTaken(
+          bookingDetails.service.categoryId,
+          bookingId.toString(),
+          providerId.toString(),
+        );
+      }
+
+      const result = {
         message: 'Provider selected',
         bookingId: updatedBooking.id.toString(),
         providerId: providerId.toString(),
@@ -542,6 +604,20 @@ export class BookingsService {
         addressText: updatedBooking.addressText,
         customerName: updatedBooking.customer.profile?.fullName,
       };
+
+      // Create persistent notification for provider
+      await this.notificationsService.create(
+        providerId,
+        'BOOKING_ACCEPTED',
+        'Chúc mừng! Bạn đã được nhận việc',
+        `Khách hàng ${updatedBooking.customer.profile?.fullName || ''} đã chọn bạn cho dịch vụ ${bookingDetails?.service?.name || ''}.`,
+        {
+          type: 'booking_accepted',
+          ...result,
+        },
+      );
+
+      return result;
     });
   }
 
@@ -1018,9 +1094,13 @@ export class BookingsService {
       throw new NotFoundException('Booking not found');
     }
 
-    if (booking.customerId !== userId) {
+    const isCustomer = booking.customerId === userId;
+    const isAssignedProvider = booking.providerId === userId;
+
+    if (!isCustomer && !isAssignedProvider) {
       throw new ForbiddenException('Not your booking');
     }
+
 
     if (!['pending', 'accepted'].includes(booking.status)) {
       throw new BadRequestException('Cannot cancel booking in current status');
@@ -1045,6 +1125,35 @@ export class BookingsService {
         },
       });
 
+      // Notify the other party
+      const targetUserId = isCustomer ? booking.providerId : booking.customerId;
+      if (targetUserId) {
+        const message = isCustomer 
+          ? 'Khách hàng đã hủy đơn đặt lịch' 
+          : 'Thợ đã từ chối yêu cầu đặt lịch';
+
+        this.realtimeGateway.emitBookingStatusChange(
+          booking.customerId.toString(),
+          booking.providerId ? booking.providerId.toString() : null,
+          {
+            bookingId: bookingId.toString(),
+            status: 'cancelled',
+            previousStatus: booking.status,
+            message: message,
+            actorId: userId.toString(),
+          },
+        );
+
+        // Persistent notification
+        await this.notificationsService.create(
+          targetUserId,
+          'BOOKING_CANCELLED',
+          'Đơn hàng đã bị hủy',
+          `${message}: ${dto.reason || 'Không có lý do'}`,
+          { bookingId: bookingId.toString(), status: 'cancelled' },
+        );
+      }
+
       return {
         id: updated.id.toString(),
         status: updated.status,
@@ -1055,26 +1164,75 @@ export class BookingsService {
 
   // PATCH /provider/bookings/:id/accept
   async acceptBooking(providerId: bigint, bookingId: bigint) {
+    console.log(`[acceptBooking] START - providerId: ${providerId} (type: ${typeof providerId}), bookingId: ${bookingId} (type: ${typeof bookingId})`);
+    
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
     });
 
     if (!booking) {
+      console.error(`[acceptBooking] ERROR: Booking ${bookingId} not found`);
       throw new NotFoundException('Booking not found');
     }
 
+    console.log(`[acceptBooking] Booking details:`, {
+      id: booking.id.toString(),
+      status: booking.status,
+      assignedProviderId: booking.providerId?.toString(),
+      customerId: booking.customerId.toString()
+    });
+
+    // BUSINESS RULE: Only the specifically assigned provider can directly 'accept'
+    if (booking.providerId === null) {
+      console.warn(`[acceptBooking] WARNING: Booking ${bookingId} is a general booking, cannot accept legacy.`);
+      throw new ForbiddenException('Đơn hàng này cần báo giá trước, không thể nhận trực tiếp.');
+    }
+
     if (booking.providerId !== providerId) {
-      throw new ForbiddenException('Not your booking');
+      console.error(`[acceptBooking] ID Mismatch: booking.providerId(${booking.providerId}) !== providerId(${providerId})`);
+      throw new ForbiddenException('Bạn không phải là thợ được chỉ định cho đơn hàng này.');
     }
 
     if (booking.status !== 'pending') {
-      throw new BadRequestException('Booking is not pending');
+      // Idempotency: If already accepted by this provider, return success
+      if (booking.status === 'accepted' && booking.providerId === providerId) {
+        console.log(
+          `[acceptBooking] Idempotency: Booking ${bookingId} already accepted by provider ${providerId}`,
+        );
+        return {
+          id: booking.id.toString(),
+          status: booking.status,
+          message: 'Booking accepted',
+          customerId: booking.customerId.toString(),
+        };
+      }
+      console.warn(
+        `[acceptBooking] WARNING: Booking ${bookingId} is in status '${booking.status}', expected 'pending'`,
+      );
+      throw new BadRequestException(
+        `Đơn hàng không ở trạng thái chờ (Hiện tại: ${booking.status}).`,
+      );
     }
+
+    // Get provider's price for this service
+    const providerService = await this.prisma.providerService.findUnique({
+      where: {
+        providerUserId_serviceId: {
+          providerUserId: providerId,
+          serviceId: booking.serviceId,
+        },
+      },
+    });
+
+    const actualPrice = providerService?.price || booking.estimatedPrice || 0;
 
     return await this.prisma.$transaction(async (tx) => {
       const updated = await tx.booking.update({
         where: { id: bookingId },
-        data: { status: 'accepted' },
+        data: {
+          status: 'accepted',
+          actualPrice: actualPrice,
+        },
       });
 
       await tx.bookingEvent.create({
@@ -1083,9 +1241,31 @@ export class BookingsService {
           previousStatus: 'pending',
           newStatus: 'accepted',
           actorUserId: providerId,
-          note: 'Provider accepted booking',
+          note: 'Provider accepted direct booking',
         },
       });
+
+      // Emit socket event for real-time notification
+      this.realtimeGateway.emitBookingStatusChange(
+        booking.customerId.toString(),
+        providerId.toString(),
+        {
+          bookingId: bookingId.toString(),
+          status: 'accepted',
+          previousStatus: 'pending',
+          message: 'Thợ đã nhận đơn đặt lịch của bạn',
+          actorId: providerId.toString(),
+        },
+      );
+
+      // Persistent notification for customer
+      await this.notificationsService.create(
+        booking.customerId,
+        'BOOKING_ACCEPTED',
+        'Thợ đã nhận đơn',
+        'Chúc mừng! Thợ đã chấp nhận yêu cầu dịch vụ của bạn.',
+        { bookingId: bookingId.toString(), status: 'accepted' },
+      );
 
       return {
         id: updated.id.toString(),
@@ -1129,6 +1309,28 @@ export class BookingsService {
           note: 'Provider started service',
         },
       });
+
+      // Emit socket event for real-time notification
+      this.realtimeGateway.emitBookingStatusChange(
+        booking.customerId.toString(),
+        providerId.toString(),
+        {
+          bookingId: bookingId.toString(),
+          status: 'in_progress',
+          previousStatus: 'accepted',
+          message: 'Thợ đã bắt đầu làm việc',
+          actorId: providerId.toString(),
+        },
+      );
+
+      // Persistent notification for customer
+      await this.notificationsService.create(
+        booking.customerId,
+        'BOOKING_STARTED',
+        'Dịch vụ đang thực hiện',
+        'Thợ đã bắt đầu thực hiện dịch vụ tại địa điểm của bạn.',
+        { bookingId: bookingId.toString(), status: 'in_progress' },
+      );
 
       return {
         id: updated.id.toString(),
@@ -1176,6 +1378,28 @@ export class BookingsService {
           note: 'Provider marked service as complete, awaiting customer confirmation',
         },
       });
+
+      // Emit socket event for real-time notification
+      this.realtimeGateway.emitBookingStatusChange(
+        booking.customerId.toString(),
+        providerId.toString(),
+        {
+          bookingId: bookingId.toString(),
+          status: 'pending_completion',
+          previousStatus: 'in_progress',
+          message: 'Thợ đã hoàn thành công việc. Vui lòng xác nhận.',
+          actorId: providerId.toString(),
+        },
+      );
+
+      // Persistent notification for customer
+      await this.notificationsService.create(
+        booking.customerId,
+        'BOOKING_COMPLETED',
+        'Hoàn thành dịch vụ',
+        'Thợ đã đánh dấu hoàn thành công việc. Vui lòng kiểm tra và xác nhận.',
+        { bookingId: bookingId.toString(), status: 'pending_completion' },
+      );
 
       return {
         id: updated.id.toString(),
@@ -1225,7 +1449,28 @@ export class BookingsService {
         },
       });
 
-      // Update provider rating if needed (can be done in review step)
+      // Emit socket event for real-time notification to provider
+      if (booking.providerId) {
+        this.realtimeGateway.emitBookingStatusChange(
+          customerId.toString(),
+          booking.providerId.toString(),
+          {
+            bookingId: bookingId.toString(),
+            status: 'completed',
+            previousStatus: 'pending_completion',
+            actorId: customerId.toString(),
+          },
+        );
+
+        // Persistent notification for provider
+        await this.notificationsService.create(
+          booking.providerId,
+          'BOOKING_COMPLETED',
+          'Khách hàng đã xác nhận',
+          'Tuyệt vời! Khách hàng đã xác nhận hoàn thành dịch vụ. Tiền đã được cộng vào tài khoản của bạn.',
+          { bookingId: bookingId.toString(), status: 'completed' },
+        );
+      }
 
       return {
         id: updated.id.toString(),
@@ -1273,6 +1518,21 @@ export class BookingsService {
           note: reason || 'Customer disputed service completion',
         },
       });
+
+      // Emit socket event for real-time notification to provider
+      if (booking.providerId) {
+        this.realtimeGateway.emitBookingStatusChange(
+          customerId.toString(),
+          booking.providerId.toString(),
+          {
+            bookingId: bookingId.toString(),
+            status: 'disputed',
+            previousStatus: 'pending_completion',
+            message: 'Khách hàng khiếu nại về công việc. Hệ thống sẽ xử lý.',
+            actorId: customerId.toString(),
+          },
+        );
+      }
 
       return {
         id: updated.id.toString(),

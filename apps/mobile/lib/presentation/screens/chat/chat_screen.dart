@@ -34,7 +34,12 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isSending = false;
   String? _error;
   bool _isConnected = false;
-  String? _currentUserId; // Added _currentUserId
+  String? _currentUserId;
+
+  // Typing indicator state
+  bool _isOtherUserTyping = false;
+  Timer? _typingTimer;
+  bool _isTyping = false;
 
   @override
   void initState() {
@@ -45,6 +50,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _disconnectSocket();
+    _typingTimer?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -183,6 +189,20 @@ class _ChatScreenState extends State<ChatScreen> {
     _socket!
         .on('reconnecting', (_) => debugPrint('[ChatScreen] Reconnecting...'));
 
+    // Listen for typing indicator
+    _socket!.on('user_typing', (data) {
+      debugPrint('[ChatScreen] Typing indicator: $data');
+      if (data != null && mounted) {
+        final userId = data['userId']?.toString();
+        final isTyping = data['isTyping'] == true;
+
+        // Only show if other user is typing
+        if (userId != _currentUserId) {
+          setState(() => _isOtherUserTyping = isTyping);
+        }
+      }
+    });
+
     _socket!.connect();
   }
 
@@ -235,7 +255,47 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isSending = false);
+      if (mounted) {
+        setState(() => _isSending = false);
+        _stopTyping(); // Stop typing indicator after sending
+      }
+    }
+  }
+
+  // Handle text input change for typing indicator
+  void _onTextChanged(String text) {
+    if (text.isNotEmpty && !_isTyping) {
+      _startTyping();
+    } else if (text.isEmpty && _isTyping) {
+      _stopTyping();
+    }
+  }
+
+  void _startTyping() {
+    if (!_isConnected || _socket == null || _conversationId == null) return;
+
+    _isTyping = true;
+    _socket!.emit('user_typing', {
+      'conversationId': _conversationId,
+      'isTyping': true,
+    });
+
+    // Auto stop typing after 3 seconds of no input
+    _typingTimer?.cancel();
+    _typingTimer = Timer(const Duration(seconds: 3), _stopTyping);
+  }
+
+  void _stopTyping() {
+    if (!_isTyping) return;
+
+    _isTyping = false;
+    _typingTimer?.cancel();
+
+    if (_isConnected && _socket != null && _conversationId != null) {
+      _socket!.emit('user_typing', {
+        'conversationId': _conversationId,
+        'isTyping': false,
+      });
     }
   }
 
@@ -352,11 +412,62 @@ class _ChatScreenState extends State<ChatScreen> {
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      itemCount: _messages.length,
+      itemCount: _messages.length + (_isOtherUserTyping ? 1 : 0),
       itemBuilder: (context, index) {
+        if (index == _messages.length) {
+          return _buildTypingIndicator();
+        }
         final message = _messages[index];
         return _buildMessageBubble(message);
       },
+    );
+  }
+
+  Widget _buildTypingIndicator() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+            bottomLeft: Radius.circular(4),
+            bottomRight: Radius.circular(20),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(13),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${widget.otherUserName ?? 'Đối phương'} đang nhập',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.textTertiary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -453,6 +564,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   contentPadding:
                       EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 ),
+                onChanged: _onTextChanged,
                 onSubmitted: (_) => _sendMessage(),
               ),
             ),

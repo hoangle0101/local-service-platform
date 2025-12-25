@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:async';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/services/socket_service.dart';
 import '../../../data/datasources/bookings_datasource.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
@@ -22,10 +24,15 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  // Socket service for real-time updates
+  final SocketService _socketService = SocketService();
+  StreamSubscription<BookingStatusUpdate>? _bookingStatusSubscription;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _initSocketConnection();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BookingsBloc>().add(const LoadBookings());
     });
@@ -33,8 +40,14 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
 
   @override
   void dispose() {
+    _bookingStatusSubscription?.cancel();
     _tabController.dispose();
     super.dispose();
+  }
+
+  /// Initialize socket connection
+  void _initSocketConnection() async {
+    await _socketService.connectAsync();
   }
 
   void _refreshBookings() {
@@ -206,8 +219,10 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
     if (state is BookingsLoading) {
       return const Center(
           child: CircularProgressIndicator(color: AppColors.primary));
-    } else if (state is BookingsLoaded) {
-      final bookings = state.bookings;
+    } else if (state is BookingsLoaded || state is UserBookingsLoaded) {
+      final bookings = state is BookingsLoaded
+          ? state.bookings
+          : (state as UserBookingsLoaded).bookings;
       return TabBarView(
         controller: _tabController,
         children: [
