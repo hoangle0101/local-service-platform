@@ -11,6 +11,7 @@ import '../../bloc/bookings/bookings_event_state.dart';
 import '../../widgets/review_dialog.dart';
 import '../../widgets/minimalist_widgets.dart';
 import '../../widgets/booking_offers_dialog.dart';
+import '../../widgets/quote_view_widget.dart';
 import '../booking/invoice_screen.dart';
 
 class UserBookingsScreen extends StatefulWidget {
@@ -477,11 +478,14 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
         ],
       );
     } else if (['accepted', 'confirmed', 'in_progress'].contains(status)) {
-      // Active bookings - show chat button
+      // Active bookings - show chat and quote buttons
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (chatButton != null) ...[chatButton, const SizedBox(width: 8)],
+          if (status == 'in_progress')
+            _buildActionButton('Báo giá', () => _showQuotesDialog(booking.id)),
+          if (status == 'in_progress') const SizedBox(width: 8),
           _buildActionButton('Hủy', () => _showCancelDialog(booking.id),
               isPrimary: false, isError: true),
         ],
@@ -597,6 +601,69 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
                 style: const TextStyle(color: AppColors.textSecondary)),
             const SizedBox(height: 24),
             MinButton(text: 'Thử lại', onPressed: _refreshBookings),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showQuotesDialog(String bookingId) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(context).size.height * 0.75,
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Báo giá từ thợ',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: QuoteViewWidget(
+                  bookingId: bookingId,
+                  onQuoteAccepted: () {
+                    Navigator.pop(ctx);
+                    _refreshBookings();
+                  },
+                  onQuoteRejected: _refreshBookings,
+                ),
+              ),
+            ),
           ],
         ),
       ),

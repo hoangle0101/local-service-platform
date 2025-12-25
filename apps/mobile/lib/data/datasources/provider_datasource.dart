@@ -339,4 +339,127 @@ class ProviderDataSource {
       throw Exception('Lỗi: $e');
     }
   }
+
+  // ============== Service Items ==============
+
+  /// Get service items for a specific service
+  Future<List<Map<String, dynamic>>> getServiceItems(int serviceId) async {
+    try {
+      final token = await SecureStorage.getAccessToken();
+      if (token == null || token.isEmpty) {
+        throw Exception('Vui lòng đăng nhập lại');
+      }
+
+      final response = await _dio.get(
+        '/provider/services/$serviceId/items',
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      final data = response.data;
+      if (data is List) {
+        return List<Map<String, dynamic>>.from(data);
+      }
+      if (data is Map && data.containsKey('data')) {
+        return List<Map<String, dynamic>>.from(data['data'] ?? []);
+      }
+      return [];
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        throw Exception('Phiên đăng nhập hết hạn');
+      }
+      throw Exception('Lỗi tải danh sách: ${e.message}');
+    } catch (e) {
+      throw Exception('Lỗi: $e');
+    }
+  }
+
+  /// Create a service item
+  Future<Map<String, dynamic>> createServiceItem(
+    int serviceId,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final token = await SecureStorage.getAccessToken();
+      if (token == null || token.isEmpty) {
+        throw Exception('Vui lòng đăng nhập lại');
+      }
+
+      print(
+          '[ProviderDataSource] Creating service item for serviceId: $serviceId');
+      print('[ProviderDataSource] Data: $data');
+
+      final response = await _dio.post(
+        '/provider/services/$serviceId/items',
+        data: data,
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      print(
+          '[ProviderDataSource] Create response status: ${response.statusCode}');
+      print('[ProviderDataSource] Create response data: ${response.data}');
+
+      return response.data is Map ? response.data : {};
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        throw Exception('Phiên đăng nhập hết hạn');
+      }
+      throw Exception('Lỗi thêm mục: ${e.message}');
+    } catch (e) {
+      throw Exception('Lỗi: $e');
+    }
+  }
+
+  /// Update a service item
+  Future<void> updateServiceItem(
+      String itemId, Map<String, dynamic> data) async {
+    try {
+      final token = await SecureStorage.getAccessToken();
+      if (token == null || token.isEmpty) {
+        throw Exception('Vui lòng đăng nhập lại');
+      }
+
+      await _dio.patch(
+        '/provider/services/items/$itemId',
+        data: data,
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        throw Exception('Phiên đăng nhập hết hạn');
+      }
+      throw Exception('Lỗi cập nhật: ${e.message}');
+    } catch (e) {
+      throw Exception('Lỗi: $e');
+    }
+  }
+
+  /// Delete a service item
+  Future<void> deleteServiceItem(String itemId) async {
+    try {
+      final token = await SecureStorage.getAccessToken();
+      if (token == null || token.isEmpty) {
+        throw Exception('Vui lòng đăng nhập lại');
+      }
+
+      await _dio.delete(
+        '/provider/services/items/$itemId',
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        throw Exception('Phiên đăng nhập hết hạn');
+      }
+      throw Exception('Lỗi xóa mục: ${e.message}');
+    } catch (e) {
+      throw Exception('Lỗi: $e');
+    }
+  }
 }

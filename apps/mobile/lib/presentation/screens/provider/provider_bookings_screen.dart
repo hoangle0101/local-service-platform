@@ -8,6 +8,7 @@ import '../../bloc/bookings/bookings_event_state.dart';
 import '../../widgets/minimalist_widgets.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
+import 'create_quote_screen.dart';
 
 class ProviderBookingsScreen extends StatefulWidget {
   const ProviderBookingsScreen({super.key});
@@ -532,28 +533,41 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
       );
     }
     if (booking.status == 'in_progress') {
-      return Row(
+      return Column(
         children: [
-          Expanded(
-            flex: 2,
-            child: MinButton(
-              text: 'Hoàn thành việc',
-              onPressed: () => _completeService(booking),
-              icon: Icons.check_circle_rounded,
-            ),
+          // Quote creation button
+          MinButton(
+            text: 'Tạo Báo Giá',
+            isFullWidth: true,
+            isPrimary: false,
+            onPressed: () => _openCreateQuote(booking),
+            icon: Icons.receipt_long_rounded,
           ),
-          if (booking.latitude != null && booking.longitude != null) ...[
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 1,
-              child: MinButton(
-                text: 'Chỉ đường',
-                isPrimary: false,
-                onPressed: () => _openNavigation(booking),
-                icon: Icons.map_rounded,
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: MinButton(
+                  text: 'Hoàn thành việc',
+                  onPressed: () => _completeService(booking),
+                  icon: Icons.check_circle_rounded,
+                ),
               ),
-            ),
-          ],
+              if (booking.latitude != null && booking.longitude != null) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 1,
+                  child: MinButton(
+                    text: 'Chỉ đường',
+                    isPrimary: false,
+                    onPressed: () => _openNavigation(booking),
+                    icon: Icons.map_rounded,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ],
       );
     }
@@ -671,6 +685,22 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
           SnackBar(content: Text('Lỗi: $e'), backgroundColor: AppColors.error),
         );
       }
+    }
+  }
+
+  /// Opens quote creation screen
+  void _openCreateQuote(Booking booking) async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CreateQuoteScreen(
+          bookingId: booking.id,
+          serviceName: booking.serviceName,
+        ),
+      ),
+    );
+
+    if (result == true) {
+      _loadAllData();
     }
   }
 

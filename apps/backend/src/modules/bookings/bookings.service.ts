@@ -228,7 +228,67 @@ export class BookingsService {
       const booking = bookingIdResult[0];
       const bookingId = booking.id;
 
-      // 2. Determine which providers to notify
+      // 2. Save selected items if provided
+      let totalFromItems = 0;
+      if (
+        dto.selectedItems &&
+        dto.selectedItems.length > 0 &&
+        isDirectBooking
+      ) {
+        console.log(
+          '[createBooking] Processing selectedItems:',
+          dto.selectedItems,
+        );
+
+        // Get item prices from provider_service_items
+        const itemIds = dto.selectedItems.map((i) => BigInt(i.itemId));
+        const items = await tx.providerServiceItem.findMany({
+          where: {
+            id: { in: itemIds },
+            providerUserId: BigInt(dto.providerId!),
+            serviceId: dto.serviceId,
+            isActive: true,
+          },
+        });
+
+        // Create BookingSelectedItem records
+        for (const selectedItem of dto.selectedItems) {
+          const itemData = items.find(
+            (i) => i.id.toString() === selectedItem.itemId,
+          );
+          if (itemData) {
+            const quantity = selectedItem.quantity || 1;
+            const unitPrice = Number(itemData.price);
+            const totalPrice = unitPrice * quantity;
+            totalFromItems += totalPrice;
+
+            await tx.bookingSelectedItem.create({
+              data: {
+                bookingId,
+                providerServiceItemId: BigInt(selectedItem.itemId),
+                quantity,
+                unitPrice,
+                totalPrice,
+              },
+            });
+          }
+        }
+
+        // Update booking with total from selected items
+        if (totalFromItems > 0) {
+          await tx.booking.update({
+            where: { id: bookingId },
+            data: { estimatedPrice: totalFromItems },
+          });
+        }
+
+        console.log(
+          '[createBooking] Saved selectedItems, total:',
+          totalFromItems,
+        );
+      }
+
+      // 3. Determine which providers to notify
       let providerIdsToNotify: string[] = [];
 
       if (isDirectBooking) {
@@ -287,16 +347,20 @@ export class BookingsService {
         });
       }
 
-      // 3. Return booking info with provider IDs for notification
+      // 4. Return booking info with provider IDs for notification
       return {
         id: booking.id.toString(),
         code: booking.code,
         status: booking.status,
         scheduledAt: booking.scheduled_at,
-        estimatedPrice: booking.estimated_price?.toString(),
+        estimatedPrice:
+          totalFromItems > 0
+            ? totalFromItems.toString()
+            : booking.estimated_price?.toString(),
         providerId: booking.provider_id?.toString() || null,
         isDirectBooking,
         nearbyProviderIds: providerIdsToNotify,
+        hasSelectedItems: dto.selectedItems && dto.selectedItems.length > 0,
       };
     });
   }
@@ -381,12 +445,14 @@ export class BookingsService {
       }
 
       // Check if provider has ANY service in this category
-      const hasCategoryCompetence = await this.prisma.providerService.findFirst({
-        where: {
-          providerUserId: providerId,
-          service: { categoryId: targetService.categoryId },
+      const hasCategoryCompetence = await this.prisma.providerService.findFirst(
+        {
+          where: {
+            providerUserId: providerId,
+            service: { categoryId: targetService.categoryId },
+          },
         },
-      });
+      );
 
       if (!hasCategoryCompetence) {
         throw new ForbiddenException(
@@ -395,8 +461,7 @@ export class BookingsService {
       }
 
       // Auto-register sub-service since they already do this category
-      const offerPrice =
-        booking.estimatedPrice || targetService.basePrice || 0;
+      const offerPrice = booking.estimatedPrice || targetService.basePrice || 0;
 
       providerService = (await this.prisma.providerService.create({
         data: {

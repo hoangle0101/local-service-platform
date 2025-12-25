@@ -38,6 +38,7 @@ class BookingsDataSource {
     required double longitude,
     String? notes,
     int? providerId, // Optional: for direct booking (Book Now)
+    List<Map<String, dynamic>>? selectedItems, // Pre-selected service items
   }) async {
     try {
       final data = <String, dynamic>{
@@ -59,6 +60,12 @@ class BookingsDataSource {
             '[BookingsDataSource] Direct booking with providerId: $providerId');
       } else {
         print('[BookingsDataSource] General booking (no providerId)');
+      }
+
+      // Add selectedItems if provided
+      if (selectedItems != null && selectedItems.isNotEmpty) {
+        data['selectedItems'] = selectedItems;
+        print('[BookingsDataSource] Selected items: $selectedItems');
       }
 
       print('[BookingsDataSource] Sending booking data: $data');

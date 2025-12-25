@@ -29,6 +29,15 @@ export class RegisterDto {
   @ApiProperty({ example: 'John Doe' })
   @IsNotEmpty()
   fullName: string;
+
+  @ApiProperty({
+    example: 'customer',
+    enum: ['customer', 'provider'],
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  role?: 'customer' | 'provider';
 }
 
 export class LoginDto {

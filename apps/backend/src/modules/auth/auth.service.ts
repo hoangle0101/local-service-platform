@@ -1,9 +1,21 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { LoginDto, LoginWithOtpDto, OtpPurpose, RegisterDto, ResetPasswordDto, SendOtpDto, VerifyOtpDto } from './dto/auth.dto';
+import {
+  LoginDto,
+  LoginWithOtpDto,
+  OtpPurpose,
+  RegisterDto,
+  ResetPasswordDto,
+  SendOtpDto,
+  VerifyOtpDto,
+} from './dto/auth.dto';
 import { UserStatus } from '@prisma/client';
 import { normalizePhoneNumber } from '../../common/utils/phone.util';
 
@@ -21,20 +33,25 @@ export class AuthService {
       where: { phone: normalizedPhone },
     });
     if (existingUser) {
-      throw new BadRequestException('User with this phone number already exists');
+      throw new BadRequestException(
+        'User with this phone number already exists',
+      );
     }
 
     const salt = await bcrypt.genSalt();
     const passwordHash = await bcrypt.hash(dto.password, salt);
 
     const user = await this.prisma.$transaction(async (tx) => {
-      // Get the customer role
-      const customerRole = await tx.role.findUnique({
-        where: { name: 'customer' },
+      // Get the appropriate role (provider or customer)
+      const roleName = dto.role || 'customer';
+      const userRole = await tx.role.findUnique({
+        where: { name: roleName },
       });
 
-      if (!customerRole) {
-        throw new Error('Customer role not found. Please run database seed.');
+      if (!userRole) {
+        throw new Error(
+          `${roleName} role not found. Please run database seed.`,
+        );
       }
 
       const newUser = await tx.user.create({
@@ -55,7 +72,7 @@ export class AuthService {
           },
           userRoles: {
             create: {
-              roleId: customerRole.id,
+              roleId: userRole.id,
             },
           },
         },
@@ -73,10 +90,14 @@ export class AuthService {
     });
 
     // Send OTP for phone verification
-    await this.sendOtp({ phone: normalizedPhone, purpose: OtpPurpose.VERIFY_PHONE });
+    await this.sendOtp({
+      phone: normalizedPhone,
+      purpose: OtpPurpose.VERIFY_PHONE,
+    });
 
     return {
-      message: 'Registration successful. Please verify OTP to activate your account.',
+      message:
+        'Registration successful. Please verify OTP to activate your account.',
     };
   }
 
@@ -98,7 +119,7 @@ export class AuthService {
     // Check if user is verified (must verify OTP first)
     if (user.status === UserStatus.inactive) {
       throw new UnauthorizedException(
-        'Account not verified. Please verify OTP sent to your phone first.'
+        'Account not verified. Please verify OTP sent to your phone first.',
       );
     }
 
@@ -109,7 +130,7 @@ export class AuthService {
     // Update last login time
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { lastLoginAt: new Date() }
+      data: { lastLoginAt: new Date() },
     });
 
     return this.generateTokens(user.id, user.phone);
@@ -117,12 +138,12 @@ export class AuthService {
 
   async generateTokens(userId: bigint, phone: string) {
     const payload = { sub: userId.toString(), phone };
-    
+
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('jwt.accessSecret'),
       expiresIn: this.configService.get<string>('jwt.accessExpiresIn') as any,
     });
-    
+
     const refreshToken = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('jwt.refreshSecret'),
       expiresIn: this.configService.get<string>('jwt.refreshExpiresIn') as any,
@@ -149,11 +170,11 @@ export class AuthService {
   async sendOtp(dto: SendOtpDto) {
     // Generate random 6-digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     // Hash the code for security
     const salt = await bcrypt.genSalt();
     const codeHash = await bcrypt.hash(code, salt);
-    
+
     await this.prisma.otpCode.create({
       data: {
         phone: normalizePhoneNumber(dto.phone),
@@ -163,10 +184,10 @@ export class AuthService {
         attemptCount: 0,
       },
     });
-    
+
     // TODO: Send SMS via provider (Twilio, AWS SNS, etc.)
     console.log(`[OTP] Phone: ${dto.phone}, Code: ${code}`);
-    
+
     // Return code only in development
     return {
       message: 'OTP sent successfully',
@@ -212,21 +233,21 @@ export class AuthService {
         if (dto.purpose === OtpPurpose.VERIFY_PHONE) {
           await this.prisma.user.update({
             where: { phone: normalizedPhone },
-            data: { 
+            data: {
               status: UserStatus.active,
-              isVerified: true 
+              isVerified: true,
             },
           });
         }
 
-        return { 
+        return {
           message: 'OTP verified successfully',
-          ...(dto.purpose === OtpPurpose.VERIFY_PHONE && { 
-            note: 'Account activated. You can now login with your password.' 
-          })
+          ...(dto.purpose === OtpPurpose.VERIFY_PHONE && {
+            note: 'Account activated. You can now login with your password.',
+          }),
         };
       }
-      
+
       // Increment attempt count
       await this.prisma.otpCode.update({
         where: { id: otp.id },
@@ -239,70 +260,74 @@ export class AuthService {
 
     throw new BadRequestException('Invalid OTP code');
   }
-  
+
   async resetPassword(dto: ResetPasswordDto) {
-      const normalizedPhone = normalizePhoneNumber(dto.phone);
-      await this.verifyOtp({ phone: normalizedPhone, code: dto.otp, purpose: OtpPurpose.RESET_PASSWORD });
+    const normalizedPhone = normalizePhoneNumber(dto.phone);
+    await this.verifyOtp({
+      phone: normalizedPhone,
+      code: dto.otp,
+      purpose: OtpPurpose.RESET_PASSWORD,
+    });
 
-      const salt = await bcrypt.genSalt();
-      const passwordHash = await bcrypt.hash(dto.newPassword, salt);
+    const salt = await bcrypt.genSalt();
+    const passwordHash = await bcrypt.hash(dto.newPassword, salt);
 
-      await this.prisma.user.update({
-          where: { phone: normalizedPhone },
-          data: { passwordHash }
-      });
+    await this.prisma.user.update({
+      where: { phone: normalizedPhone },
+      data: { passwordHash },
+    });
 
-      return { message: 'Password reset successfully' };
+    return { message: 'Password reset successfully' };
   }
 
   async refreshToken(token: string) {
-      try {
-          const payload = this.jwtService.verify(token, {
-            secret: this.configService.get<string>('jwt.refreshSecret'),
-          });
-          
-          // Get all non-revoked sessions for this user
-          const sessions = await this.prisma.session.findMany({
-              where: { 
-                userId: BigInt(payload.sub),
-                revoked: false,
-                expiresAt: { gt: new Date() }
-              }
-          });
-          
-          if (sessions.length === 0) {
-            throw new UnauthorizedException('No valid session found');
-          }
+    try {
+      const payload = this.jwtService.verify(token, {
+        secret: this.configService.get<string>('jwt.refreshSecret'),
+      });
 
-          // Find matching session by comparing hashed token
-          let validSession: typeof sessions[0] | null = null;
-          for (const session of sessions) {
-            const isMatch = await bcrypt.compare(token, session.refreshTokenHash);
-            if (isMatch) {
-              validSession = session;
-              break;
-            }
-          }
-          
-          if (!validSession) {
-            throw new UnauthorizedException('Session not found or revoked');
-          }
+      // Get all non-revoked sessions for this user
+      const sessions = await this.prisma.session.findMany({
+        where: {
+          userId: BigInt(payload.sub),
+          revoked: false,
+          expiresAt: { gt: new Date() },
+        },
+      });
 
-          const newPayload = { sub: payload.sub, phone: payload.phone };
-          const accessToken = this.jwtService.sign(newPayload, {
-            secret: this.configService.get<string>('jwt.accessSecret'),
-            expiresIn: this.configService.get<string>('jwt.accessExpiresIn') as any,
-          });
-          
-          return { accessToken };
-      } catch (e) {
-          throw new UnauthorizedException('Invalid refresh token');
+      if (sessions.length === 0) {
+        throw new UnauthorizedException('No valid session found');
       }
+
+      // Find matching session by comparing hashed token
+      let validSession: (typeof sessions)[0] | null = null;
+      for (const session of sessions) {
+        const isMatch = await bcrypt.compare(token, session.refreshTokenHash);
+        if (isMatch) {
+          validSession = session;
+          break;
+        }
+      }
+
+      if (!validSession) {
+        throw new UnauthorizedException('Session not found or revoked');
+      }
+
+      const newPayload = { sub: payload.sub, phone: payload.phone };
+      const accessToken = this.jwtService.sign(newPayload, {
+        secret: this.configService.get<string>('jwt.accessSecret'),
+        expiresIn: this.configService.get<string>('jwt.accessExpiresIn') as any,
+      });
+
+      return { accessToken };
+    } catch (e) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
   }
 
   async loginWithOtp(dto: LoginWithOtpDto) {
     const normalizedPhone = normalizePhoneNumber(dto.phone);
-    
+
     // Find user
     const user = await this.prisma.user.findUnique({
       where: { phone: normalizedPhone },
@@ -329,7 +354,9 @@ export class AuthService {
     });
 
     if (otps.length === 0) {
-      throw new BadRequestException('No valid OTP found. Please request a new one.');
+      throw new BadRequestException(
+        'No valid OTP found. Please request a new one.',
+      );
     }
 
     let otpVerified = false;
@@ -352,17 +379,17 @@ export class AuthService {
         if (user.status === UserStatus.inactive) {
           await this.prisma.user.update({
             where: { id: user.id },
-            data: { 
+            data: {
               status: UserStatus.active,
               isVerified: true,
-              lastLoginAt: new Date()
+              lastLoginAt: new Date(),
             },
           });
         } else {
           // Update last login
           await this.prisma.user.update({
             where: { id: user.id },
-            data: { lastLoginAt: new Date() }
+            data: { lastLoginAt: new Date() },
           });
         }
 
@@ -388,36 +415,39 @@ export class AuthService {
   }
 
   async logout(refreshToken: string) {
-      try {
-          // Verify token first
-          const payload = this.jwtService.verify(refreshToken, {
-            secret: this.configService.get<string>('jwt.refreshSecret'),
+    try {
+      // Verify token first
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: this.configService.get<string>('jwt.refreshSecret'),
+      });
+
+      // Get all non-revoked sessions for this user
+      const sessions = await this.prisma.session.findMany({
+        where: {
+          userId: BigInt(payload.sub),
+          revoked: false,
+        },
+      });
+
+      // Find and revoke matching session
+      for (const session of sessions) {
+        const isMatch = await bcrypt.compare(
+          refreshToken,
+          session.refreshTokenHash,
+        );
+        if (isMatch) {
+          await this.prisma.session.update({
+            where: { id: session.id },
+            data: { revoked: true, revokedAt: new Date() },
           });
-
-          // Get all non-revoked sessions for this user
-          const sessions = await this.prisma.session.findMany({
-              where: { 
-                userId: BigInt(payload.sub),
-                revoked: false
-              }
-          });
-
-          // Find and revoke matching session
-          for (const session of sessions) {
-            const isMatch = await bcrypt.compare(refreshToken, session.refreshTokenHash);
-            if (isMatch) {
-              await this.prisma.session.update({
-                where: { id: session.id },
-                data: { revoked: true, revokedAt: new Date() }
-              });
-              break;
-            }
-          }
-
-          return { message: 'Logged out successfully' };
-      } catch (e) {
-          // Still return success even if token invalid (logout is idempotent)
-          return { message: 'Logged out successfully' };
+          break;
+        }
       }
+
+      return { message: 'Logged out successfully' };
+    } catch (e) {
+      // Still return success even if token invalid (logout is idempotent)
+      return { message: 'Logged out successfully' };
+    }
   }
 }
