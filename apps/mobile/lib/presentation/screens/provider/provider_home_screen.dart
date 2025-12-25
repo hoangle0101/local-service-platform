@@ -4,16 +4,19 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/services/socket_service.dart';
 import '../../../data/datasources/provider_datasource.dart';
 import '../../../data/datasources/bookings_datasource.dart';
 import '../../../data/datasources/directions_datasource.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../widgets/minimalist_widgets.dart';
-import '../../widgets/mini_map_widget.dart';
 import 'package:geolocator/geolocator.dart';
+import '../../bloc/notifications/notifications_bloc.dart';
+import '../../bloc/notifications/notifications_state.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 
 // Safe parsing helpers
 double _safeDouble(dynamic value, {double defaultValue = 0.0}) {
@@ -53,19 +56,37 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
   final MapController _mapController = MapController();
   StreamSubscription<Position>? _positionStream;
 
+  // Audio player for notifications
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
+  // Socket service for sending location updates only
+  final SocketService _socketService = SocketService();
+
+  // Default location (Hanoi center) as backup
+  final LatLng _defaultLocation = const LatLng(21.0285, 105.8542);
+
   @override
   void initState() {
     super.initState();
     _loadStatistics();
     _loadActiveBooking();
     _determinePosition();
+    _initSocketConnection();
   }
 
   @override
   void dispose() {
     _positionStream?.cancel();
     _mapController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
+  }
+
+  /// Initialize socket connection for sending location updates
+  void _initSocketConnection() async {
+    await _socketService.connectAsync();
+    // NOTE: Booking status updates are handled globally by ProviderShellScreen
+    // to avoid duplicate popups. This screen only refreshes via BlocListener.
   }
 
   Future<void> _determinePosition() async {
@@ -145,6 +166,19 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
         setState(() {
           _currentLocation = LatLng(position.latitude, position.longitude);
         });
+
+        // Send location to customer via socket if we have an active booking
+        if (_activeBooking != null &&
+            (_activeBooking!.status == 'accepted' ||
+                _activeBooking!.status == 'in_progress')) {
+          _socketService.sendLocation(
+            bookingId: _activeBooking!.id,
+            latitude: position.latitude,
+            longitude: position.longitude,
+            heading: position.heading,
+            speed: position.speed,
+          );
+        }
       }
     });
   }
@@ -246,7 +280,8 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
   Widget build(BuildContext context) {
     final bool isVerified = _verificationStatus == 'verified';
 
-    if (_isLoadingStats || (_currentLocation == null && _isLocating)) {
+    // Only show loading on initial load, not on subsequent refreshes
+    if (_isLoadingStats && _statistics == null) {
       return const Scaffold(
         body: Center(
           child: Column(
@@ -255,7 +290,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
               CircularProgressIndicator(color: AppColors.primary),
               SizedBox(height: 16),
               Text(
-                'Đang xác định vị trí...',
+                'Đang tải...',
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontWeight: FontWeight.w600,
@@ -273,56 +308,89 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      // Listen to Bloc state changes triggered by ProviderShellScreen
       body: BlocListener<BookingsBloc, BookingsState>(
         listener: (context, state) {
+          // Refresh local data when Bloc updates (triggered by shell screen)
           if (state is BookingsLoaded || state is BookingActionSuccess) {
             _loadActiveBooking();
-            _loadStatistics(); // Reload stats (earnings) too
+            _loadStatistics();
           }
         },
         child: Stack(
           children: [
             // 1. Full-screen Map Background with Route
             Positioned.fill(
-              child: _currentLocation == null
-                  ? Container(color: AppColors.shelf)
-                  : FlutterMap(
-                      mapController: _mapController,
-                      options: MapOptions(
-                        initialCenter: _currentLocation!,
-                        initialZoom: 15.0,
-                      ),
-                      children: [
-                        // Map tiles
-                        TileLayer(
-                          urlTemplate:
-                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName: 'com.localservice.app',
+              child: FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: _currentLocation ?? _defaultLocation,
+                  initialZoom: 15.0,
+                ),
+                children: [
+                  // Map tiles
+                  TileLayer(
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.localservice.app',
+                  ),
+
+                  // Route polyline (if available)
+                  if (_routePoints.isNotEmpty)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: _routePoints,
+                          strokeWidth: 5,
+                          color: AppColors.primary,
+                        ),
+                      ],
+                    ),
+
+                  // Markers
+                  MarkerLayer(
+                    markers: [
+                      // Provider current location marker
+                      if (_currentLocation != null)
+                        Marker(
+                          point: _currentLocation!,
+                          width: 50,
+                          height: 50,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.3),
+                                  blurRadius: 10,
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.navigation_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
                         ),
 
-                        // Route polyline (if available)
-                        if (_routePoints.isNotEmpty)
-                          PolylineLayer(
-                            polylines: [
-                              Polyline(
-                                points: _routePoints,
-                                strokeWidth: 5,
-                                color: AppColors.primary,
-                              ),
-                            ],
-                          ),
-
-                        // Markers
-                        MarkerLayer(
-                          markers: [
-                            // Provider current location marker
-                            Marker(
-                              point: _currentLocation!,
-                              width: 50,
-                              height: 50,
-                              child: Container(
+                      // Customer destination marker (if active booking)
+                      if (_activeBooking != null &&
+                          _activeBooking!.latitude != null &&
+                          _activeBooking!.longitude != null)
+                        Marker(
+                          point: LatLng(_activeBooking!.latitude!,
+                              _activeBooking!.longitude!),
+                          width: 50,
+                          height: 60,
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary,
+                                  color: AppColors.error,
                                   shape: BoxShape.circle,
                                   border:
                                       Border.all(color: Colors.white, width: 3),
@@ -334,52 +402,18 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
                                   ],
                                 ),
                                 child: const Icon(
-                                  Icons.navigation_rounded,
+                                  Icons.location_on_rounded,
                                   color: Colors.white,
-                                  size: 24,
+                                  size: 20,
                                 ),
                               ),
-                            ),
-
-                            // Customer destination marker (if active booking)
-                            if (_activeBooking != null &&
-                                _activeBooking!.latitude != null &&
-                                _activeBooking!.longitude != null)
-                              Marker(
-                                point: LatLng(_activeBooking!.latitude!,
-                                    _activeBooking!.longitude!),
-                                width: 50,
-                                height: 60,
-                                child: Column(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.error,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                            color: Colors.white, width: 3),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color:
-                                                Colors.black.withOpacity(0.3),
-                                            blurRadius: 10,
-                                          ),
-                                        ],
-                                      ),
-                                      child: const Icon(
-                                        Icons.location_on_rounded,
-                                        color: Colors.white,
-                                        size: 20,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
+                    ],
+                  ),
+                ],
+              ),
             ),
 
             // 2. Top Bar (Earnings & Toggle)
@@ -443,38 +477,90 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
                     ),
                   ],
                 ),
-                GestureDetector(
-                  onTap: _toggleAvailability,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color:
-                          _isAvailable ? AppColors.success : AppColors.warning,
-                      borderRadius: BorderRadius.circular(100),
+                Row(
+                  children: [
+                    BlocBuilder<NotificationsBloc, NotificationsState>(
+                      builder: (context, state) {
+                        int unreadCount = 0;
+                        if (state is NotificationsLoaded) {
+                          unreadCount = state.unreadCount;
+                        }
+
+                        return Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.notifications_none_rounded,
+                                  color: AppColors.textPrimary),
+                              onPressed: () => context.push('/notifications'),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                            if (unreadCount > 0)
+                              Positioned(
+                                top: -2,
+                                right: -2,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.error,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 16,
+                                    minHeight: 16,
+                                  ),
+                                  child: Text(
+                                    unreadCount.toString(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _isAvailable
-                              ? Icons.bolt_rounded
-                              : Icons.pause_rounded,
-                          color: Colors.white,
-                          size: 18,
+                    const SizedBox(width: 16),
+                    GestureDetector(
+                      onTap: _toggleAvailability,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _isAvailable
+                              ? AppColors.success
+                              : AppColors.warning,
+                          borderRadius: BorderRadius.circular(100),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _isAvailable ? 'SẴN SÀNG' : 'TẠM NGHỈ',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _isAvailable
+                                  ? Icons.bolt_rounded
+                                  : Icons.pause_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _isAvailable ? 'SẴN SÀNG' : 'TẠM NGHỈ',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -600,57 +686,58 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
-                  ElevatedButton.icon(
+                  // Primary action button - Search jobs
+                  OutlinedButton.icon(
                     onPressed: () => context.push('/provider/job-market'),
-                    icon:
-                        const Icon(Icons.explore_rounded, color: Colors.white),
+                    icon: Icon(Icons.explore_rounded, color: AppColors.primary),
                     label: const Text('TÌM VIỆC MỚI',
                         style: TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 15,
                             letterSpacing: 0.5)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      minimumSize: const Size(double.infinity, 56),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      minimumSize: const Size(double.infinity, 52),
+                      side:
+                          const BorderSide(color: AppColors.primary, width: 2),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16)),
-                      elevation: 8,
-                      shadowColor: AppColors.primary.withOpacity(0.3),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+                  // Secondary buttons row
                   Row(
                     children: [
                       Expanded(
-                        child: OutlinedButton(
+                        child: OutlinedButton.icon(
                           onPressed: () => context.push('/provider/bookings'),
+                          icon: const Icon(Icons.history_rounded, size: 20),
+                          label: const Text('Lịch sử',
+                              style: TextStyle(fontWeight: FontWeight.w700)),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            foregroundColor: AppColors.textSecondary,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                             side: BorderSide(color: Colors.grey.shade300),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16)),
+                                borderRadius: BorderRadius.circular(14)),
                           ),
-                          child: const Text('LỊCH SỬ',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.primary)),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: ElevatedButton(
+                        child: OutlinedButton.icon(
                           onPressed: () => context.push('/provider/profile'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.white,
-                            foregroundColor: AppColors.textPrimary,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            elevation: 0,
+                          icon: const Icon(Icons.person_outline_rounded,
+                              size: 20),
+                          label: const Text('Hồ sơ',
+                              style: TextStyle(fontWeight: FontWeight.w700)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.textSecondary,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                             side: BorderSide(color: Colors.grey.shade300),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16)),
+                                borderRadius: BorderRadius.circular(14)),
                           ),
-                          child: const Text('HỒ SƠ',
-                              style: TextStyle(fontWeight: FontWeight.w800)),
                         ),
                       ),
                     ],
@@ -668,6 +755,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
   Widget _buildActiveJobCard() {
     final booking = _activeBooking!;
     final currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
+    final isPending = booking.status == 'pending';
     final isInProgress = booking.status == 'in_progress';
     final isPendingCompletion = booking.status == 'pending_completion';
 
@@ -675,7 +763,11 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
     Color statusColor;
     IconData statusIcon;
 
-    if (isPendingCompletion) {
+    if (isPending) {
+      statusText = 'Yêu cầu mới';
+      statusColor = AppColors.primary;
+      statusIcon = Icons.new_releases_rounded;
+    } else if (isPendingCompletion) {
       statusText = 'Chờ khách xác nhận';
       statusColor = AppColors.warning;
       statusIcon = Icons.hourglass_top_rounded;
@@ -794,102 +886,67 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
 
         const SizedBox(height: 20),
 
-        // Action Buttons
-        if (!isPendingCompletion) ...[
-          // Navigation button
-          if (booking.latitude != null && booking.longitude != null)
-            ElevatedButton.icon(
-              onPressed: () => context.push('/provider/navigation', extra: {
-                'lat': booking.latitude,
-                'lng': booking.longitude,
-                'address': booking.addressText,
-                'customerName': booking.customerName,
-              }),
-              icon: const Icon(Icons.navigation_rounded, color: Colors.white),
-              label: const Text('CHỈ ĐƯỜNG ĐẾN KHÁCH',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                minimumSize: const Size(double.infinity, 52),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
-              ),
-            ),
-          // Chat button
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () => context.push(
-              '/chat/${booking.id}',
-              extra: booking.customerName,
-            ),
-            icon: const Icon(Icons.chat_bubble_outline_rounded),
-            label: const Text('NHẮN TIN VỚI KHÁCH',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              minimumSize: const Size(double.infinity, 52),
-              side: const BorderSide(color: AppColors.primary, width: 2),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
-
-        // Primary action based on status
+        // Action Buttons - Compact Icon Row
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            if (!isInProgress && !isPendingCompletion)
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    await _bookingsDataSource.startService(booking.id);
-                    _loadActiveBooking();
-                  },
-                  icon:
-                      const Icon(Icons.play_arrow_rounded, color: Colors.white),
-                  label: const Text('BẮT ĐẦU',
-                      style: TextStyle(fontWeight: FontWeight.w900)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    minimumSize: const Size(0, 52),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
+            // Navigation button
+            if (booking.latitude != null && booking.longitude != null)
+              _buildActionIcon(
+                icon: Icons.navigation_rounded,
+                label: 'Chỉ đường',
+                color: AppColors.primary,
+                onTap: () => context.push('/provider/navigation', extra: {
+                  'lat': booking.latitude,
+                  'lng': booking.longitude,
+                  'address': booking.addressText,
+                  'customerName': booking.customerName,
+                }),
               ),
-            if (isInProgress)
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    await _bookingsDataSource.completeService(booking.id);
-                    _loadActiveBooking();
-                  },
-                  icon: const Icon(Icons.check_circle_rounded,
-                      color: Colors.white),
-                  label: const Text('HOÀN THÀNH',
-                      style: TextStyle(fontWeight: FontWeight.w900)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success,
-                    minimumSize: const Size(0, 52),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
+            // Chat button
+            _buildActionIcon(
+              icon: Icons.chat_bubble_outline_rounded,
+              label: 'Nhắn tin',
+              color: AppColors.primary,
+              onTap: () => context.push(
+                '/chat/${booking.id}',
+                extra: booking.customerName,
               ),
-            if (isPendingCompletion)
-              const Expanded(
-                child: Center(
-                  child: Text(
-                    'Đang chờ khách hàng xác nhận hoàn thành...',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
+            ),
+            // Status action button (Start / Complete / Pending)
+            if (isPending)
+              _buildActionIcon(
+                icon: Icons.hourglass_top_rounded,
+                label: 'Chờ duyệt',
+                color: AppColors.warning,
+                onTap: () {},
+              )
+            else if (!isInProgress && !isPendingCompletion)
+              _buildActionIcon(
+                icon: Icons.play_circle_filled_rounded,
+                label: 'Bắt đầu',
+                color: AppColors.primary,
+                onTap: () async {
+                  await _bookingsDataSource.startService(booking.id);
+                  _loadActiveBooking();
+                },
+              )
+            else if (isInProgress)
+              _buildActionIcon(
+                icon: Icons.check_circle_rounded,
+                label: 'Hoàn thành',
+                color: AppColors.success,
+                onTap: () async {
+                  await _bookingsDataSource.completeService(booking.id);
+                  _loadActiveBooking();
+                },
+              )
+            else if (isPendingCompletion)
+              _buildActionIcon(
+                icon: Icons.pending_rounded,
+                label: 'Chờ xác nhận',
+                color: AppColors.warning,
+                onTap: () {},
               ),
           ],
         ),
@@ -915,6 +972,40 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  /// Build compact action icon button with label
+  Widget _buildActionIcon({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

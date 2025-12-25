@@ -7,7 +7,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/user_datasource.dart';
-import '../../../data/datasources/track_asia_datasource.dart';
 import '../../bloc/auth/auth_bloc.dart';
 import '../../widgets/address_input_widget.dart';
 import '../../widgets/minimalist_widgets.dart';
@@ -61,7 +60,7 @@ class _UserEditProfileScreenState extends State<UserEditProfileScreen> {
     if (_currentAvatarUrl == null || _currentAvatarUrl!.isEmpty) return null;
     return _currentAvatarUrl!.startsWith('http')
         ? _currentAvatarUrl!
-        : 'http://10.0.2.2:3000$_currentAvatarUrl';
+        : 'http://10.0.2.2:3000${_currentAvatarUrl!.startsWith('/') ? '' : '/'}$_currentAvatarUrl';
   }
 
   @override

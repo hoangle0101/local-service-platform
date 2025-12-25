@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/entities/entities.dart';
+import '../../../core/services/socket_service.dart';
 import '../../../data/datasources/bookings_datasource.dart';
 import '../../bloc/categories/categories_bloc.dart';
 import '../../bloc/categories/categories_event_state.dart';
@@ -25,11 +29,103 @@ class _JobMarketScreenState extends State<JobMarketScreen> {
   bool _isLoadingJobs = false;
   final BookingsDataSource _bookingsDataSource = BookingsDataSource();
 
+  // Socket service for real-time updates
+  final SocketService _socketService = SocketService();
+  StreamSubscription<NewJobEvent>? _newJobSubscription;
+  StreamSubscription<JobTakenEvent>? _jobTakenSubscription;
+  StreamSubscription<BookingStatusUpdate>? _bookingStatusSubscription;
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
   @override
   void initState() {
     super.initState();
     context.read<CategoriesBloc>().add(LoadCategories());
-    _fetchJobs(); // Load all pending jobs initialy
+    _fetchJobs(); // Load all pending jobs initially
+    _initSocketConnection();
+  }
+
+  @override
+  void dispose() {
+    _newJobSubscription?.cancel();
+    _jobTakenSubscription?.cancel();
+    _bookingStatusSubscription?.cancel();
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  /// Initialize socket connection and subscribe to job market updates
+  void _initSocketConnection() async {
+    await _socketService.connectAsync();
+
+    // Subscribe to job market for all categories initially
+    _socketService.subscribeToJobMarket();
+
+    // Listen for new job events
+    _newJobSubscription = _socketService.newJobStream.listen(
+      (event) {
+        debugPrint('[JobMarketScreen] New job available: ${event.bookingId}');
+
+        // Refresh the job list to include the new job
+        _fetchJobs();
+
+        // Show a snackbar notification
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Có việc mới: ${event.serviceName}'),
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
+              action: SnackBarAction(
+                label: 'XEM',
+                textColor: Colors.white,
+                onPressed: () {
+                  // Job list will already be refreshed
+                },
+              ),
+            ),
+          );
+        }
+      },
+    );
+
+    // Listen for job taken events (to remove from list)
+    _jobTakenSubscription = _socketService.jobTakenStream.listen(
+      (event) {
+        debugPrint('[JobMarketScreen] Job taken: ${event.bookingId}');
+
+        // Remove the job from local list immediately
+        if (mounted) {
+          setState(() {
+            _jobs.removeWhere((job) => job.id == event.bookingId);
+          });
+
+          // Show notification only if someone else took the job
+          if (event.takenByProviderId != _socketService.currentUserId) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Một đơn hàng đã có người nhận'),
+                backgroundColor: Colors.grey,
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        }
+      },
+    );
+
+    _bookingStatusSubscription = _socketService.bookingStatusStream.listen(
+      (update) {
+        debugPrint(
+            '[JobMarketScreen] Status Update: ${update.status}, providerId=${update.providerId}, currentUserId=${_socketService.currentUserId}');
+
+        // Refresh the job list if relevant
+        _fetchJobs();
+
+        // The booking dialog for direct jobs is now handled globally in ProviderShellScreen
+      },
+    );
   }
 
   Future<void> _fetchJobs() async {
@@ -64,7 +160,10 @@ class _JobMarketScreenState extends State<JobMarketScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        _fetchJobs(); // Refresh list
+        // Navigate to home to see the active job
+        if (mounted) {
+          context.go('/provider/home');
+        }
       }
     } catch (e) {
       if (mounted) {

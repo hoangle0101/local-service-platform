@@ -18,6 +18,8 @@ import '../../widgets/animations/slide_in_animation.dart';
 import '../../widgets/loading/shimmer_loading.dart';
 import '../../widgets/phone_verification_card.dart';
 import '../../widgets/mini_map_widget.dart';
+import '../../bloc/notifications/notifications_bloc.dart';
+import '../../bloc/notifications/notifications_state.dart';
 
 class UserHomeScreen extends StatefulWidget {
   const UserHomeScreen({super.key});
@@ -161,7 +163,6 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           _buildBottomSlidingPanel(),
         ],
       ),
-      floatingActionButton: _buildModernFAB(),
     );
   }
 
@@ -246,10 +247,51 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                         return const SizedBox.shrink();
                       },
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.notifications_none_rounded,
-                          color: AppColors.textPrimary),
-                      onPressed: () {},
+                    BlocBuilder<NotificationsBloc, NotificationsState>(
+                      builder: (context, state) {
+                        int unreadCount = 0;
+                        if (state is NotificationsLoaded) {
+                          unreadCount = state.unreadCount;
+                        }
+
+                        return Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.notifications_none_rounded,
+                                  color: AppColors.textPrimary),
+                              onPressed: () => context.push('/notifications'),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                            if (unreadCount > 0)
+                              Positioned(
+                                top: -2,
+                                right: -2,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.error,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 16,
+                                    minHeight: 16,
+                                  ),
+                                  child: Text(
+                                    unreadCount.toString(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -289,58 +331,91 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
       left: 0,
       right: 0,
       bottom: 0,
-      child: Container(
-        height: MediaQuery.of(context).size.height * 0.45,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 20,
-              offset: Offset(0, -5),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            // Handle
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                color: AppColors.divider,
-                borderRadius: BorderRadius.circular(2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Recenter Button
+          Padding(
+            padding: const EdgeInsets.only(right: 16, bottom: 16),
+            child: GestureDetector(
+              onTap: () {
+                if (_currentLocation != null) {
+                  _mapController.move(_currentLocation!, 15.0);
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.my_location_rounded,
+                    color: AppColors.textPrimary, size: 24),
               ),
             ),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () async {
-                  context.read<CategoriesBloc>().add(LoadCategories());
-                  context.read<ServicesBloc>().add(const LoadServices());
-                },
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildVerificationBanner(),
-                      _buildSectionHeader('Danh mục dịch vụ', () {}),
-                      const SizedBox(height: 16),
-                      _buildCategoriesList(),
-                      const SizedBox(height: 32),
-                      _buildSectionHeader('Dịch vụ phổ biến', () {}),
-                      const SizedBox(height: 16),
-                      _buildPopularServices(),
-                    ],
+          ),
+          // Sliding Panel
+          Container(
+            height: MediaQuery.of(context).size.height * 0.45,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 20,
+                  offset: Offset(0, -5),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Handle
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.divider,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      context.read<CategoriesBloc>().add(LoadCategories());
+                      context.read<ServicesBloc>().add(const LoadServices());
+                    },
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildVerificationBanner(),
+                          _buildSectionHeader('Danh mục dịch vụ', () {}),
+                          const SizedBox(height: 16),
+                          _buildCategoriesList(),
+                          const SizedBox(height: 32),
+                          _buildSectionHeader('Dịch vụ phổ biến', () {}),
+                          const SizedBox(height: 16),
+                          _buildPopularServices(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -474,19 +549,6 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         }
         return const SizedBox.shrink();
       },
-    );
-  }
-
-  Widget _buildModernFAB() {
-    return FloatingActionButton(
-      onPressed: () {
-        if (_currentLocation != null) {
-          _mapController.move(_currentLocation!, 15.0);
-        }
-      },
-      backgroundColor: Colors.white,
-      elevation: 4,
-      child: const Icon(Icons.my_location_rounded, color: AppColors.primary),
     );
   }
 

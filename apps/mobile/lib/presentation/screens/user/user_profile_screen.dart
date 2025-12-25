@@ -73,7 +73,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
       fullAvatarUrl = avatarUrl.startsWith('http')
           ? avatarUrl
-          : 'http://10.0.2.2:3000$avatarUrl';
+          : 'http://10.0.2.2:3000${avatarUrl.startsWith('/') ? '' : '/'}$avatarUrl';
     }
 
     return RefreshIndicator(
@@ -128,25 +128,26 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            GestureDetector(
-              onTap: () => context.pop(),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+            if (context.canPop())
+              GestureDetector(
+                onTap: () => context.pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded,
+                      size: 18, color: AppColors.textPrimary),
                 ),
-                child: const Icon(Icons.arrow_back_ios_new_rounded,
-                    size: 18, color: AppColors.textPrimary),
               ),
-            ),
             GestureDetector(
               onTap: () async {
                 await context.push('/user/profile/edit');
@@ -453,70 +454,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   void _showLogoutDialog(BuildContext context) {
-    showDialog(
+    MinDialog.show(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        title: const Text(
-          'Đăng xuất',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-            color: AppColors.textPrimary,
-            letterSpacing: -0.5,
-          ),
-        ),
-        content: const Text(
+      title: 'Đăng xuất',
+      message:
           'Bạn có chắc chắn muốn thoát khỏi phiên đăng nhập hiện tại không?',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 15,
-            height: 1.5,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-        actions: [
-          Row(
-            children: [
-              Expanded(
-                child: MinButton(
-                  text: 'Quay lại',
-                  isPrimary: false,
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.of(dialogContext).pop();
-                    context.read<AuthBloc>().add(LogoutRequested());
-                  },
-                  child: Container(
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'Đăng xuất',
-                        style: TextStyle(
-                            color: AppColors.error,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+      primaryLabel: 'Đăng xuất',
+      isDestructive: true,
+      icon: Icons.logout_rounded,
+      secondaryLabel: 'Quay lại',
+      onPrimaryPressed: () {
+        context.read<AuthBloc>().add(LogoutRequested());
+        context.go('/');
+      },
     );
   }
 }

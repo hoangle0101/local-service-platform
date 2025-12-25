@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../widgets/navigation/animated_bottom_nav_item.dart';
@@ -20,6 +21,10 @@ class UserShellScreen extends StatefulWidget {
 }
 
 class _UserShellScreenState extends State<UserShellScreen> {
+  StreamSubscription? _bookingStatusSubscription;
+  String? _lastNotificationMessage;
+  Timer? _messageClearTimer;
+
   @override
   void initState() {
     super.initState();
@@ -29,38 +34,58 @@ class _UserShellScreenState extends State<UserShellScreen> {
   void _setupSocketListeners() {
     final socket = SocketService();
 
-    socket.on('booking.new_offer', (data) {
+    // Unified handling via bookingStatusStream to avoid duplicates
+    _bookingStatusSubscription =
+        socket.bookingStatusStream.distinct((prev, next) {
+      return prev.status == next.status &&
+          prev.bookingId == next.bookingId &&
+          prev.message == next.message;
+    }).listen((update) {
       if (!mounted) return;
-      _showNotification(
-        'Bạn nhận được báo giá mới!',
-        icon: Icons.local_offer_rounded,
-        color: Colors.blue,
-      );
+
+      // Refresh bookings data
       context.read<BookingsBloc>().add(const LoadUserBookingsEvent());
+
+      // Show notification if action was by someone else or it's a new offer
+      if (update.actorId != socket.currentUserId) {
+        String message =
+            update.message ?? 'Trạng thái đơn hàng: ${update.status}';
+        IconData icon = Icons.info_outline_rounded;
+        Color color = AppColors.primary;
+
+        if (update.status == 'cancelled') {
+          icon = Icons.cancel_outlined;
+          color = AppColors.error;
+        } else if (update.status == 'OFFER_RECEIVED') {
+          icon = Icons.local_offer_rounded;
+          color = Colors.blue;
+        }
+
+        _showNotification(
+          message,
+          icon: icon,
+          color: color,
+        );
+      }
     });
 
-    socket.on('booking.started', (data) {
-      if (!mounted) return;
-      _showNotification(
-        'Thợ đã bắt đầu công việc!',
-        icon: Icons.play_arrow_rounded,
-        color: Colors.green,
-      );
-      context.read<BookingsBloc>().add(const LoadUserBookingsEvent());
-    });
-
-    socket.on('booking.completed', (data) {
-      if (!mounted) return;
-      _showNotification(
-        'Công việc đã hoàn thành. Hãy xác nhận!',
-        icon: Icons.check_circle_rounded,
-        color: Colors.green,
-      );
-      context.read<BookingsBloc>().add(const LoadUserBookingsEvent());
-    });
+    // to avoid duplicate notifications.
   }
 
   void _showNotification(String message, {IconData? icon, Color? color}) {
+    // Tránh hiện lại tin nhắn cũ trong thời gian ngắn
+    if (_lastNotificationMessage == message) return;
+    _lastNotificationMessage = message;
+
+    // Clear cache sau 2 giây
+    _messageClearTimer?.cancel();
+    _messageClearTimer = Timer(const Duration(seconds: 2), () {
+      _lastNotificationMessage = null;
+    });
+
+    // Xóa snackbar cũ trước khi hiện cái mới
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
@@ -88,10 +113,10 @@ class _UserShellScreenState extends State<UserShellScreen> {
 
   @override
   void dispose() {
+    _bookingStatusSubscription?.cancel();
+    _messageClearTimer?.cancel();
     final socket = SocketService();
     socket.off('booking.new_offer');
-    socket.off('booking.started');
-    socket.off('booking.completed');
     super.dispose();
   }
 

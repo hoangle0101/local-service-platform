@@ -7,7 +7,6 @@ import '../../../data/datasources/quote_datasource.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../widgets/minimalist_widgets.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import 'create_quote_screen.dart';
 import '../booking/booking_detail_screen.dart';
@@ -136,37 +135,35 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
   }
 
   Widget _buildSliverAppBar(BuildContext context) {
-    final topPadding = MediaQuery.of(context).padding.top;
     return SliverAppBar(
       pinned: true,
-      floating: false,
-      expandedHeight: 240,
+      expandedHeight: 200,
       backgroundColor: AppColors.white,
       elevation: 0,
+      scrolledUnderElevation: 0,
       automaticallyImplyLeading: false,
-      flexibleSpace: FlexibleSpaceBar(
+      flexibleSpace: const FlexibleSpaceBar(
         background: Padding(
-          padding: EdgeInsets.fromLTRB(24, topPadding + 40, 24, 0),
+          padding: EdgeInsets.fromLTRB(24, 80, 24, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
+            children: [
               Text(
                 'Công việc của tôi',
                 style: TextStyle(
                   fontSize: 28,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w900,
                   color: AppColors.textPrimary,
-                  letterSpacing: -0.8,
+                  letterSpacing: -1.0,
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
+              SizedBox(height: 8),
+              Text(
                 'Theo dõi và quản lý các yêu cầu của khách hàng gửi đến bạn',
                 style: TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary,
                   fontWeight: FontWeight.w500,
-                  height: 1.4,
                 ),
               ),
             ],
@@ -174,34 +171,30 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
         ),
       ),
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(64),
+        preferredSize: const Size.fromHeight(60),
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(
             color: AppColors.white,
             border: Border(
-                bottom: BorderSide(
-                    color: AppColors.divider.withOpacity(0.3), width: 1)),
+                bottom: BorderSide(color: AppColors.divider.withOpacity(0.5))),
           ),
           child: TabBar(
             controller: _tabController,
             isScrollable: true,
             tabAlignment: TabAlignment.start,
-            padding: const EdgeInsets.only(
-                left: 8), // Aligns with the 24px container padding
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             labelColor: AppColors.primary,
             unselectedLabelColor: AppColors.textTertiary,
+            indicatorSize: TabBarIndicatorSize.label,
             indicator: const UnderlineTabIndicator(
               borderSide: BorderSide(color: AppColors.primary, width: 4),
-              insets: EdgeInsets.zero,
+              insets: EdgeInsets.symmetric(horizontal: -8),
             ),
-            indicatorSize: TabBarIndicatorSize.label,
-            labelPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            labelStyle:
-                const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+            labelStyle: const TextStyle(
+                fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.2),
             unselectedLabelStyle:
-                const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
             tabs: [
               _buildTab('Yêu cầu', _myRequests.length),
               _buildTab('Xa hơn', _globalRequests.length),
@@ -225,13 +218,13 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: AppColors.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 count.toString(),
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppColors.primary,
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
                 ),
@@ -847,61 +840,40 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
     });
   }
 
-  Future<void> _openMap(double lat, double lng) async {
-    final googleUrl =
-        Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
-    final appleUrl = Uri.parse('https://maps.apple.com/?q=$lat,$lng');
-
-    try {
-      if (await canLaunchUrl(googleUrl)) {
-        await launchUrl(googleUrl, mode: LaunchMode.externalApplication);
-      } else if (await canLaunchUrl(appleUrl)) {
-        await launchUrl(appleUrl, mode: LaunchMode.externalApplication);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Không thể mở bản đồ')),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('[ProviderBookings] Error opening map: $e');
-    }
-  }
-
   void _showCustomerReviewDialog(BookingReview review, {String? customerName}) {
-    showDialog(
+    MinDialog.show(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.background,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text('Đánh giá từ ${customerName ?? "khách"}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                  5,
-                  (index) => Icon(
-                        index < review.rating
-                            ? Icons.star_rounded
-                            : Icons.star_outline_rounded,
-                        color: AppColors.warning,
-                        size: 32,
-                      )),
+      title: 'Đánh giá từ ${customerName ?? "khách"}',
+      icon: Icons.star_rounded,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+                5,
+                (index) => Icon(
+                      index < review.rating
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
+                      color: AppColors.warning,
+                      size: 32,
+                    )),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            review.comment ?? 'Không có nhận xét.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
             ),
-            const SizedBox(height: 16),
-            Text(review.comment ?? 'Không có nhận xét.',
-                textAlign: TextAlign.center),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Đóng')),
+          ),
         ],
       ),
+      primaryLabel: 'Đóng',
+      onPrimaryPressed: () {},
     );
   }
 }

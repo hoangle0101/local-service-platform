@@ -7,6 +7,7 @@ class FavoriteButton extends StatefulWidget {
   final bool isFavorite;
   final VoidCallback? onToggle;
   final double size;
+  final EdgeInsetsGeometry padding;
   final Color favoriteColor;
   final Color unfavoriteColor;
 
@@ -15,6 +16,7 @@ class FavoriteButton extends StatefulWidget {
     required this.isFavorite,
     this.onToggle,
     this.size = 24,
+    this.padding = const EdgeInsets.all(8.0),
     this.favoriteColor = Colors.red,
     this.unfavoriteColor = Colors.grey,
   });
@@ -79,7 +81,7 @@ class _FavoriteButtonState extends State<FavoriteButton>
       onTap: _handleTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.all(8.0),
+        padding: widget.padding,
         child: AnimatedBuilder(
           animation: _scaleAnimation,
           builder: (context, child) {

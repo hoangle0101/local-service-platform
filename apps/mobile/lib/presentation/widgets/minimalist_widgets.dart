@@ -239,3 +239,174 @@ class MinTextField extends StatelessWidget {
     );
   }
 }
+
+class MinDialog extends StatelessWidget {
+  final String title;
+  final String? message;
+  final Widget? content;
+  final String primaryLabel;
+  final VoidCallback? onPrimaryPressed;
+  final String? secondaryLabel;
+  final VoidCallback? onSecondaryPressed;
+  final bool isDestructive;
+  final IconData? icon;
+
+  const MinDialog({
+    super.key,
+    required this.title,
+    this.message,
+    this.content,
+    required this.primaryLabel,
+    this.onPrimaryPressed,
+    this.secondaryLabel,
+    this.onSecondaryPressed,
+    this.isDestructive = false,
+    this.icon,
+  });
+
+  static Future<T?> show<T>({
+    required BuildContext context,
+    required String title,
+    String? message,
+    Widget? content,
+    required String primaryLabel,
+    VoidCallback? onPrimaryPressed,
+    String? secondaryLabel,
+    VoidCallback? onSecondaryPressed,
+    bool isDestructive = false,
+    IconData? icon,
+    bool barrierDismissible = true,
+  }) {
+    return showDialog<T>(
+      context: context,
+      barrierDismissible: barrierDismissible,
+      builder: (dialogContext) => MinDialog(
+        title: title,
+        message: message,
+        content: content,
+        primaryLabel: primaryLabel,
+        isDestructive: isDestructive,
+        icon: icon,
+        secondaryLabel: secondaryLabel,
+        onPrimaryPressed: () {
+          Navigator.of(dialogContext).pop(true);
+          if (onPrimaryPressed != null) onPrimaryPressed();
+        },
+        onSecondaryPressed: () {
+          Navigator.of(dialogContext).pop(false);
+          if (onSecondaryPressed != null) onSecondaryPressed();
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      title: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: (isDestructive ? AppColors.error : AppColors.primary)
+                    .withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: isDestructive ? AppColors.error : AppColors.primary,
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.5,
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (message != null)
+              Text(
+                message!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 15,
+                  height: 1.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            if (content != null) ...[
+              if (message != null) const SizedBox(height: 16),
+              content!,
+            ],
+          ],
+        ),
+      ),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      actions: [
+        Row(
+          children: [
+            if (secondaryLabel != null) ...[
+              Expanded(
+                child: MinButton(
+                  text: secondaryLabel!,
+                  isPrimary: false,
+                  onPressed: onSecondaryPressed ??
+                      () => Navigator.of(context).pop(false),
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: isDestructive
+                  ? GestureDetector(
+                      onTap: onPrimaryPressed ??
+                          () => Navigator.of(context).pop(true),
+                      child: Container(
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Center(
+                          child: Text(
+                            primaryLabel,
+                            style: const TextStyle(
+                              color: AppColors.error,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : MinButton(
+                      text: primaryLabel,
+                      onPressed: onPrimaryPressed ??
+                          () => Navigator.of(context).pop(true),
+                    ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}

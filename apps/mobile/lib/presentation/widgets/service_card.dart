@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/entities/entities.dart';
 import '../bloc/favorites/favorites_bloc.dart';
 import '../../core/theme/app_colors.dart';
+import 'favorite_button.dart';
 
 class ServiceCardWidget extends StatelessWidget {
   final ProviderService service;
@@ -30,7 +31,7 @@ class ServiceCardWidget extends StatelessWidget {
       ),
       child: InkWell(
         onTap: () {
-          context.push('/service/${service.serviceId}', extra: service);
+          context.push('/service/${service.id}', extra: service);
         },
         borderRadius: BorderRadius.circular(24),
         child: Column(
@@ -99,7 +100,10 @@ class ServiceCardWidget extends StatelessWidget {
                           ],
                         ),
                       ),
-                      _FavoriteToggle(serviceId: service.serviceId),
+                      _FavoriteToggle(
+                        serviceId: service.id,
+                        serviceName: service.service.name,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -162,9 +166,6 @@ class _MetricRibbon extends StatelessWidget {
             children: [
               _buildMetric(context, Icons.star_rounded,
                   service.provider.ratingAvg.toStringAsFixed(1), Colors.orange),
-              _buildVerticalDivider(),
-              _buildMetric(context, Icons.location_on_rounded, '1.2 km',
-                  AppColors.primary),
             ],
           ),
           // Show "Liên hệ" instead of fixed price
@@ -206,52 +207,42 @@ class _MetricRibbon extends StatelessWidget {
       ],
     );
   }
-
-  Widget _buildVerticalDivider() {
-    return Container(
-      height: 14,
-      width: 1.5,
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      color: AppColors.divider,
-    );
-  }
 }
 
 class _FavoriteToggle extends StatelessWidget {
   final int serviceId;
+  final String serviceName;
 
-  const _FavoriteToggle({required this.serviceId});
+  const _FavoriteToggle({required this.serviceId, required this.serviceName});
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<FavoritesBloc, FavoritesState>(
       builder: (context, state) {
         final isFavorite = state.favoriteIds.contains(serviceId);
-        return GestureDetector(
-          onTap: () =>
-              context.read<FavoritesBloc>().add(ToggleFavorite(serviceId)),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isFavorite
-                  ? AppColors.error.withOpacity(0.1)
-                  : AppColors.white,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isFavorite
-                    ? AppColors.error.withOpacity(0.2)
-                    : AppColors.divider.withOpacity(0.5),
+        return FavoriteButton(
+          isFavorite: isFavorite,
+          size: 20,
+          onToggle: () {
+            context.read<FavoritesBloc>().add(ToggleFavorite(serviceId));
+            ScaffoldMessenger.of(context).clearSnackBars();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  isFavorite
+                      ? 'Đã xóa "$serviceName" khỏi yêu thích'
+                      : 'Đã thêm "$serviceName" vào yêu thích',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: AppColors.textPrimary,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                margin: const EdgeInsets.all(24),
+                duration: const Duration(seconds: 2),
               ),
-            ),
-            child: Icon(
-              isFavorite
-                  ? Icons.favorite_rounded
-                  : Icons.favorite_outline_rounded,
-              size: 20,
-              color: isFavorite ? AppColors.error : AppColors.textTertiary,
-            ),
-          ),
+            );
+          },
         );
       },
     );

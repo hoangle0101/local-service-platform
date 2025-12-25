@@ -95,8 +95,32 @@ class AuthDataSource {
         return AuthTokens.fromJson(data);
       }
       throw Exception('Unexpected response format');
+    } on DioException catch (e) {
+      // Handle specific HTTP error codes
+      if (e.response?.statusCode == 401) {
+        throw Exception('Thông tin đăng nhập không chính xác');
+      }
+      if (e.response?.statusCode == 404) {
+        throw Exception('Số điện thoại chưa được đăng ký');
+      }
+
+      // Try to extract error message from backend
+      if (e.response?.data != null &&
+          e.response?.data is Map<String, dynamic>) {
+        final errorData = e.response!.data as Map<String, dynamic>;
+        if (errorData.containsKey('message')) {
+          final message = errorData['message'];
+          if (message is String) {
+            throw Exception(message);
+          }
+        }
+      }
+
+      throw Exception('Đăng nhập thất bại. Vui lòng thử lại.');
     } catch (e) {
-      throw Exception('Failed to login: $e');
+      // Re-throw if it's already our Exception
+      if (e is Exception) rethrow;
+      throw Exception('Đăng nhập thất bại: $e');
     }
   }
 

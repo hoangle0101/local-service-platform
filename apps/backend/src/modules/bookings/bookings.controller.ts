@@ -27,7 +27,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { ChatGateway } from '../conversations/chat.gateway';
+import { RealtimeGateway } from '../gateway/realtime.gateway';
 
 @ApiTags('Bookings')
 @Controller('bookings')
@@ -36,7 +36,7 @@ import { ChatGateway } from '../conversations/chat.gateway';
 export class BookingsController {
   constructor(
     private bookingsService: BookingsService,
-    private chatGateway: ChatGateway,
+    private realtimeGateway: RealtimeGateway,
   ) {}
 
   @Post('estimate')
@@ -52,13 +52,6 @@ export class BookingsController {
       BigInt(user.userId),
       dto,
     );
-
-    // Notify nearby providers
-    if (result.nearbyProviderIds && result.nearbyProviderIds.length > 0) {
-      for (const providerId of result.nearbyProviderIds) {
-        this.chatGateway.notifyUser(providerId, 'booking.new_request', result);
-      }
-    }
 
     return result;
   }
@@ -137,15 +130,6 @@ export class BookingsController {
       BigInt(providerId),
     );
 
-    // Notify provider
-    if (result.providerId) {
-      this.chatGateway.notifyUser(
-        result.providerId,
-        'booking.accepted',
-        result,
-      );
-    }
-
     return result;
   }
 
@@ -156,20 +140,12 @@ export class BookingsController {
     @CurrentUser() user: any,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    const result = await this.bookingsService.confirmCompletion(
+    // NOTE: booking_status_changed event is already emitted by service
+    // No need to emit booking.confirmed separately
+    return this.bookingsService.confirmCompletion(
       BigInt(user.userId),
       BigInt(id),
     );
-
-    if (result.providerId) {
-      this.chatGateway.notifyUser(
-        result.providerId,
-        'booking.confirmed',
-        result,
-      );
-    }
-
-    return result;
   }
 
   @Patch(':id/dispute')
@@ -196,7 +172,7 @@ export class BookingsController {
 export class ProviderBookingsController {
   constructor(
     private bookingsService: BookingsService,
-    private chatGateway: ChatGateway,
+    private realtimeGateway: RealtimeGateway,
   ) {}
 
   @Get('requests')
@@ -236,7 +212,7 @@ export class ProviderBookingsController {
     );
 
     if (result.customerId) {
-      this.chatGateway.notifyUser(
+      this.realtimeGateway.notifyUser(
         result.customerId,
         'booking.new_offer',
         result,
@@ -251,20 +227,16 @@ export class ProviderBookingsController {
   @ApiParam({ name: 'id', example: 1 })
   async acceptBooking(
     @CurrentUser() user: any,
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string, // Change to string to see raw value
   ) {
+    console.log(
+      `[ProviderBookingsController] acceptBooking called with id: ${id} (raw string)`,
+    );
     const result = await this.bookingsService.acceptBooking(
       BigInt(user.userId),
       BigInt(id),
     );
 
-    if (result.customerId) {
-      this.chatGateway.notifyUser(
-        result.customerId,
-        'booking.accepted_legacy',
-        result,
-      );
-    }
     return result;
   }
 
@@ -275,14 +247,8 @@ export class ProviderBookingsController {
     @CurrentUser() user: any,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    const result = await this.bookingsService.startBooking(
-      BigInt(user.userId),
-      BigInt(id),
-    );
-    if (result.customerId) {
-      this.chatGateway.notifyUser(result.customerId, 'booking.started', result);
-    }
-    return result;
+    // NOTE: booking_status_changed event is already emitted by service
+    return this.bookingsService.startBooking(BigInt(user.userId), BigInt(id));
   }
 
   @Patch(':id/complete')
@@ -292,17 +258,20 @@ export class ProviderBookingsController {
     @CurrentUser() user: any,
     @Param('id', ParseIntPipe) id: number,
   ) {
+    // NOTE: booking_status_changed event is already emitted by service
     const result = await this.bookingsService.completeBooking(
       BigInt(user.userId),
       BigInt(id),
     );
+
     if (result.customerId) {
-      this.chatGateway.notifyUser(
+      this.realtimeGateway.notifyUser(
         result.customerId,
         'booking.completed',
         result,
       );
     }
+
     return result;
   }
 }

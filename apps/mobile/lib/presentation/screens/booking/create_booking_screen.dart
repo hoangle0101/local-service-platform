@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
 import 'dart:async';
 import '../../../core/theme/app_colors.dart';
+import 'package:geolocator/geolocator.dart'; // Added geolocator
 import '../../../core/entities/entities.dart';
 import '../../../data/datasources/track_asia_datasource.dart';
 import '../../../data/storage/secure_storage.dart';
@@ -650,17 +651,64 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
     );
   }
 
-  void _getCurrentLocation() {
-    setState(() {
-      _addressController.text = 'Hoàn Kiếm, Hà Nội, Việt Nam';
-      _latitude = 21.0285;
-      _longitude = 105.8542;
-    });
+  Future<void> _getCurrentLocation() async {
+    setState(() => _latitude = 0); // Trigger loading state if needed on UI
+
+    try {
+      // 1. Check permissions
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          _showSnackBar('Cần cấp quyền vị trí để sử dụng tính năng này.',
+              isError: true);
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        _showSnackBar(
+            'Quyền vị trí bị từ chối vĩnh viễn. Hãy kiểm tra cài đặt.',
+            isError: true);
+        return;
+      }
+
+      // 2. Get Position
+      // 2. Get Position - Silent update
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // 3. Reverse Geocode
+      final fullAddress = await _trackAsiaDataSource.reverseGeocode(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (mounted) {
+        setState(() {
+          _latitude = position.latitude;
+          _longitude = position.longitude;
+          _addressController.text = fullAddress?.displayText ??
+              '${position.latitude}, ${position.longitude}';
+        });
+
+        // Silent success
+      }
+    } catch (e) {
+      debugPrint('Location error: $e');
+      _showSnackBar('Không thể lấy vị trí hiện tại: $e', isError: true);
+    }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Đã cập nhật vị trí hiện tại (Hà Nội)'),
+        content: Text(message),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.primary,
+        backgroundColor: isError ? AppColors.error : AppColors.success,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );

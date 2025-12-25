@@ -40,7 +40,7 @@ export class MarketplaceController {
   @ApiOperation({ summary: 'Get provider service details by ID' })
   @ApiParam({ name: 'id', example: '1' })
   async getServiceById(@Param('id') id: string) {
-    return this.marketplaceService.getProviderServiceById(parseInt(id));
+    return this.marketplaceService.getProviderServiceById(id);
   }
 
   @Get('providers/:id')

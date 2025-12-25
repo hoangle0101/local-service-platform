@@ -7,8 +7,6 @@ import '../bloc/services/services_bloc.dart';
 import '../bloc/services/services_event_state.dart';
 import '../widgets/service_card.dart';
 import '../widgets/minimalist_widgets.dart';
-import '../widgets/animations/fade_in_animation.dart';
-import '../widgets/animations/slide_in_animation.dart';
 import '../widgets/loading/shimmer_loading.dart';
 
 class CategoryServicesScreen extends StatefulWidget {

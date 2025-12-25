@@ -31,6 +31,7 @@ import '../screens/provider/provider_services_screen.dart';
 import '../screens/provider/job_market_screen.dart';
 import '../screens/provider/navigation_screen.dart';
 import '../screens/chat/chat_screen.dart';
+import '../screens/notifications_screen.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -38,6 +39,10 @@ final router = GoRouter(
     GoRoute(
       path: '/',
       builder: (context, state) => const GuestHomeScreen(),
+    ),
+    GoRoute(
+      path: '/notifications',
+      builder: (context, state) => const NotificationsScreen(),
     ),
 
     // Authentication Routes

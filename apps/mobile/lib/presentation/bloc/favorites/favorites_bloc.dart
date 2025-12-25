@@ -83,10 +83,11 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
     ToggleFavorite event,
     Emitter<FavoritesState> emit,
   ) async {
-    final isFavorite = state.favoriteIds.contains(event.serviceId);
+    final originalFavoriteIds = state.favoriteIds;
+    final isFavorite = originalFavoriteIds.contains(event.serviceId);
 
     // Optimistic update
-    final newFavoriteIds = Set<int>.from(state.favoriteIds);
+    final newFavoriteIds = Set<int>.from(originalFavoriteIds);
     if (isFavorite) {
       newFavoriteIds.remove(event.serviceId);
     } else {
@@ -114,14 +115,20 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
       success = await _dataSource.addFavorite(event.serviceId);
     }
 
-    // Revert on failure
+    // Handle result
     if (!success) {
+      // Revert to original state on failure
       if (state is FavoritesLoaded) {
         emit(FavoritesLoaded(
           items: (state as FavoritesLoaded).items,
-          favoriteIds: state.favoriteIds,
+          favoriteIds: originalFavoriteIds,
         ));
+      } else {
+        emit(FavoritesLoading(favoriteIds: originalFavoriteIds));
       }
+    } else {
+      // Refresh to ensure full synchronization with server
+      add(LoadFavorites());
     }
   }
 
@@ -129,8 +136,10 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
     RemoveFavorite event,
     Emitter<FavoritesState> emit,
   ) async {
+    final originalFavoriteIds = state.favoriteIds;
+
     // Optimistic update
-    final newFavoriteIds = Set<int>.from(state.favoriteIds)
+    final newFavoriteIds = Set<int>.from(originalFavoriteIds)
       ..remove(event.serviceId);
 
     if (state is FavoritesLoaded) {
@@ -140,9 +149,28 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
             currentItems.where((i) => i.serviceId != event.serviceId).toList(),
         favoriteIds: newFavoriteIds,
       ));
+    } else {
+      emit(FavoritesLoading(favoriteIds: newFavoriteIds));
     }
 
-    await _dataSource.removeFavorite(event.serviceId);
+    // Perform API call
+    final success = await _dataSource.removeFavorite(event.serviceId);
+
+    // Handle result
+    if (!success) {
+      // Revert on failure
+      if (state is FavoritesLoaded) {
+        emit(FavoritesLoaded(
+          items: (state as FavoritesLoaded).items,
+          favoriteIds: originalFavoriteIds,
+        ));
+      } else {
+        emit(FavoritesLoading(favoriteIds: originalFavoriteIds));
+      }
+    } else {
+      // Refresh to ensure full synchronization
+      add(LoadFavorites());
+    }
   }
 
   /// Check if a service is favorited
