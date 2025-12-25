@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { BookingPaymentService } from '../payment/booking-payment.service';
 import {
   RealtimeGateway,
   SocketEvents,
@@ -26,6 +27,7 @@ export class BookingsService {
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
     private realtimeGateway: RealtimeGateway,
+    private bookingPaymentService: BookingPaymentService,
   ) {}
 
   // POST /bookings/estimate
@@ -352,7 +354,9 @@ export class BookingsService {
           latitude: dto.latitude,
           longitude: dto.longitude,
           scheduledAt: new Date(dto.scheduledAt).toISOString(),
-          estimatedPrice: booking.estimated_price ? Number(booking.estimated_price) : undefined,
+          estimatedPrice: booking.estimated_price
+            ? Number(booking.estimated_price)
+            : undefined,
         });
       }
 
@@ -1278,7 +1282,6 @@ export class BookingsService {
       throw new ForbiddenException('Not your booking');
     }
 
-
     if (!['pending', 'accepted'].includes(booking.status)) {
       throw new BadRequestException('Cannot cancel booking in current status');
     }
@@ -1305,8 +1308,8 @@ export class BookingsService {
       // Notify the other party
       const targetUserId = isCustomer ? booking.providerId : booking.customerId;
       if (targetUserId) {
-        const message = isCustomer 
-          ? 'Khách hàng đã hủy đơn đặt lịch' 
+        const message = isCustomer
+          ? 'Khách hàng đã hủy đơn đặt lịch'
           : 'Thợ đã từ chối yêu cầu đặt lịch';
 
         this.realtimeGateway.emitBookingStatusChange(
@@ -1341,8 +1344,10 @@ export class BookingsService {
 
   // PATCH /provider/bookings/:id/accept
   async acceptBooking(providerId: bigint, bookingId: bigint) {
-    console.log(`[acceptBooking] START - providerId: ${providerId} (type: ${typeof providerId}), bookingId: ${bookingId} (type: ${typeof bookingId})`);
-    
+    console.log(
+      `[acceptBooking] START - providerId: ${providerId} (type: ${typeof providerId}), bookingId: ${bookingId} (type: ${typeof bookingId})`,
+    );
+
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
     });
@@ -1356,18 +1361,26 @@ export class BookingsService {
       id: booking.id.toString(),
       status: booking.status,
       assignedProviderId: booking.providerId?.toString(),
-      customerId: booking.customerId.toString()
+      customerId: booking.customerId.toString(),
     });
 
     // BUSINESS RULE: Only the specifically assigned provider can directly 'accept'
     if (booking.providerId === null) {
-      console.warn(`[acceptBooking] WARNING: Booking ${bookingId} is a general booking, cannot accept legacy.`);
-      throw new ForbiddenException('Đơn hàng này cần báo giá trước, không thể nhận trực tiếp.');
+      console.warn(
+        `[acceptBooking] WARNING: Booking ${bookingId} is a general booking, cannot accept legacy.`,
+      );
+      throw new ForbiddenException(
+        'Đơn hàng này cần báo giá trước, không thể nhận trực tiếp.',
+      );
     }
 
     if (booking.providerId !== providerId) {
-      console.error(`[acceptBooking] ID Mismatch: booking.providerId(${booking.providerId}) !== providerId(${providerId})`);
-      throw new ForbiddenException('Bạn không phải là thợ được chỉ định cho đơn hàng này.');
+      console.error(
+        `[acceptBooking] ID Mismatch: booking.providerId(${booking.providerId}) !== providerId(${providerId})`,
+      );
+      throw new ForbiddenException(
+        'Bạn không phải là thợ được chỉ định cho đơn hàng này.',
+      );
     }
 
     if (booking.status !== 'pending') {
@@ -1538,21 +1551,29 @@ export class BookingsService {
     }
 
     return await this.prisma.$transaction(async (tx) => {
+      const actualPrice =
+        booking.estimatedPrice || booking.providerServicePrice || 0;
+      const platformFee = Math.round(Number(actualPrice) * 0.1);
+      const providerEarning = Number(actualPrice) - platformFee;
+
       const updated = await tx.booking.update({
         where: { id: bookingId },
         data: {
-          status: 'pending_completion', // Wait for customer confirmation
-          actualPrice: booking.estimatedPrice,
+          status: 'pending_payment' as any,
+          actualPrice,
+          platformFee,
+          providerEarning,
+          completedAt: new Date(),
         },
       });
 
       await tx.bookingEvent.create({
         data: {
           bookingId,
-          previousStatus: 'in_progress',
-          newStatus: 'pending_completion',
+          previousStatus: booking.status,
+          newStatus: 'pending_payment' as any,
           actorUserId: providerId,
-          note: 'Provider marked service as complete, awaiting customer confirmation',
+          note: 'Dịch vụ hoàn thành (legacy call), chờ thanh toán',
         },
       });
 
@@ -1603,15 +1624,26 @@ export class BookingsService {
       throw new ForbiddenException('Not your booking');
     }
 
-    if (booking.status !== 'pending_completion') {
-      throw new BadRequestException('Booking is not pending completion');
+    if (
+      booking.status !== 'pending_completion' &&
+      !(booking.status === 'completed' && booking.paymentStatus === 'held')
+    ) {
+      throw new BadRequestException(
+        `Đơn hàng không ở trạng thái chờ hoàn tất (Hiện tại: ${booking.status}, Payment: ${booking.paymentStatus})`,
+      );
     }
 
     return await this.prisma.$transaction(async (tx) => {
+      // If it has escrow payment, release it
+      if (booking.paymentStatus === 'held') {
+        await this.bookingPaymentService.releaseEscrow(bookingId, customerId);
+      }
+
       const updated = await tx.booking.update({
         where: { id: bookingId },
         data: {
           status: 'completed',
+          paymentStatus: 'paid', // Mark as fully paid/released
           completedAt: new Date(),
         },
       });

@@ -31,7 +31,7 @@ export class AdminService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Resolve dispute
+   * Resolve dispute - handles escrow release/refund
    */
   async resolveDispute(
     disputeId: bigint,
@@ -41,13 +41,23 @@ export class AdminService {
     const dispute = await this.prisma.dispute.findUnique({
       where: { id: disputeId },
       include: {
-        booking: { include: { customer: { include: { wallet: true } } } },
+        booking: {
+          include: {
+            customer: { include: { wallet: true } },
+            providerUser: { include: { wallet: true } },
+          },
+        },
       },
     });
 
     if (!dispute) {
       throw new NotFoundException('Dispute not found');
     }
+
+    // Find related BookingPayment
+    const bookingPayment = await this.prisma.bookingPayment.findUnique({
+      where: { bookingId: dispute.bookingId },
+    });
 
     return this.prisma.$transaction(async (tx) => {
       // Update dispute
@@ -58,42 +68,174 @@ export class AdminService {
           resolution: dto.resolution,
           resolvedByAdminId: adminId,
           resolvedAt: new Date(),
-          // adminNotes: dto.notes // Schema doesn't have adminNotes yet.
         },
       });
 
-      // Process refund if in favor of customer
       const refundAmt = dto.refundAmount || 0;
+      const now = new Date();
+
+      // Handle escrow based on resolution
       if (
-        (dto.resolution === 'full_refund_to_customer' ||
-          dto.resolution === 'partial_refund_to_customer') &&
-        refundAmt > 0
+        dto.resolution === 'full_refund_to_customer' ||
+        dto.resolution === 'partial_refund_to_customer'
       ) {
-        const refundAmount = new Decimal(refundAmt);
+        // REFUND: Customer wins
+        if (refundAmt > 0) {
+          const refundAmount = new Decimal(refundAmt);
 
-        // Create refund transaction
-        await tx.walletTransaction.create({
-          data: {
-            walletUserId: dispute.booking.customerId,
-            type: 'refund',
-            amount: refundAmount,
-            balanceAfter: dispute.booking.customer.wallet
-              ? dispute.booking.customer.wallet.balance.plus(refundAmount)
-              : refundAmount, // Should check wallet existence, assuming it exists for now
-            status: 'completed',
-            metadata: {
-              description: `Dispute refund for booking #${dispute.bookingId}`,
-              disputeId: disputeId.toString(),
+          // Create refund transaction
+          await tx.walletTransaction.create({
+            data: {
+              walletUserId: dispute.booking.customerId,
+              type: 'refund',
+              amount: refundAmount,
+              balanceAfter: dispute.booking.customer.wallet
+                ? dispute.booking.customer.wallet.balance.plus(refundAmount)
+                : refundAmount,
+              status: 'completed',
+              metadata: {
+                description: `Dispute refund for booking #${dispute.bookingId}`,
+                disputeId: disputeId.toString(),
+                resolution: dto.resolution,
+              },
             },
-          },
-        });
+          });
 
-        // Update wallet balance
-        await tx.wallet.update({
-          where: { userId: dispute.booking.customerId },
-          data: { balance: { increment: refundAmount } },
-        });
+          // Update customer wallet balance
+          await tx.wallet.upsert({
+            where: { userId: dispute.booking.customerId },
+            create: {
+              userId: dispute.booking.customerId,
+              balance: refundAmount,
+            },
+            update: {
+              balance: { increment: refundAmount },
+            },
+          });
+        }
+
+        // Update BookingPayment status to refunded
+        if (bookingPayment) {
+          await tx.bookingPayment.update({
+            where: { id: bookingPayment.id },
+            data: {
+              status: 'refunded',
+              refundedAt: now,
+              refundAmount: refundAmt,
+              refundReason: dto.notes || `Dispute resolved: ${dto.resolution}`,
+            },
+          });
+        }
+
+        console.log(
+          `[Admin] Dispute ${disputeId} resolved: Refunded ${refundAmt} to customer`,
+        );
+      } else if (dto.resolution === 'full_payment_to_provider') {
+        // RELEASE: Provider wins - release escrow to provider
+        if (bookingPayment && dispute.booking.providerId) {
+          const providerAmount = Number(bookingPayment.providerAmount);
+
+          // Add earnings to provider wallet
+          const updatedWallet = await tx.wallet.upsert({
+            where: { userId: dispute.booking.providerId },
+            create: {
+              userId: dispute.booking.providerId,
+              balance: providerAmount,
+            },
+            update: {
+              balance: { increment: providerAmount },
+            },
+          });
+
+          // Create wallet transaction
+          await tx.walletTransaction.create({
+            data: {
+              walletUserId: dispute.booking.providerId,
+              type: 'earning',
+              amount: providerAmount,
+              balanceAfter: updatedWallet.balance,
+              status: 'completed',
+              metadata: {
+                bookingPaymentId: bookingPayment.id.toString(),
+                bookingId: dispute.bookingId.toString(),
+                source: 'dispute_resolution',
+                disputeId: disputeId.toString(),
+              },
+            },
+          });
+
+          // Update BookingPayment status to released
+          await tx.bookingPayment.update({
+            where: { id: bookingPayment.id },
+            data: {
+              status: 'released',
+              releasedAt: now,
+            },
+          });
+
+          console.log(
+            `[Admin] Dispute ${disputeId} resolved: Released ${providerAmount} to provider`,
+          );
+        }
+      } else if (dto.resolution === 'mutual_cancellation') {
+        // MUTUAL: Both parties agree to cancel
+        // Refund customer minus a small processing fee (5%)
+        if (bookingPayment) {
+          const totalAmount = Number(bookingPayment.amount);
+          const processingFee = Math.round(totalAmount * 0.05);
+          const refundToCustomer = totalAmount - processingFee;
+
+          if (refundToCustomer > 0) {
+            await tx.wallet.upsert({
+              where: { userId: dispute.booking.customerId },
+              create: {
+                userId: dispute.booking.customerId,
+                balance: refundToCustomer,
+              },
+              update: {
+                balance: { increment: refundToCustomer },
+              },
+            });
+
+            await tx.walletTransaction.create({
+              data: {
+                walletUserId: dispute.booking.customerId,
+                type: 'refund',
+                amount: refundToCustomer,
+                balanceAfter: (
+                  dispute.booking.customer.wallet?.balance || new Decimal(0)
+                ).plus(refundToCustomer),
+                status: 'completed',
+                metadata: {
+                  description: `Mutual cancellation refund (minus 5% fee)`,
+                  disputeId: disputeId.toString(),
+                  processingFee,
+                },
+              },
+            });
+          }
+
+          await tx.bookingPayment.update({
+            where: { id: bookingPayment.id },
+            data: {
+              status: 'refunded',
+              refundedAt: now,
+              refundAmount: refundToCustomer,
+              refundReason: `Mutual cancellation (processing fee: ${processingFee})`,
+            },
+          });
+
+          console.log(
+            `[Admin] Dispute ${disputeId} resolved: Mutual cancellation, refunded ${refundToCustomer}`,
+          );
+        }
       }
+
+      // Restore booking status to completed (dispute is resolved)
+      await tx.booking.update({
+        where: { id: dispute.bookingId },
+        data: { status: 'completed' },
+      });
 
       // Create audit log
       await tx.auditLog.create({
@@ -107,11 +249,19 @@ export class AdminService {
             resolution: dto.resolution,
             refundAmount: dto.refundAmount,
             notes: dto.notes,
+            bookingPaymentStatus: bookingPayment
+              ? dto.resolution.includes('refund')
+                ? 'refunded'
+                : 'released'
+              : null,
           },
         },
       });
 
-      return { message: 'Dispute resolved successfully' };
+      return {
+        message: 'Dispute resolved successfully',
+        resolution: dto.resolution,
+      };
     });
   }
 

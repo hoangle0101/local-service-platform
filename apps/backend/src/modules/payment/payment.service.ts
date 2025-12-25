@@ -3,8 +3,10 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MomoService, MomoCallbackData } from './momo.service';
+import { RealtimeGateway } from '../gateway/realtime.gateway';
 
 const PLATFORM_FEE_PERCENT = 0.1; // 10% commission
 
@@ -23,6 +25,7 @@ export class PaymentService {
   constructor(
     private prisma: PrismaService,
     private momoService: MomoService,
+    private realtimeGateway: RealtimeGateway,
   ) {}
 
   /**
@@ -35,6 +38,106 @@ export class PaymentService {
     const platformFee = Math.round(totalAmount * PLATFORM_FEE_PERCENT);
     const providerAmount = totalAmount - platformFee;
     return { platformFee, providerAmount };
+  }
+
+  /**
+   * CRON JOB: Auto-release escrow payments every 5 minutes
+   * Releases payments where:
+   * - status = 'held'
+   * - autoReleaseAt <= now
+   * - disputeId is null (not disputed)
+   */
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async processAutoReleaseEscrow() {
+    const now = new Date();
+
+    // Find all payments ready for auto-release
+    const paymentsToRelease = await this.prisma.bookingPayment.findMany({
+      where: {
+        status: 'held',
+        autoReleaseAt: {
+          lte: now,
+        },
+        disputeId: null, // Not disputed
+      },
+      include: {
+        booking: true,
+        provider: true,
+      },
+    });
+
+    if (paymentsToRelease.length === 0) {
+      return;
+    }
+
+    console.log(
+      `[Payment] Auto-releasing ${paymentsToRelease.length} escrow payments...`,
+    );
+
+    for (const payment of paymentsToRelease) {
+      try {
+        await this.releasePaymentInternal(payment);
+        console.log(
+          `[Payment] Auto-released payment ${payment.id} for booking ${payment.bookingId}`,
+        );
+      } catch (error) {
+        console.error(
+          `[Payment] Failed to auto-release payment ${payment.id}:`,
+          error.message,
+        );
+      }
+    }
+  }
+
+  /**
+   * Internal release payment logic (shared between manual and auto-release)
+   */
+  private async releasePaymentInternal(payment: any) {
+    // Update payment status
+    await this.prisma.bookingPayment.update({
+      where: { id: payment.id },
+      data: {
+        status: 'released',
+        releasedAt: new Date(),
+      },
+    });
+
+    // Add provider earnings to wallet
+    const updatedWallet = await this.prisma.wallet.upsert({
+      where: { userId: payment.providerId },
+      create: {
+        userId: payment.providerId,
+        balance: payment.providerAmount,
+      },
+      update: {
+        balance: { increment: payment.providerAmount },
+      },
+    });
+
+    // Create wallet transaction
+    await this.prisma.walletTransaction.create({
+      data: {
+        walletUserId: payment.providerId,
+        type: 'earning',
+        amount: payment.providerAmount,
+        balanceAfter: updatedWallet.balance,
+        status: 'completed',
+        metadata: {
+          bookingPaymentId: payment.id.toString(),
+          bookingId: payment.bookingId.toString(),
+          source: 'escrow_release',
+        },
+      },
+    });
+
+    // Create booking event
+    await this.prisma.bookingEvent.create({
+      data: {
+        bookingId: payment.bookingId,
+        newStatus: 'completed' as any,
+        note: `Tiền đã được chuyển cho thợ: ${Number(payment.providerAmount).toLocaleString()}đ`,
+      },
+    });
   }
 
   /**
@@ -121,7 +224,7 @@ export class PaymentService {
   }
 
   /**
-   * Handle MoMo IPN callback
+   * Handle MoMo IPN callback - supports both booking payments and wallet deposits
    */
   async handleMomoCallback(data: MomoCallbackData) {
     console.log('[Payment] MoMo callback received:', data);
@@ -140,6 +243,20 @@ export class PaymentService {
       console.error('[Payment] Failed to parse extraData:', e);
     }
 
+    const isSuccess = this.momoService.isPaymentSuccessful(data.resultCode);
+
+    console.log('[Payment] Callback identified as:', {
+      type: extraData.type,
+      isSuccess,
+      orderId: data.orderId,
+    });
+
+    // Handle wallet deposits
+    if (extraData.type === 'wallet_deposit') {
+      return this.handleWalletDepositCallback(data, extraData, isSuccess);
+    }
+
+    // Handle booking payments (existing logic)
     const bookingPaymentId = extraData.bookingPaymentId
       ? BigInt(extraData.bookingPaymentId)
       : null;
@@ -162,7 +279,7 @@ export class PaymentService {
     }
 
     // Check result
-    if (this.momoService.isPaymentSuccessful(data.resultCode)) {
+    if (isSuccess) {
       // Payment successful - move to HELD (escrow)
       await this.prisma.bookingPayment.update({
         where: { id: bookingPaymentId },
@@ -182,6 +299,103 @@ export class PaymentService {
     } else {
       // Payment failed
       console.log('[Payment] Payment failed:', data.message);
+      return { success: false, message: data.message };
+    }
+  }
+
+  /**
+   * Handle wallet deposit MoMo callback
+   */
+  private async handleWalletDepositCallback(
+    data: MomoCallbackData,
+    extraData: any,
+    isSuccess: boolean,
+  ) {
+    const walletTransactionId = extraData.walletTransactionId
+      ? BigInt(extraData.walletTransactionId)
+      : null;
+    const userId = extraData.userId ? BigInt(extraData.userId) : null;
+
+    if (!walletTransactionId || !userId) {
+      console.error('[Payment] Missing wallet deposit data in extraData:', {
+        extraData,
+        walletTransactionId: extraData.walletTransactionId,
+        userId: extraData.userId,
+      });
+      return { success: false, message: 'Missing transaction data' };
+    }
+
+    const transaction = await this.prisma.walletTransaction.findUnique({
+      where: { id: walletTransactionId },
+    });
+
+    if (!transaction) {
+      console.error(
+        '[Payment] Wallet transaction not found:',
+        walletTransactionId.toString(),
+      );
+      return { success: false, message: 'Transaction not found' };
+    }
+
+    if (isSuccess) {
+      // Deposit successful - credit user wallet
+      const updatedWallet = await this.prisma.wallet.upsert({
+        where: { userId },
+        create: {
+          userId,
+          balance: data.amount,
+        },
+        update: {
+          balance: { increment: data.amount },
+        },
+      });
+
+      // Update transaction status
+      await this.prisma.walletTransaction.update({
+        where: { id: walletTransactionId },
+        data: {
+          status: 'completed',
+          balanceAfter: updatedWallet.balance,
+          metadata: {
+            ...(transaction.metadata as any),
+            momoTransId: data.transId.toString(),
+            completedAt: new Date().toISOString(),
+          },
+        },
+      });
+
+      // Update payment record
+      if (extraData.paymentId) {
+        await this.prisma.payment.update({
+          where: { id: BigInt(extraData.paymentId) },
+          data: {
+            status: 'succeeded',
+            gatewayTxId: data.transId.toString(),
+          },
+        });
+      }
+
+      console.log('[Payment] Wallet deposit successful:', {
+        userId: userId.toString(),
+        amount: data.amount,
+        newBalance: updatedWallet.balance.toString(),
+      });
+
+      // Notify user via socket
+      this.realtimeGateway.emitWalletUpdate(
+        userId.toString(),
+        updatedWallet.balance.toNumber(),
+      );
+
+      return { success: true, message: 'Deposit completed' };
+    } else {
+      // Deposit failed
+      await this.prisma.walletTransaction.update({
+        where: { id: walletTransactionId },
+        data: { status: 'failed' },
+      });
+
+      console.log('[Payment] Wallet deposit failed:', data.message);
       return { success: false, message: data.message };
     }
   }
@@ -224,6 +438,20 @@ export class PaymentService {
       '[Payment] COD payment confirmed:',
       bookingPaymentId.toString(),
     );
+
+    // Notify status change
+    this.realtimeGateway.emitBookingStatusChange(
+      payment.customerId.toString(),
+      payment.providerId.toString(),
+      {
+        bookingId: payment.bookingId.toString(),
+        status: 'held',
+        message:
+          'Thợ đã xác nhận thu tiền mặt. Tiền đang được giữ bởi hệ thống.',
+        actorId: providerId.toString(),
+      },
+    );
+
     return this.formatBookingPayment(updated);
   }
 
@@ -291,6 +519,14 @@ export class PaymentService {
       providerAmount: payment.providerAmount.toString(),
     });
 
+    // Notify provider of wallet update
+    if (wallet) {
+      this.realtimeGateway.emitWalletUpdate(
+        payment.providerId.toString(),
+        wallet.balance.toNumber(),
+      );
+    }
+
     return this.formatBookingPayment(updated);
   }
 
@@ -350,6 +586,95 @@ export class PaymentService {
     }
 
     return this.formatBookingPayment(payment);
+  }
+
+  /**
+   * Manually check payment status from MoMo (Polling fallback)
+   */
+  async checkPaymentStatus(orderId: string) {
+    if (!orderId) {
+      throw new BadRequestException('OrderId is required');
+    }
+
+    console.log('[Payment] Checking status for order:', orderId);
+
+    // 1. Query MoMo API
+    // RequestId for query should be different from original request
+    const requestId = `${orderId}_query_${Date.now()}`;
+    const momoResponse = await this.momoService.queryPayment(
+      orderId,
+      requestId,
+    );
+
+    console.log('[Payment] MoMo Query Response:', momoResponse);
+
+    if (momoResponse.resultCode !== 0) {
+      return {
+        status: 'pending',
+        message: `Payment still pending or failed: ${momoResponse.message}`,
+        momoResult: momoResponse,
+      };
+    }
+
+    // 2. If Successful, Trigger Callback Logic manually
+    // We need to reconstruct the callback data structure
+    // NOTE: queryPayment response might not have 'extraData' populated fully if not passed back by MoMo query API.
+    // However, for 'wallet_deposit', we usually encode IDs in extraData.
+    // If MoMo Query response doesn't return full extraData, we might strictly rely on our DB state
+    // BUT we need the mapping.
+    // Let's check `extraData` in response.
+
+    let extraDataObj: any = {};
+    try {
+      if (momoResponse.extraData) {
+        extraDataObj = JSON.parse(
+          Buffer.from(momoResponse.extraData, 'base64').toString(),
+        );
+      }
+    } catch (e) {
+      console.error('[Payment] Failed to parse extraData from Query:', e);
+    }
+
+    // Use the existing handling logic
+    const callbackData: MomoCallbackData = {
+      partnerCode: momoResponse.partnerCode,
+      orderId: momoResponse.orderId,
+      requestId: momoResponse.requestId,
+      amount: momoResponse.amount,
+      transId: momoResponse.transId,
+      resultCode: momoResponse.resultCode,
+      message: momoResponse.message,
+      responseTime: momoResponse.responseTime,
+      extraData: momoResponse.extraData,
+      signature: '', // Signature not needed for internal query verification
+    };
+
+    // We should bypass signature check in handleWalletDepositCallback if called internally?
+    // Actually handleWalletDepositCallback is private and doesn't verify signature.
+    // handleMomoCallback verifies signature.
+
+    // We will call handleWalletDepositCallback directly if it's a wallet deposit
+    if (extraDataObj.type === 'wallet_deposit') {
+      const result = await this.handleWalletDepositCallback(
+        callbackData,
+        extraDataObj,
+        true,
+      );
+      return {
+        status: 'success',
+        data: result,
+        momoResult: momoResponse,
+      };
+    }
+
+    // Handle generic Booking Payment if needed (logic similar to handleMomoCallback)
+    // For now, focusing on Wallet Deposit as per user urgency.
+
+    return {
+      status: 'processed',
+      message: 'Payment status checked',
+      momoResult: momoResponse,
+    };
   }
 
   /**

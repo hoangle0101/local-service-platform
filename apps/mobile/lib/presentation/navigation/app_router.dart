@@ -32,6 +32,10 @@ import '../screens/provider/job_market_screen.dart';
 import '../screens/provider/navigation_screen.dart';
 import '../screens/chat/chat_screen.dart';
 import '../screens/notifications_screen.dart';
+import '../screens/wallet/wallet_deposit_screen.dart';
+import '../screens/booking/booking_detail_screen.dart';
+import '../screens/booking/booking_dispute_screen.dart';
+import '../bloc/bookings/bookings_event_state.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -214,6 +218,10 @@ final router = GoRouter(
       builder: (context, state) => const ProviderWithdrawScreen(),
     ),
     GoRoute(
+      path: '/wallet/deposit',
+      builder: (context, state) => const WalletDepositScreen(),
+    ),
+    GoRoute(
       path: '/provider/services',
       builder: (context, state) => const ProviderServicesScreen(),
     ),
@@ -300,6 +308,21 @@ final router = GoRouter(
           categoryId: id,
           category: category,
         );
+      },
+    ),
+    GoRoute(
+      path: '/booking/detail/:id',
+      builder: (context, state) {
+        final isProvider = state.uri.queryParameters['isProvider'] == 'true';
+        final booking = state.extra as Booking;
+        return BookingDetailScreen(booking: booking, isProvider: isProvider);
+      },
+    ),
+    GoRoute(
+      path: '/booking/dispute/:id',
+      builder: (context, state) {
+        final id = state.pathParameters['id']!;
+        return BookingDisputeScreen(bookingId: id);
       },
     ),
   ],

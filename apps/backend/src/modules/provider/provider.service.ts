@@ -372,7 +372,7 @@ export class ProviderService {
       totalBookings,
       completedBookings,
       pendingBookings,
-      earnings,
+      earningsAggregate,
       provider,
     ] = await Promise.all([
       // Total bookings
@@ -390,25 +390,36 @@ export class ProviderService {
           status: { in: ['pending', 'accepted', 'in_progress'] },
         },
       }),
-      // Total earnings (completed bookings)
+      // Earnings breakdown from completed bookings
       this.prisma.booking.aggregate({
         where: {
           providerId: userId,
           status: 'completed',
         },
         _sum: {
-          providerEarning: true,
+          actualPrice: true, // Total customer paid
+          platformFee: true, // Platform fee
+          providerEarning: true, // Provider earning (after fee)
         },
       }),
       // Provider profile
       this.prisma.providerProfile.findUnique({
         where: { userId },
-        include: { user: true }
+        include: { user: true },
       }),
     ]);
 
-    const totalEarningsValue = earnings._sum?.providerEarning
-      ? Number(earnings._sum.providerEarning)
+    // Calculate earnings breakdown
+    const totalCustomerPaid = earningsAggregate._sum?.actualPrice
+      ? Number(earningsAggregate._sum.actualPrice)
+      : 0;
+
+    const totalPlatformFee = earningsAggregate._sum?.platformFee
+      ? Number(earningsAggregate._sum.platformFee)
+      : 0;
+
+    const totalProviderEarning = earningsAggregate._sum?.providerEarning
+      ? Number(earningsAggregate._sum.providerEarning)
       : 0;
 
     return {
@@ -417,7 +428,14 @@ export class ProviderService {
       completedJobs: completedBookings, // Alias for frontend compatibility
       pendingBookings,
       pendingJobs: pendingBookings, // Alias for frontend compatibility
-      totalEarnings: totalEarningsValue,
+
+      // Earnings breakdown
+      totalEarnings: totalProviderEarning, // What provider actually receives
+      totalCustomerPaid, // Total amount customers paid
+      totalPlatformFee, // Platform commission
+      providerEarning: totalProviderEarning, // Alias
+
+      // Additional stats
       rating: provider?.ratingAvg ? Number(provider.ratingAvg) : 0,
       ratingAvg: provider?.ratingAvg?.toString() || '0',
       ratingCount: provider?.ratingCount || 0,

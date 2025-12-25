@@ -8,6 +8,7 @@ class WalletBalanceCard extends StatelessWidget {
   final double pendingBalance;
   final double totalEarnings;
   final VoidCallback? onWithdraw;
+  final VoidCallback? onDeposit;
   final VoidCallback? onHistory;
   final bool isLoading;
 
@@ -17,6 +18,7 @@ class WalletBalanceCard extends StatelessWidget {
     this.pendingBalance = 0,
     this.totalEarnings = 0,
     this.onWithdraw,
+    this.onDeposit,
     this.onHistory,
     this.isLoading = false,
   });
@@ -193,19 +195,30 @@ class WalletBalanceCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _buildActionButton(
-                        icon: Icons.account_balance_wallet_outlined,
-                        label: 'Rút tiền',
-                        onTap: onWithdraw,
+                        icon: Icons.add_circle_outline_rounded,
+                        label: 'Nạp tiền',
+                        onTap: onDeposit,
                         isPrimary: true,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildActionButton(
+                        icon: Icons.account_balance_wallet_outlined,
+                        label: 'Rút tiền',
+                        onTap: onWithdraw,
+                        isPrimary: false,
+                        backgroundColor: Colors.white.withOpacity(0.15),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _buildActionButton(
                         icon: Icons.history,
                         label: 'Lịch sử',
                         onTap: onHistory,
                         isPrimary: false,
+                        backgroundColor: Colors.white.withOpacity(0.15),
                       ),
                     ),
                   ],
@@ -260,14 +273,16 @@ class WalletBalanceCard extends StatelessWidget {
     required String label,
     required VoidCallback? onTap,
     required bool isPrimary,
+    Color? backgroundColor,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isPrimary ? Colors.white : Colors.white.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(14),
+          color: backgroundColor ??
+              (isPrimary ? Colors.white : Colors.white.withOpacity(0.2)),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -179,6 +179,7 @@ class _ProviderWalletScreenState extends State<ProviderWalletScreen>
               pendingBalance: _balance?.pendingBalance ?? 0,
               totalEarnings: _balance?.totalEarnings ?? 0,
               onWithdraw: _navigateToWithdraw,
+              onDeposit: () => context.push('/wallet/deposit'),
               onHistory: _navigateToHistory,
             ),
           ),

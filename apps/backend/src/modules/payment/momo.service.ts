@@ -24,7 +24,7 @@ export interface MomoCallbackData {
   orderId: string;
   requestId: string;
   amount: number;
-  transId: number;
+  transId: string | number;
   resultCode: number;
   message: string;
   responseTime: number;
@@ -40,7 +40,8 @@ export class MomoService {
     secretKey: 'K951B6PE1waDMi640xX08PD3vg6EkVlz',
     partnerCode: 'MOMO',
     redirectUrl: 'myapp://',
-    ipnUrl: 'https://0778-14-178-58-205.ngrok-free.app/callback',
+    ipnUrl:
+      'https://renewable-waiting-hunting-regulations.trycloudflare.com/payments/momo/callback',
     requestType: 'captureWallet',
     autoCapture: true,
     lang: 'vi',
@@ -130,6 +131,7 @@ export class MomoService {
     };
 
     console.log('[MoMo] Creating payment:', { orderId, amount, orderInfo });
+    console.log('[MoMo] Request Body:', JSON.stringify(requestBody, null, 2));
 
     try {
       const response = await this.httpRequest(
@@ -177,6 +179,9 @@ export class MomoService {
       .digest('hex');
 
     const isValid = expectedSignature === data.signature;
+    console.log('[MoMo] IPN Raw Signature String:', rawSignature);
+    console.log('[MoMo] Expected Signature:', expectedSignature);
+    console.log('[MoMo] Received Signature:', data.signature);
     console.log(
       '[MoMo] Signature verification:',
       isValid ? 'VALID' : 'INVALID',

@@ -340,6 +340,10 @@ class Booking {
   final int? providerId;
   final List<Map<String, dynamic>>?
       selectedItems; // Items pre-selected by customer
+  final String? paymentStatus;
+  final String? paymentMethod;
+  final String? bookingPaymentId;
+  final DateTime? autoReleaseAt;
 
   Booking({
     required this.id,
@@ -365,6 +369,10 @@ class Booking {
     this.serviceId,
     this.providerId,
     this.selectedItems,
+    this.paymentStatus,
+    this.paymentMethod,
+    this.bookingPaymentId,
+    this.autoReleaseAt,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) {
@@ -409,6 +417,12 @@ class Booking {
       serviceId: _parseIntSafe(json['serviceId'] ?? json['service']?['id']),
       providerId: _parseIntSafe(json['providerId'] ?? json['provider']?['id']),
       selectedItems: selectedItems,
+      paymentStatus: json['paymentStatus'],
+      paymentMethod: json['paymentMethod'],
+      bookingPaymentId: json['bookingPaymentId']?.toString(),
+      autoReleaseAt: json['autoReleaseAt'] != null
+          ? DateTime.tryParse(json['autoReleaseAt'].toString())
+          : null,
     );
   }
 

@@ -267,6 +267,7 @@ class SocketEvents {
   static const String newMessage = 'new_message';
   static const String userTyping = 'user_typing';
   static const String messageRead = 'message_read';
+  static const String walletUpdated = 'wallet_updated';
 }
 
 // ========================
@@ -319,6 +320,11 @@ class SocketService {
       _notificationController.stream;
   Stream<TypingEvent> get typingStream => _typingController.stream;
   Stream<Map<String, dynamic>> get messageStream => _messageController.stream;
+
+  final _walletUpdateController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get walletUpdateStream =>
+      _walletUpdateController.stream;
 
   // Legacy getters for compatibility
   IO.Socket? get socket => _socket;
@@ -468,6 +474,13 @@ class SocketService {
       debugPrint('[SocketService] User typing: $data');
       if (data != null) {
         _typingController.add(TypingEvent.fromJson(data));
+      }
+    });
+
+    _socket!.on(SocketEvents.walletUpdated, (data) {
+      debugPrint('[SocketService] Wallet updated: $data');
+      if (data != null) {
+        _walletUpdateController.add(data as Map<String, dynamic>);
       }
     });
   }

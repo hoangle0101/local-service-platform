@@ -47,6 +47,18 @@ class PaymentDataSource {
     return WalletBalance(balance: 0);
   }
 
+  /// Deposit money to wallet
+  Future<Map<String, dynamic>> deposit({
+    required int amount,
+    required String gateway, // momo
+  }) async {
+    final response = await _dio.post('/wallets/deposit', data: {
+      'amount': amount,
+      'gateway': gateway,
+    });
+    return response.data['data'] ?? response.data;
+  }
+
   /// Get wallet transactions
   Future<List<WalletTransaction>> getTransactions({
     int page = 1,
@@ -209,7 +221,33 @@ class PaymentDataSource {
 
   /// Customer pays via MoMo
   Future<Map<String, dynamic>> payWithMomo(String bookingId) async {
-    final response = await _dio.post('/bookings/$bookingId/pay-momo');
+    final response = await _dio.post('/booking-payments/$bookingId/pay-momo');
+    final data = response.data;
+    if (data is Map<String, dynamic>) {
+      return data.containsKey('data') ? data['data'] : data;
+    }
+    return {};
+  }
+
+  /// Check deposit payment status (polling fallback)
+  Future<Map<String, dynamic>> checkDepositStatus(String orderId) async {
+    final response =
+        await _dio.get('/wallets/check-deposit-status', queryParameters: {
+      'orderId': orderId,
+    });
+    final data = response.data;
+    if (data is Map<String, dynamic>) {
+      return data.containsKey('data') ? data['data'] : data;
+    }
+    return {};
+  }
+
+  /// Check booking payment status (polling fallback for MoMo)
+  Future<Map<String, dynamic>> checkBookingPaymentStatus(String orderId) async {
+    final response = await _dio
+        .get('/booking-payments/check-payment-status', queryParameters: {
+      'orderId': orderId,
+    });
     final data = response.data;
     if (data is Map<String, dynamic>) {
       return data.containsKey('data') ? data['data'] : data;

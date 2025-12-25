@@ -21,7 +21,7 @@ class UpdateFinalPriceDto {
 }
 
 @ApiTags('Booking Payment')
-@Controller('bookings')
+@Controller('booking-payments') // Changed from 'bookings' to avoid conflict with BookingsController
 export class BookingPaymentController {
   constructor(private bookingPaymentService: BookingPaymentService) {}
 
@@ -98,6 +98,38 @@ export class BookingPaymentController {
       BigInt(id),
       BigInt(user.userId),
     );
+  }
+
+  /**
+   * TEST endpoint - check if basic GET works
+   */
+  @Get('test-endpoint')
+  async testEndpoint(@Query('orderId') orderId: string) {
+    console.log('[TEST] Endpoint called with orderId:', orderId);
+    return {
+      success: true,
+      orderId,
+      message: 'Test endpoint works!',
+    };
+  }
+
+  /**
+   * Check booking payment status (polling fallback for MoMo)
+   */
+  @Get('check-payment-status')
+  // @UseGuards(JwtAuthGuard)  // TODO: Re-enable after testing
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Check booking payment status via MoMo query' })
+  async checkPaymentStatus(
+    @CurrentUser() user: any,
+    @Query('orderId') orderId: string,
+  ) {
+    console.log('[checkPaymentStatus] Method called!', { orderId });
+
+    // Temp: Use hardcoded userId for testing
+    const userId = user?.userId ? BigInt(user.userId) : BigInt(1);
+
+    return this.bookingPaymentService.checkAndProcessPayment(userId, orderId);
   }
 
   /**

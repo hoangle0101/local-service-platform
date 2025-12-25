@@ -97,10 +97,14 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
           .where((b) =>
               b.status == 'accepted' ||
               b.status == 'confirmed' ||
-              b.status == 'in_progress' ||
+              b.status == 'in_progress')
+          .length;
+      completedCount = bookings
+          .where((b) =>
+              b.status == 'completed' ||
+              b.status == 'pending_payment' ||
               b.status == 'pending_completion')
           .length;
-      completedCount = bookings.where((b) => b.status == 'completed').length;
       cancelledCount = bookings
           .where((b) => b.status == 'cancelled' || b.status == 'disputed')
           .length;
@@ -234,11 +238,14 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
               .where((b) =>
                   b.status == 'accepted' ||
                   b.status == 'confirmed' ||
-                  b.status == 'in_progress' ||
+                  b.status == 'in_progress')
+              .toList()),
+          _buildBookingsList(bookings
+              .where((b) =>
+                  b.status == 'completed' ||
+                  b.status == 'pending_payment' ||
                   b.status == 'pending_completion')
               .toList()),
-          _buildBookingsList(
-              bookings.where((b) => b.status == 'completed').toList()),
           _buildBookingsList(bookings
               .where((b) => b.status == 'cancelled' || b.status == 'disputed')
               .toList()),
@@ -511,24 +518,19 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
               isPrimary: false, isError: true),
         ],
       );
-    } else if (status == 'pending_completion') {
+    } else if (status == 'pending_completion' || status == 'pending_payment') {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (chatButton != null) ...[chatButton, const SizedBox(width: 8)],
-          _buildActionButton('Khiếu nại', () => _showDisputeDialog(booking.id),
-              isError: true),
-          const SizedBox(width: 8),
-          _buildActionButton('Xác nhận', () => _confirmCompletion(booking.id)),
+          _buildActionButton('Thanh toán', () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: (_) => InvoiceScreen(bookingId: booking.id)),
+            );
+          }),
         ],
       );
-    } else if (status == 'pending_payment') {
-      return _buildActionButton('Thanh toán', () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-              builder: (_) => InvoiceScreen(bookingId: booking.id)),
-        );
-      });
     } else if (status == 'completed' && !booking.hasReview) {
       return _buildActionButton(
           'Đánh giá',
@@ -716,28 +718,6 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
     );
   }
 
-  void _showDisputeDialog(String bookingId) {
-    final reasonController = TextEditingController();
-    MinDialog.show(
-      context: context,
-      title: 'Khiếu nại dịch vụ',
-      icon: Icons.error_outline_rounded,
-      content: MinTextField(
-        controller: reasonController,
-        hint: 'Nhập lý do khiếu nại...',
-        maxLines: 3,
-      ),
-      primaryLabel: 'Gửi khiếu nại',
-      isDestructive: true,
-      secondaryLabel: 'Hủy',
-      onPrimaryPressed: () async {
-        await BookingsDataSource()
-            .disputeBooking(bookingId, reasonController.text);
-        _refreshBookings();
-      },
-    );
-  }
-
   void _showReviewDialog(String bookingId, {String? serviceName}) {
     ReviewDialog.show(
       context,
@@ -748,17 +728,6 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
         _refreshBookings();
       },
     );
-  }
-
-  Future<void> _confirmCompletion(String bookingId) async {
-    try {
-      await BookingsDataSource().confirmCompletion(bookingId);
-      _showSnackBar('Đã xác nhận hoàn thành dịch vụ!', isError: false);
-      _refreshBookings();
-      _showReviewDialog(bookingId);
-    } catch (e) {
-      _showSnackBar('Lỗi: $e', isError: true);
-    }
   }
 
   void _showSnackBar(String message, {required bool isError}) {

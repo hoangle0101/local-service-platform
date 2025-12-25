@@ -13,6 +13,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PaymentService } from './payment.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Public } from 'src/common/decorators/public.decorator';
 
 class CreatePaymentDto {
   bookingId: string;
@@ -96,26 +97,20 @@ export class PaymentController {
     return this.paymentService.releasePayment(BigInt(id));
   }
 
-  /**
-   * Refund payment to customer
-   */
-  @Post(':id/refund')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Refund payment to customer' })
-  async refundPayment(@Param('id') id: string, @Body('reason') reason: string) {
-    return this.paymentService.refundPayment(BigInt(id), reason);
+  @Get('check-status')
+  @Public()
+  @ApiOperation({ summary: 'Manually check MoMo payment status' })
+  async checkStatus(@Query('orderId') orderId: string) {
+    return this.paymentService.checkPaymentStatus(orderId);
   }
 
-  /**
-   * Get payment by ID
-   */
-  @Get(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get booking payment by ID' })
-  async getPayment(@Param('id') id: string) {
-    return this.paymentService.getBookingPayment(BigInt(id));
+  @Get('test-status')
+  async testStatus() {
+    return {
+      status: 'ok',
+      message: 'Payment controller is reachable',
+      timestamp: new Date().toISOString(),
+    };
   }
 
   /**
@@ -130,5 +125,27 @@ export class PaymentController {
     @Query('status') status?: string,
   ) {
     return this.paymentService.getProviderPayments(BigInt(user.userId), status);
+  }
+
+  /**
+   * Get payment by ID
+   */
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get booking payment by ID' })
+  async getPayment(@Param('id') id: string) {
+    return this.paymentService.getBookingPayment(BigInt(id));
+  }
+
+  /**
+   * Refund payment to customer
+   */
+  @Post(':id/refund')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Refund payment to customer' })
+  async refundPayment(@Param('id') id: string, @Body('reason') reason: string) {
+    return this.paymentService.refundPayment(BigInt(id), reason);
   }
 }

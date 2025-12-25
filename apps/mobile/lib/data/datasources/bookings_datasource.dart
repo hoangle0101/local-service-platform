@@ -486,9 +486,12 @@ class BookingsDataSource {
     }
   }
 
+  /// Provider marks service as complete -> pending_payment
+  /// This triggers the payment flow (COD or MoMo selection)
   Future<void> completeService(String bookingId) async {
     try {
-      await _dio.patch('/provider/bookings/$bookingId/complete');
+      // Use the mark-complete endpoint which sets status to 'pending_payment'
+      await _dio.post('/bookings/$bookingId/mark-complete');
     } catch (e) {
       throw Exception('Failed to complete service: $e');
     }
