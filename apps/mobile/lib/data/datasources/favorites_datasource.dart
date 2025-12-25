@@ -22,9 +22,20 @@ class FavoriteItem {
   });
 
   factory FavoriteItem.fromJson(Map<String, dynamic> json) {
+    // Safely parse IDs
+    final targetIdStr = json['targetId']?.toString() ?? '';
+    final targetIdInt = int.tryParse(targetIdStr);
+
+    // Check various common field names for service identity
+    final rawServiceId = json['id'] ?? json['serviceId'] ?? json['service_id'];
+    final fallbackServiceId = rawServiceId is int
+        ? rawServiceId
+        : int.tryParse(rawServiceId?.toString() ?? '0') ?? 0;
+
     return FavoriteItem(
-      serviceId: json['serviceId'] as int,
-      targetId: json['targetId']?.toString() ?? '',
+      // Use targetId (ProviderService.id) as the primary identifier if available
+      serviceId: targetIdInt ?? fallbackServiceId,
+      targetId: targetIdStr,
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'].toString())
           : null,

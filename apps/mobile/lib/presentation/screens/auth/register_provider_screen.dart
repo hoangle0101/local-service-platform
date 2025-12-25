@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/provider_datasource.dart';
 import '../../../data/datasources/auth_datasource.dart';
+import '../../../data/datasources/track_asia_datasource.dart';
 import '../../../data/storage/secure_storage.dart';
 import '../../bloc/auth/auth_bloc.dart';
 import '../../widgets/minimalist_widgets.dart';
@@ -66,19 +67,70 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
       }
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Đang lấy vị trí hiện tại...'),
+              behavior: SnackBarBehavior.floating),
+        );
+
         Position position = await Geolocator.getCurrentPosition();
         setState(() {
           _latitude = position.latitude;
           _longitude = position.longitude;
         });
+
+        // Reverse geocode to get address text
+        final trackAsia = TrackAsiaDataSource();
+        final address = await trackAsia.reverseGeocode(
+          position.latitude,
+          position.longitude,
+        );
+
+        if (mounted) {
+          if (address != null) {
+            setState(() {
+              _addressController.text = address.displayText;
+            });
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content: Text('Đã lấy vị trí: ${address.shortText}'),
+                  backgroundColor: AppColors.success,
+                  behavior: SnackBarBehavior.floating),
+            );
+          } else {
+            // Fallback: show coordinates
+            setState(() {
+              _addressController.text =
+                  'Vị trí: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+            });
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('Đã cập nhật vị trí GPS'),
+                  backgroundColor: AppColors.success,
+                  behavior: SnackBarBehavior.floating),
+            );
+          }
+        }
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Đã cập nhật vị trí hiện tại'),
+              content: Text('Vui lòng cấp quyền vị trí'),
+              backgroundColor: AppColors.error,
               behavior: SnackBarBehavior.floating),
         );
       }
     } catch (e) {
       print('Error getting location: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Lỗi lấy vị trí: $e'),
+              backgroundColor: AppColors.error,
+              behavior: SnackBarBehavior.floating),
+        );
+      }
     }
   }
 
@@ -143,20 +195,20 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
           .where((s) => s.isNotEmpty)
           .toList();
 
-      var token = await SecureStorage.getAccessToken();
-      if (token == null) {
-        final authDataSource = AuthDataSource();
-        String phone = _phoneController.text.trim();
-        if (!phone.startsWith('+'))
-          phone = '+84${phone.substring(phone.startsWith('0') ? 1 : 0)}';
-        final tokens = await authDataSource.login(
-            phone: phone, password: _passwordController.text);
-        await SecureStorage.saveAuthData(
-            accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken,
-            userPhone: phone);
-        token = tokens.accessToken;
-      }
+      // Always login with new credentials to get the correct token for this user
+      // Don't use cached token - it may belong to a different user
+      final authDataSource = AuthDataSource();
+      String phone = _phoneController.text.trim();
+      if (!phone.startsWith('+'))
+        phone = '+84${phone.substring(phone.startsWith('0') ? 1 : 0)}';
+
+      final tokens = await authDataSource.login(
+          phone: phone, password: _passwordController.text);
+      await SecureStorage.saveAuthData(
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          userPhone: phone);
+      final token = tokens.accessToken;
 
       await providerDataSource.createProviderProfile(
         displayName: _displayNameController.text,
@@ -197,28 +249,30 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: AppColors.success.withOpacity(0.1),
+                color: AppColors.info.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.check_circle_rounded,
-                  color: AppColors.success, size: 64),
+              child: const Icon(Icons.hourglass_top_rounded,
+                  color: AppColors.info, size: 64),
             ),
             const SizedBox(height: 24),
-            Text('Chúc mừng đối tác!',
+            Text('Đang chờ xét duyệt',
                 style: Theme.of(context).textTheme.displaySmall),
             const SizedBox(height: 12),
             const Text(
-              'Hồ sơ của bạn đã được tạo thành công. Bạn có thể bắt đầu nhận lịch ngay bây giờ.',
+              'Hồ sơ của bạn đã được gửi thành công. Vui lòng chờ quản trị viên xét duyệt trước khi có thể bắt đầu nhận việc.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textSecondary, height: 1.5),
             ),
             const SizedBox(height: 32),
             MinButton(
-              text: 'Đi đến Trang chủ',
+              text: 'Quay về Trang chủ',
               isFullWidth: true,
               onPressed: () {
                 Navigator.of(dialogContext).pop();
-                context.go('/provider/home');
+                // Clear auth state and go back to guest page
+                context.read<AuthBloc>().add(LogoutRequested());
+                context.go('/');
               },
             ),
             const SizedBox(height: 16),

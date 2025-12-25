@@ -486,17 +486,42 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
                           unreadCount = state.unreadCount;
                         }
 
-                        return Badge(
-                          label: unreadCount > 0 ? Text('$unreadCount') : null,
-                          isLabelVisible: unreadCount > 0,
-                          backgroundColor: AppColors.error,
-                          child: IconButton(
-                            icon: const Icon(Icons.notifications_none_rounded,
-                                color: AppColors.textPrimary),
-                            onPressed: () => context.push('/notifications'),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
+                        return Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.notifications_none_rounded,
+                                  color: AppColors.textPrimary),
+                              onPressed: () => context.push('/notifications'),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                            if (unreadCount > 0)
+                              Positioned(
+                                top: -2,
+                                right: -2,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.error,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 16,
+                                    minHeight: 16,
+                                  ),
+                                  child: Text(
+                                    unreadCount.toString(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
                         );
                       },
                     ),

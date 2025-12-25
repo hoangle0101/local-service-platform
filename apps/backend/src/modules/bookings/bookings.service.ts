@@ -554,6 +554,22 @@ export class BookingsService {
       'vi-VN',
     );
 
+    // Emit unified socket event for real-time notification
+    this.realtimeGateway.emitBookingStatusChange(
+      booking.customerId.toString(),
+      providerId.toString(),
+      {
+        bookingId: booking.id.toString(),
+        status: 'OFFER_RECEIVED',
+        message: `${providerName} vừa gửi báo giá ${priceFormatted}đ cho đơn đặt lịch của bạn.`,
+        actorId: providerId.toString(),
+        payload: {
+          offerId: offerResult[0].id.toString(),
+          type: 'booking_offer',
+        },
+      },
+    );
+
     await this.notificationsService.create(
       booking.customerId,
       'OFFER_RECEIVED',

@@ -30,6 +30,7 @@ export interface BookingStatusPayload {
   latitude?: number;
   longitude?: number;
   actorId?: string;
+  payload?: any;
 }
 
 export interface LocationUpdatePayload {

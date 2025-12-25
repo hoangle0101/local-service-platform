@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../data/datasources/favorites_datasource.dart';
 import 'favorite_button.dart';
 import 'star_rating.dart';
+import 'minimalist_widgets.dart';
 
 /// Modern card for displaying a favorite service item
 /// Features swipe-to-delete and tap to navigate
@@ -236,30 +237,19 @@ class FavoriteServiceCard extends StatelessWidget {
   }
 
   Future<bool> _showConfirmDialog(BuildContext context) async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: const Text('Xóa khỏi yêu thích?'),
-            content: Text(
-              'Bạn có chắc muốn xóa "${favorite.service.name}" khỏi danh sách yêu thích?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('Hủy'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                style: TextButton.styleFrom(foregroundColor: AppColors.error),
-                child: const Text('Xóa'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+    final result = await MinDialog.show<bool>(
+      context: context,
+      title: 'Xóa khỏi yêu thích?',
+      message:
+          'Bạn có chắc muốn xóa "${favorite.service.name}" khỏi danh sách yêu thích?',
+      primaryLabel: 'Xóa',
+      isDestructive: true,
+      icon: Icons.delete_outline_rounded,
+      secondaryLabel: 'Hủy',
+      onPrimaryPressed: () {},
+      onSecondaryPressed: () {},
+    );
+    return result ?? false;
   }
 
   String _formatPrice(double price) {

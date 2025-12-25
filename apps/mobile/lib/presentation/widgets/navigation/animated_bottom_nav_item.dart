@@ -56,8 +56,8 @@ class AnimatedBottomNavItem extends StatelessWidget {
                 ),
                 if (badgeCount != null && badgeCount! > 0)
                   Positioned(
-                    right: -8,
-                    top: -8,
+                    right: -4,
+                    top: -4,
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(

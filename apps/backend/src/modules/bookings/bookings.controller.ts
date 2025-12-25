@@ -130,15 +130,6 @@ export class BookingsController {
       BigInt(providerId),
     );
 
-    // Notify provider
-    if (result.providerId) {
-      this.realtimeGateway.notifyUser(
-        result.providerId,
-        'booking.accepted',
-        result,
-      );
-    }
-
     return result;
   }
 
@@ -218,10 +209,6 @@ export class ProviderBookingsController {
       BigInt(id),
     );
 
-    if (result.customerId) {
-      this.realtimeGateway.notifyUser(result.customerId, 'booking.new_offer', result);
-    }
-
     return result;
   }
 
@@ -238,13 +225,6 @@ export class ProviderBookingsController {
       BigInt(id),
     );
 
-    if (result.customerId) {
-      this.realtimeGateway.notifyUser(
-        result.customerId,
-        'booking.accepted_legacy',
-        result,
-      );
-    }
     return result;
   }
 

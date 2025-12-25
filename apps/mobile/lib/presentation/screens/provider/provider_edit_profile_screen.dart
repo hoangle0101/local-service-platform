@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/provider_datasource.dart';
 import '../../../data/datasources/track_asia_datasource.dart';
 import '../../bloc/auth/auth_bloc.dart';
+import '../../widgets/minimalist_widgets.dart';
 
 class ProviderEditProfileScreen extends StatefulWidget {
   const ProviderEditProfileScreen({super.key});
@@ -78,11 +79,12 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
       _displayNameController.text = profile.displayName;
       _bioController.text = profile.bio ?? '';
       _addressController.text = profile.address ?? '';
-      // Clamp radius to valid range (1000-40000 meters / 1-40km)
       final profileRadius = profile.serviceRadiusM ?? 5000;
       _selectedRadius = profileRadius.clamp(1000, 40000);
       _latitude = profile.latitude;
       _longitude = profile.longitude;
+      // Avatar is loaded from UserProfileEntity
+      _existingImageUrl = state.user?.profile?.avatarUrl;
     }
   }
 
@@ -137,7 +139,6 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
     }
   }
 
-  /// Pick image from camera or gallery
   Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? image = await _imagePicker.pickImage(
@@ -163,7 +164,6 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
     }
   }
 
-  /// Show bottom sheet to choose image source
   void _showImageSourceDialog() {
     showModalBottomSheet(
       context: context,
@@ -228,12 +228,10 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
     );
   }
 
-  /// Get current GPS location
   Future<void> _getCurrentLocation() async {
     setState(() => _isGettingLocation = true);
 
     try {
-      // Check location services
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (mounted) {
@@ -253,7 +251,6 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
         return;
       }
 
-      // Check permissions
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -289,12 +286,10 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
         return;
       }
 
-      // Get position
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      // Reverse geocode to get full address
       final address = await _trackAsiaDataSource.reverseGeocode(
         position.latitude,
         position.longitude,
@@ -309,7 +304,6 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
             _isGettingLocation = false;
           });
         } else {
-          // Fallback: use coordinates only
           setState(() {
             _addressController.text =
                 'Vị trí: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
@@ -359,9 +353,6 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
     setState(() => _isSaving = true);
 
     try {
-      // Upload avatar if selected
-      debugPrint(
-          '[EditProfile] _selectedImage: ${_selectedImage?.path ?? "null"}');
       if (_selectedImage != null) {
         debugPrint('[EditProfile] Uploading avatar...');
         try {
@@ -370,10 +361,7 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
           debugPrint('[EditProfile] Avatar uploaded successfully: $avatarUrl');
         } catch (e) {
           debugPrint('[EditProfile] Avatar upload error: $e');
-          // Continue with profile update even if avatar fails
         }
-      } else {
-        debugPrint('[EditProfile] No image selected, skipping avatar upload');
       }
 
       await _providerDataSource.updateProviderProfile(
@@ -390,7 +378,6 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
       );
 
       if (mounted) {
-        // Refresh AuthBloc to update profile in app state
         context.read<AuthBloc>().add(const ProfileFetchRequested());
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -429,104 +416,10 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
+      backgroundColor: AppColors.white,
       body: CustomScrollView(
         slivers: [
-          // Premium gradient header
-          SliverAppBar(
-            expandedHeight: 160,
-            pinned: true,
-            backgroundColor: AppColors.primary,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-              onPressed: () => context.pop(),
-            ),
-            actions: [
-              if (_isSaving)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.only(right: 16),
-                    child: SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2),
-                    ),
-                  ),
-                )
-              else
-                TextButton.icon(
-                  onPressed: _saveProfile,
-                  icon: const Icon(Icons.check, color: Colors.white),
-                  label: const Text('Lưu',
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppColors.primary,
-                      AppColors.primary.withBlue(180),
-                      AppColors.primary.withGreen(100),
-                    ],
-                  ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 60, 24, 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Icon(Icons.edit_note,
-                                  color: Colors.white, size: 28),
-                            ),
-                            const SizedBox(width: 16),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Chỉnh sửa hồ sơ',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    'Cập nhật thông tin cá nhân',
-                                    style: TextStyle(
-                                        color: Colors.white70, fontSize: 14),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // Form content
+          _buildHeader(),
           SliverToBoxAdapter(
             child: Form(
               key: _formKey,
@@ -534,392 +427,15 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    // Avatar section
                     _buildAvatarSection(),
                     const SizedBox(height: 24),
-
-                    // Basic info card
-                    _buildCard(
-                      icon: Icons.person_outline,
-                      title: 'Thông tin cơ bản',
-                      color: Colors.blue,
-                      child: Column(
-                        children: [
-                          _buildModernTextField(
-                            controller: _displayNameController,
-                            label: 'Tên hiển thị',
-                            hint: 'VD: Nguyễn Văn A',
-                            icon: Icons.badge_outlined,
-                            validator: (v) =>
-                                v?.isEmpty ?? true ? 'Vui lòng nhập tên' : null,
-                          ),
-                          const SizedBox(height: 20),
-                          _buildModernTextField(
-                            controller: _bioController,
-                            label: 'Giới thiệu bản thân',
-                            hint: 'Kinh nghiệm, chuyên môn, điểm mạnh...',
-                            icon: Icons.description_outlined,
-                            maxLines: 4,
-                          ),
-                        ],
-                      ),
-                    ),
+                    _buildInfoCard(),
                     const SizedBox(height: 20),
-
-                    // Location card
-                    _buildCard(
-                      icon: Icons.location_on_outlined,
-                      title: 'Vị trí hoạt động',
-                      color: Colors.green,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildModernTextField(
-                            controller: _addressController,
-                            label: 'Địa chỉ',
-                            hint: 'Nhập địa chỉ để tìm kiếm...',
-                            icon: Icons.search,
-                            onChanged: _onAddressChanged,
-                          ),
-
-                          // Address suggestions
-                          if (_showSuggestions &&
-                              _addressSuggestions.isNotEmpty)
-                            Container(
-                              margin: const EdgeInsets.only(top: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.08),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              constraints: const BoxConstraints(maxHeight: 220),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: ListView.separated(
-                                  shrinkWrap: true,
-                                  padding: EdgeInsets.zero,
-                                  itemCount: _addressSuggestions.length,
-                                  separatorBuilder: (_, __) => Divider(
-                                      height: 1, color: Colors.grey.shade200),
-                                  itemBuilder: (context, index) {
-                                    final s = _addressSuggestions[index];
-                                    return ListTile(
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                              horizontal: 16, vertical: 4),
-                                      leading: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.green.shade50,
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                        ),
-                                        child: Icon(Icons.location_on,
-                                            color: Colors.green.shade600,
-                                            size: 20),
-                                      ),
-                                      title: Text(s.mainText,
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 14)),
-                                      subtitle: Text(
-                                        s.secondaryText,
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      onTap: () => _selectAddress(s),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-
-                          // GPS Location Button
-                          Container(
-                            margin: const EdgeInsets.only(top: 12),
-                            child: ElevatedButton.icon(
-                              onPressed: _isGettingLocation
-                                  ? null
-                                  : _getCurrentLocation,
-                              icon: _isGettingLocation
-                                  ? SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.green.shade700,
-                                      ),
-                                    )
-                                  : Icon(Icons.my_location,
-                                      size: 18, color: Colors.green.shade700),
-                              label: Text(
-                                _isGettingLocation
-                                    ? 'Đang lấy vị trí...'
-                                    : 'Lấy vị trí GPS hiện tại',
-                                style: TextStyle(
-                                  color: Colors.green.shade700,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green.shade50,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side:
-                                      BorderSide(color: Colors.green.shade200),
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          // Coordinates
-                          if (_latitude != null && _longitude != null)
-                            Container(
-                              margin: const EdgeInsets.only(top: 12),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade50,
-                                borderRadius: BorderRadius.circular(12),
-                                border:
-                                    Border.all(color: Colors.green.shade200),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.gps_fixed,
-                                      size: 18, color: Colors.green.shade700),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      '${_latitude!.toStringAsFixed(6)}, ${_longitude!.toStringAsFixed(6)}',
-                                      style: TextStyle(
-                                          fontSize: 13,
-                                          color: Colors.green.shade800,
-                                          fontWeight: FontWeight.w500),
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.shade600,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: const Text('Đã xác định',
-                                        style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
+                    _buildLocationCard(),
                     const SizedBox(height: 20),
-
-                    // Service radius card
-                    _buildCard(
-                      icon: Icons.radar,
-                      title: 'Phạm vi nhận việc',
-                      color: Colors.orange,
-                      child: Column(
-                        children: [
-                          Text(
-                            'Bạn sẽ nhận được yêu cầu từ khách hàng trong bán kính này',
-                            style: TextStyle(
-                                fontSize: 13, color: Colors.grey.shade600),
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Radius display
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 24, horizontal: 16),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.orange.shade50,
-                                  Colors.amber.shade50,
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.orange.shade200),
-                            ),
-                            child: Column(
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Icon(Icons.radar,
-                                        color: Colors.orange.shade700,
-                                        size: 36),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      '${(_selectedRadius / 1000).toStringAsFixed(_selectedRadius % 1000 == 0 ? 0 : 1)}',
-                                      style: TextStyle(
-                                        fontSize: 52,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.orange.shade800,
-                                        height: 1,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Padding(
-                                      padding: const EdgeInsets.only(bottom: 8),
-                                      child: Text(
-                                        'km',
-                                        style: TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.orange.shade700),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 20),
-                                SliderTheme(
-                                  data: SliderThemeData(
-                                    activeTrackColor: Colors.orange.shade400,
-                                    inactiveTrackColor: Colors.orange.shade100,
-                                    thumbColor: Colors.orange.shade600,
-                                    overlayColor:
-                                        Colors.orange.withOpacity(0.2),
-                                    trackHeight: 6,
-                                    thumbShape: const RoundSliderThumbShape(
-                                        enabledThumbRadius: 12),
-                                  ),
-                                  child: Slider(
-                                    value: _selectedRadius.toDouble(),
-                                    min: 1000,
-                                    max: 40000,
-                                    divisions: 39,
-                                    onChanged: (v) => setState(
-                                        () => _selectedRadius = v.round()),
-                                  ),
-                                ),
-                                Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(horizontal: 8),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text('1 km',
-                                          style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.orange.shade700)),
-                                      Text('40 km',
-                                          style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.orange.shade700)),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Quick select chips
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            alignment: WrapAlignment.center,
-                            children: _radiusOptions.map((r) {
-                              final selected = _selectedRadius == r;
-                              return GestureDetector(
-                                onTap: () =>
-                                    setState(() => _selectedRadius = r),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: selected
-                                        ? Colors.orange.shade600
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(25),
-                                    border: Border.all(
-                                      color: selected
-                                          ? Colors.orange.shade600
-                                          : Colors.grey.shade300,
-                                      width: selected ? 2 : 1,
-                                    ),
-                                    boxShadow: selected
-                                        ? [
-                                            BoxShadow(
-                                                color: Colors.orange
-                                                    .withOpacity(0.3),
-                                                blurRadius: 8,
-                                                offset: const Offset(0, 3))
-                                          ]
-                                        : null,
-                                  ),
-                                  child: Text(
-                                    '${r ~/ 1000} km',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      color: selected
-                                          ? Colors.white
-                                          : Colors.grey.shade700,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _buildRadiusCard(),
                     const SizedBox(height: 32),
-
-                    // Save button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed: _isSaving ? null : _saveProfile,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16)),
-                          elevation: 4,
-                          shadowColor: AppColors.primary.withOpacity(0.4),
-                        ),
-                        child: _isSaving
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2.5))
-                            : const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.save_rounded, size: 22),
-                                  SizedBox(width: 10),
-                                  Text('Lưu thay đổi',
-                                      style: TextStyle(
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                      ),
-                    ),
+                    _buildSaveButton(),
                     const SizedBox(height: 40),
                   ],
                 ),
@@ -931,224 +447,413 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
     );
   }
 
-  Widget _buildAvatarSection() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Stack(
+  Widget _buildHeader() {
+    return SliverAppBar(
+      pinned: true,
+      floating: false,
+      expandedHeight: 120,
+      backgroundColor: AppColors.white,
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      flexibleSpace: FlexibleSpaceBar(
+        background: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 64, 24, 0),
+          child: Row(
             children: [
-              // Avatar image
+              GestureDetector(
+                onTap: () => context.pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    shape: BoxShape.circle,
+                    border:
+                        Border.all(color: AppColors.divider.withOpacity(0.5)),
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded,
+                      size: 18, color: AppColors.textPrimary),
+                ),
+              ),
+              const SizedBox(width: 20),
+              const Text(
+                'Sửa hồ sơ',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvatarSection() {
+    return Column(
+      children: [
+        Center(
+          child: Stack(
+            children: [
               Container(
                 width: 120,
                 height: 120,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppColors.primary.withOpacity(0.8),
-                      AppColors.primary,
-                    ],
-                  ),
+                  border: Border.all(
+                      color: AppColors.primary.withOpacity(0.1), width: 4),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.3),
+                      color: AppColors.primary.withOpacity(0.08),
                       blurRadius: 20,
-                      offset: const Offset(0, 8),
+                      offset: const Offset(0, 10),
                     ),
                   ],
                 ),
-                child: _selectedImage != null
-                    ? ClipOval(
-                        child: Image.file(
+                child: ClipOval(
+                  child: _selectedImage != null
+                      ? Image.file(
                           _selectedImage!,
                           fit: BoxFit.cover,
-                          width: 120,
-                          height: 120,
-                        ),
-                      )
-                    : _existingImageUrl != null
-                        ? ClipOval(
-                            child: Image.network(
+                        )
+                      : (_existingImageUrl != null)
+                          ? Image.network(
                               _existingImageUrl!,
                               fit: BoxFit.cover,
-                              width: 120,
-                              height: 120,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.person,
-                                color: Colors.white,
-                                size: 60,
-                              ),
-                            ),
-                          )
-                        : const Icon(
-                            Icons.person,
-                            color: Colors.white,
-                            size: 60,
-                          ),
+                              errorBuilder: (_, __, ___) =>
+                                  _buildAvatarPlaceholder(),
+                            )
+                          : _buildAvatarPlaceholder(),
+                ),
               ),
-              // Edit button
               Positioned(
-                right: 0,
                 bottom: 0,
+                right: 0,
                 child: GestureDetector(
                   onTap: _showImageSourceDialog,
                   child: Container(
-                    width: 40,
-                    height: 40,
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.primary,
                       shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.white, width: 3),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                          color: AppColors.primary.withOpacity(0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
-                    child: Icon(
-                      Icons.camera_alt,
-                      color: AppColors.primary,
-                      size: 22,
-                    ),
+                    child: const Icon(Icons.camera_alt_rounded,
+                        color: Colors.white, size: 18),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Nhấn để thay đổi ảnh đại diện',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w600,
-            ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Thay đổi ảnh đại diện',
+          style: TextStyle(
+            color: AppColors.textTertiary,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAvatarPlaceholder() {
+    return Container(
+      color: AppColors.shelf,
+      child: const Icon(Icons.person_rounded,
+          size: 60, color: AppColors.textTertiary),
+    );
+  }
+
+  Widget _buildInfoCard() {
+    return MinCard(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildLabel('Tên hiển thị'),
+          MinTextField(
+            controller: _displayNameController,
+            hint: 'Nhập tên hiển thị của bạn',
+            prefixIcon: const Icon(Icons.badge_outlined,
+                size: 20, color: AppColors.primary),
+            validator: (v) => v?.isEmpty ?? true ? 'Vui lòng nhập tên' : null,
+          ),
+          const SizedBox(height: 24),
+          _buildLabel('Giới thiệu bản thân'),
+          MinTextField(
+            controller: _bioController,
+            hint: 'Mô tả về kinh nghiệm, chuyên môn...',
+            prefixIcon: const Icon(Icons.description_outlined,
+                size: 20, color: AppColors.primary),
+            maxLines: 4,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCard({
-    required IconData icon,
-    required String title,
-    required Color color,
-    required Widget child,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+  Widget _buildLocationCard() {
+    return MinCard(
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Card header
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(14),
+          _buildLabel('Vị trí hoạt động'),
+          MinTextField(
+            controller: _addressController,
+            hint: 'Nhập địa chỉ để tìm kiếm...',
+            prefixIcon:
+                const Icon(Icons.search, size: 20, color: AppColors.primary),
+            onChanged: _onAddressChanged,
+          ),
+
+          // Address suggestions
+          if (_showSuggestions && _addressSuggestions.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
                   ),
-                  child: Icon(icon, color: color, size: 24),
+                ],
+              ),
+              constraints: const BoxConstraints(maxHeight: 220),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  itemCount: _addressSuggestions.length,
+                  separatorBuilder: (_, __) =>
+                      Divider(height: 1, color: Colors.grey.shade200),
+                  itemBuilder: (context, index) {
+                    final s = _addressSuggestions[index];
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.location_on,
+                            color: Colors.green.shade600, size: 20),
+                      ),
+                      title: Text(s.mainText,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 14)),
+                      subtitle: Text(
+                        s.secondaryText,
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () => _selectAddress(s),
+                    );
+                  },
                 ),
-                const SizedBox(width: 14),
+              ),
+            ),
+
+          // GPS Location Button
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: _isGettingLocation ? null : _getCurrentLocation,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _isGettingLocation
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.green.shade700,
+                          ),
+                        )
+                      : Icon(Icons.my_location,
+                          size: 18, color: Colors.green.shade700),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isGettingLocation
+                        ? 'Đang lấy vị trí...'
+                        : 'Lấy vị trí GPS hiện tại',
+                    style: TextStyle(
+                      color: Colors.green.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Coordinates
+          if (_latitude != null && _longitude != null)
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.gps_fixed, size: 18, color: Colors.green.shade700),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${_latitude!.toStringAsFixed(6)}, ${_longitude!.toStringAsFixed(6)}',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.green.shade800,
+                          fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRadiusCard() {
+    return MinCard(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildLabel('Phạm vi nhận việc'),
+          const SizedBox(height: 8),
+          Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
                 Text(
-                  title,
+                  '${(_selectedRadius / 1000).toStringAsFixed(_selectedRadius % 1000 == 0 ? 0 : 1)}',
                   style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold),
+                    fontSize: 40,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'km',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-          Divider(height: 1, color: Colors.grey.shade200),
-          // Card content
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: child,
+          SliderTheme(
+            data: SliderThemeData(
+              activeTrackColor: AppColors.primary,
+              inactiveTrackColor: AppColors.primary.withOpacity(0.1),
+              thumbColor: AppColors.primary,
+              overlayColor: AppColors.primary.withOpacity(0.1),
+              trackHeight: 4,
+            ),
+            child: Slider(
+              value: _selectedRadius.toDouble(),
+              min: 1000,
+              max: 40000,
+              divisions: 39,
+              onChanged: (v) => setState(() => _selectedRadius = v.round()),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _radiusOptions.map((r) {
+              final isSelected = _selectedRadius == r;
+              return GestureDetector(
+                onTap: () => setState(() => _selectedRadius = r),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary : AppColors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.divider.withOpacity(0.5),
+                    ),
+                  ),
+                  child: Text(
+                    '${r ~/ 1000}km',
+                    style: TextStyle(
+                      color:
+                          isSelected ? Colors.white : AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildModernTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    int maxLines = 1,
-    String? Function(String?)? validator,
-    void Function(String)? onChanged,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade800),
+  Widget _buildLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, left: 4),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
         ),
-        const SizedBox(height: 10),
-        TextFormField(
-          controller: controller,
-          maxLines: maxLines,
-          validator: validator,
-          onChanged: onChanged,
-          style: const TextStyle(fontSize: 15),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey.shade400),
-            prefixIcon: Padding(
-              padding: const EdgeInsets.only(left: 16, right: 12),
-              child: Icon(icon, color: AppColors.primary, size: 22),
-            ),
-            filled: true,
-            fillColor: const Color(0xFFF8FAFC),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: AppColors.primary, width: 2),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Colors.red, width: 1),
-            ),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          ),
-        ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return MinButton(
+      text: 'Lưu thay đổi',
+      onPressed: _saveProfile,
+      isLoading: _isSaving,
     );
   }
 }

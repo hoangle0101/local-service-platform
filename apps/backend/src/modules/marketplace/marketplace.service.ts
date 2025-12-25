@@ -259,46 +259,52 @@ export class MarketplaceService {
 
     // Format response
     const results = Array.isArray(providerServices)
-      ? providerServices.map((ps: any) => ({
-          providerUserId:
-            ps.provider_user_id?.toString() || ps.providerUserId?.toString(),
-          serviceId: ps.service_id || ps.serviceId,
-          price: ps.price.toString(),
-          currency: ps.currency,
-          distance: ps.distance ? Math.round(ps.distance) : null,
-          service: ps.service
-            ? {
-                id: ps.service.id,
-                name: ps.service.name,
-                description: ps.service.description,
-                basePrice: ps.service.basePrice.toString(),
-                durationMinutes: ps.service.durationMinutes,
-                category: ps.service.category
-                  ? {
-                      id: ps.service.category.id,
-                      name: ps.service.category.name,
-                      slug: ps.service.category.slug,
-                    }
-                  : null,
-              }
-            : null,
-          provider: ps.provider
-            ? {
-                userId: ps.provider.userId.toString(),
-                displayName: ps.provider.displayName,
-                bio: ps.provider.bio,
-                ratingAvg: ps.provider.ratingAvg.toString(),
-                ratingCount: ps.provider.ratingCount,
-                isAvailable: ps.provider.isAvailable,
-                verificationStatus: ps.provider.verificationStatus,
-                user: ps.provider.user
-                  ? {
-                      profile: ps.provider.user.profile,
-                    }
-                  : null,
-              }
-            : null,
-        }))
+      ? providerServices.map((ps: any) => {
+          const pId = BigInt(ps.provider_user_id || ps.providerUserId || 0);
+          const sId = BigInt(ps.service_id || ps.serviceId || 0);
+          const virtualId = (pId << 32n) | (sId & 0xffffffffn);
+
+          return {
+            id: virtualId.toString(),
+            providerUserId: pId.toString(),
+            serviceId: Number(sId),
+            price: ps.price.toString(),
+            currency: ps.currency,
+            distance: ps.distance ? Math.round(ps.distance) : null,
+            service: ps.service
+              ? {
+                  id: ps.service.id,
+                  name: ps.service.name,
+                  description: ps.service.description,
+                  basePrice: ps.service.basePrice.toString(),
+                  durationMinutes: ps.service.durationMinutes,
+                  category: ps.service.category
+                    ? {
+                        id: ps.service.category.id,
+                        name: ps.service.category.name,
+                        slug: ps.service.category.slug,
+                      }
+                    : null,
+                }
+              : null,
+            provider: ps.provider
+              ? {
+                  userId: ps.provider.userId.toString(),
+                  displayName: ps.provider.displayName,
+                  bio: ps.provider.bio,
+                  ratingAvg: ps.provider.ratingAvg.toString(),
+                  ratingCount: ps.provider.ratingCount,
+                  isAvailable: ps.provider.isAvailable,
+                  verificationStatus: ps.provider.verificationStatus,
+                  user: ps.provider.user
+                    ? {
+                        profile: ps.provider.user.profile,
+                      }
+                    : null,
+                }
+              : null,
+          };
+        })
       : [];
 
     return {
@@ -312,11 +318,30 @@ export class MarketplaceService {
     };
   }
 
-  async getProviderServiceById(serviceId: number) {
-    // Find the first active provider service for this service ID
+  async getProviderServiceById(idOrServiceId: string | number) {
+    const id = BigInt(idOrServiceId);
+    let where: any = {};
+
+    // If the ID is larger than a typical 32-bit INT, it's likely a Virtual ID
+    // (composite of providerUserId and serviceId)
+    if (id > 2147483647n) {
+      const pId = id >> 32n;
+      const sId = Number(id & 0xffffffffn);
+      where = {
+        providerUserId: pId,
+        serviceId: sId,
+      };
+    } else {
+      // Fallback for normal service IDs if needed
+      where = {
+        serviceId: Number(id),
+      };
+    }
+
+    // Find the first active provider service
     const providerService = await this.prisma.providerService.findFirst({
       where: {
-        serviceId: serviceId,
+        ...where,
         isActive: true,
         deletedAt: null,
       },
@@ -339,13 +364,18 @@ export class MarketplaceService {
     });
 
     if (!providerService) {
-      throw new NotFoundException(`Service with ID ${serviceId} not found`);
+      throw new NotFoundException(`Service with ID ${id} not found`);
     }
+
+    const pId = BigInt(providerService.providerUserId);
+    const sId = BigInt(providerService.serviceId);
+    const virtualId = (pId << 32n) | (sId & 0xffffffffn);
 
     return {
       data: {
-        providerUserId: providerService.providerUserId.toString(),
-        serviceId: providerService.serviceId,
+        id: virtualId.toString(),
+        providerUserId: pId.toString(),
+        serviceId: Number(sId),
         price: providerService.price.toString(),
         currency: providerService.currency,
         isActive: providerService.isActive,

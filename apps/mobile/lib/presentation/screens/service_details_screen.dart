@@ -9,9 +9,11 @@ import '../bloc/services/services_event_state.dart';
 import '../bloc/auth/auth_bloc.dart';
 import '../bloc/auth/auth_event.dart';
 import 'reviews/provider_reviews_screen.dart';
-import '../widgets/minimalist_widgets.dart';
 import 'package:dio/dio.dart';
 import '../../data/storage/secure_storage.dart';
+import '../bloc/favorites/favorites_bloc.dart';
+import '../widgets/favorite_button.dart';
+import '../widgets/minimalist_widgets.dart';
 
 class ServiceDetailsScreen extends StatefulWidget {
   final int serviceId;
@@ -331,8 +333,39 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
                   ),
                 ],
               ),
-              child: const Icon(Icons.favorite_outline_rounded,
-                  color: AppColors.textPrimary, size: 18),
+              child: BlocBuilder<FavoritesBloc, FavoritesState>(
+                builder: (context, state) {
+                  final isFavorite = state.favoriteIds.contains(service.id);
+                  return FavoriteButton(
+                    isFavorite: isFavorite,
+                    size: 18,
+                    padding: EdgeInsets.zero,
+                    unfavoriteColor: AppColors.textPrimary,
+                    onToggle: () {
+                      context
+                          .read<FavoritesBloc>()
+                          .add(ToggleFavorite(service.id));
+                      ScaffoldMessenger.of(context).clearSnackBars();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            isFavorite
+                                ? 'Đã xóa "${service.service.name}" khỏi yêu thích'
+                                : 'Đã thêm "${service.service.name}" vào yêu thích',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: AppColors.textPrimary,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
+                          margin: const EdgeInsets.all(24),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
         ),

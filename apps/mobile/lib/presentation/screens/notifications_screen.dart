@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../bloc/notifications/notifications_bloc.dart';
 import '../bloc/notifications/notifications_event.dart';
@@ -40,7 +41,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
               color: AppColors.textPrimary, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/user/home');
+            }
+          },
         ),
         actions: [
           TextButton(

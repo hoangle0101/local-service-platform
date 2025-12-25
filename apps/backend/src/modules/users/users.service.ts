@@ -189,10 +189,15 @@ export class UsersService {
     const enrichedFavorites = await Promise.all(
       favorites.map(async (fav) => {
         try {
-          // targetId is the serviceId
+          // targetId is the Virtual ID (packed providerUserId and serviceId)
+          const virtualId = BigInt(fav.targetId);
+          const providerUserId = virtualId >> 32n;
+          const serviceId = Number(virtualId & 0xffffffffn);
+
           const providerService = await this.prisma.providerService.findFirst({
             where: {
-              serviceId: Number(fav.targetId),
+              providerUserId: providerUserId,
+              serviceId: serviceId,
               deletedAt: null,
             },
             include: {
@@ -251,11 +256,24 @@ export class UsersService {
   }
 
   async addFavorite(userId: bigint, dto: FavoriteDto) {
+    // Basic existence check to avoid unique constraint error
+    const existing = await this.prisma.favorite.findUnique({
+      where: {
+        userId_targetType_targetId: {
+          userId,
+          targetType: dto.targetType,
+          targetId: BigInt(dto.targetId),
+        },
+      },
+    });
+
+    if (existing) return existing;
+
     return this.prisma.favorite.create({
       data: {
         userId,
         targetType: dto.targetType,
-        targetId: dto.targetId,
+        targetId: BigInt(dto.targetId),
       },
     });
   }

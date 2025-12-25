@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../widgets/navigation/animated_bottom_nav_item.dart';
@@ -6,9 +7,6 @@ import '../../../core/services/socket_service.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../theme/app_colors.dart';
-import '../../bloc/notifications/notifications_bloc.dart';
-import '../../bloc/notifications/notifications_event.dart';
-import '../../../core/entities/entities.dart';
 
 class UserShellScreen extends StatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -23,6 +21,10 @@ class UserShellScreen extends StatefulWidget {
 }
 
 class _UserShellScreenState extends State<UserShellScreen> {
+  StreamSubscription? _bookingStatusSubscription;
+  String? _lastNotificationMessage;
+  Timer? _messageClearTimer;
+
   @override
   void initState() {
     super.initState();
@@ -32,46 +34,19 @@ class _UserShellScreenState extends State<UserShellScreen> {
   void _setupSocketListeners() {
     final socket = SocketService();
 
-    socket.on('booking.new_offer', (data) {
-      if (!mounted) return;
-      _showNotification(
-        'Bạn nhận được báo giá mới!',
-        icon: Icons.local_offer_rounded,
-        color: Colors.blue,
-      );
-      context.read<BookingsBloc>().add(const LoadUserBookingsEvent());
-
-      // Dispatch notification event
-      try {
-        if (data != null && data['type'] == 'booking_offer') {
-          final notification = NotificationEntry.fromJson({
-            'id': DateTime.now().millisecondsSinceEpoch.toString(), // Temp ID
-            'type': 'OFFER_RECEIVED',
-            'title': 'Báo giá mới',
-            'body': 'Bạn có một báo giá mới cho đơn hàng.',
-            'isRead': false,
-            'createdAt': DateTime.now().toIso8601String(),
-            'payload': data,
-          });
-          context
-              .read<NotificationsBloc>()
-              .add(NewNotificationReceived(notification));
-        }
-      } catch (e) {
-        debugPrint('Error dispatching notification: $e');
-      }
-    });
-
     // Unified handling via bookingStatusStream to avoid duplicates
-
-    // Listen to global status updates from stream
-    socket.bookingStatusStream.listen((update) {
+    _bookingStatusSubscription =
+        socket.bookingStatusStream.distinct((prev, next) {
+      return prev.status == next.status &&
+          prev.bookingId == next.bookingId &&
+          prev.message == next.message;
+    }).listen((update) {
       if (!mounted) return;
 
       // Refresh bookings data
       context.read<BookingsBloc>().add(const LoadUserBookingsEvent());
 
-      // Show notification if theatre action was by someone else
+      // Show notification if action was by someone else or it's a new offer
       if (update.actorId != socket.currentUserId) {
         String message =
             update.message ?? 'Trạng thái đơn hàng: ${update.status}';
@@ -81,6 +56,9 @@ class _UserShellScreenState extends State<UserShellScreen> {
         if (update.status == 'cancelled') {
           icon = Icons.cancel_outlined;
           color = AppColors.error;
+        } else if (update.status == 'OFFER_RECEIVED') {
+          icon = Icons.local_offer_rounded;
+          color = Colors.blue;
         }
 
         _showNotification(
@@ -91,11 +69,23 @@ class _UserShellScreenState extends State<UserShellScreen> {
       }
     });
 
-    // NOTE: Real-time notifications are handled by NotificationsBloc itself
-    // to avoid duplicate notifications. Do NOT add another listener here.
+    // to avoid duplicate notifications.
   }
 
   void _showNotification(String message, {IconData? icon, Color? color}) {
+    // Tránh hiện lại tin nhắn cũ trong thời gian ngắn
+    if (_lastNotificationMessage == message) return;
+    _lastNotificationMessage = message;
+
+    // Clear cache sau 2 giây
+    _messageClearTimer?.cancel();
+    _messageClearTimer = Timer(const Duration(seconds: 2), () {
+      _lastNotificationMessage = null;
+    });
+
+    // Xóa snackbar cũ trước khi hiện cái mới
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
@@ -123,6 +113,8 @@ class _UserShellScreenState extends State<UserShellScreen> {
 
   @override
   void dispose() {
+    _bookingStatusSubscription?.cancel();
+    _messageClearTimer?.cancel();
     final socket = SocketService();
     socket.off('booking.new_offer');
     super.dispose();

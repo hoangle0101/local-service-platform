@@ -681,57 +681,39 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
   }
 
   void _showCancelDialog(String bookingId) {
-    showDialog(
+    MinDialog.show(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('Hủy lịch đặt',
-            style: TextStyle(fontWeight: FontWeight.w900)),
-        content: const Text('Bạn có chắc chắn muốn hủy lịch đặt này không?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Không',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          _buildActionButton('Có, Hủy bỏ', () {
-            Navigator.of(dialogContext).pop();
-            context.read<BookingsBloc>().add(CancelBooking(bookingId));
-          }, isError: true, isPrimary: false),
-        ],
-      ),
+      title: 'Hủy lịch đặt',
+      message: 'Bạn có chắc chắn muốn hủy lịch đặt này không?',
+      primaryLabel: 'Có, Hủy bỏ',
+      isDestructive: true,
+      icon: Icons.close_rounded,
+      secondaryLabel: 'Quay lại',
+      onPrimaryPressed: () {
+        context.read<BookingsBloc>().add(CancelBooking(bookingId));
+      },
     );
   }
 
   void _showDisputeDialog(String bookingId) {
     final reasonController = TextEditingController();
-    showDialog(
+    MinDialog.show(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('Khiếu nại dịch vụ',
-            style: TextStyle(fontWeight: FontWeight.w900)),
-        content: MinTextField(
-          controller: reasonController,
-          hint: 'Nhập lý do khiếu nại...',
-          maxLines: 3,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Hủy',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          _buildActionButton('Gửi khiếu nại', () async {
-            Navigator.of(dialogContext).pop();
-            await BookingsDataSource()
-                .disputeBooking(bookingId, reasonController.text);
-            _refreshBookings();
-          }),
-        ],
+      title: 'Khiếu nại dịch vụ',
+      icon: Icons.error_outline_rounded,
+      content: MinTextField(
+        controller: reasonController,
+        hint: 'Nhập lý do khiếu nại...',
+        maxLines: 3,
       ),
+      primaryLabel: 'Gửi khiếu nại',
+      isDestructive: true,
+      secondaryLabel: 'Hủy',
+      onPrimaryPressed: () async {
+        await BookingsDataSource()
+            .disputeBooking(bookingId, reasonController.text);
+        _refreshBookings();
+      },
     );
   }
 

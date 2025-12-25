@@ -61,7 +61,7 @@ class _UserEditProfileScreenState extends State<UserEditProfileScreen> {
     if (_currentAvatarUrl == null || _currentAvatarUrl!.isEmpty) return null;
     return _currentAvatarUrl!.startsWith('http')
         ? _currentAvatarUrl!
-        : 'http://10.0.2.2:3000$_currentAvatarUrl';
+        : 'http://10.0.2.2:3000${_currentAvatarUrl!.startsWith('/') ? '' : '/'}$_currentAvatarUrl';
   }
 
   @override

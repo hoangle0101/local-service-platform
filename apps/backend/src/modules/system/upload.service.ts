@@ -71,7 +71,7 @@ export class UploadService {
 
     return {
       id: media.id.toString(),
-      url: fullUrl,
+      url: media.url, // Trả về đường dẫn tương đối (ví dụ: /uploads/...)
       category: media.category,
       size: media.size,
     };

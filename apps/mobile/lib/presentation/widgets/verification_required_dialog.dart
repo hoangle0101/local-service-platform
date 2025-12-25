@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile/presentation/widgets/minimalist_widgets.dart';
 import '../../core/theme/app_colors.dart';
 
 class VerificationRequiredDialog extends StatelessWidget {
@@ -21,102 +22,20 @@ class VerificationRequiredDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Icon
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.phone_android,
-                size: 48,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Title
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-
-            // Message
-            Text(
-              message,
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                fontSize: 14,
-                height: 1.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-
-            // Benefits
-            _buildBenefits(),
-            const SizedBox(height: 24),
-
-            // Verify Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => _handleVerify(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.verified_user, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Verify Now',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Skip Button (optional)
-            if (canSkip) ...[
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text(
-                  'Skip for Now',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+    return MinDialog(
+      title: title == 'Phone Verification Required'
+          ? 'Yêu cầu xác minh điện thoại'
+          : title,
+      message: message ==
+              'Please verify your phone number to continue with this action.'
+          ? 'Vui lòng xác minh số điện thoại của bạn để tiếp tục thực hiện hành động này.'
+          : message,
+      icon: Icons.phone_android_rounded,
+      content: _buildBenefits(),
+      primaryLabel: 'Xác minh ngay',
+      onPrimaryPressed: () => _handleVerify(context),
+      secondaryLabel: canSkip ? 'Để sau' : null,
+      onSecondaryPressed: () => Navigator.of(context).pop(false),
     );
   }
 
@@ -124,42 +43,43 @@ class VerificationRequiredDialog extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.primary.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Why verify?',
+          const Text(
+            'Lợi ích khi xác minh:',
             style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Colors.blue.shade900,
+              fontWeight: FontWeight.w800,
+              color: AppColors.primary,
               fontSize: 14,
             ),
           ),
           const SizedBox(height: 12),
           ...[
-            'Secure your account',
-            'Enable instant bookings',
-            'Access exclusive features',
-            'Better customer support',
+            'Bảo mật tài khoản của bạn',
+            'Sử dụng dịch vụ nhanh chóng',
+            'Nhận hỗ trợ ưu tiên',
+            'Tránh các tin nhắn rác',
           ].map((benefit) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.check_circle,
-                      size: 18,
-                      color: Colors.blue.shade700,
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      size: 16,
+                      color: AppColors.primary,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         benefit,
-                        style: TextStyle(
-                          color: Colors.blue.shade900,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
                           fontSize: 13,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
@@ -176,7 +96,7 @@ class VerificationRequiredDialog extends StatelessWidget {
 
     // Navigate to OTP verification
     final result = await context.push('/otp-verify', extra: {
-      'phone': phone ?? 'current_user_phone',
+      'phone': phone ?? '',
       'purpose': 'verify_phone',
     });
 
@@ -199,9 +119,8 @@ class VerificationRequiredDialog extends StatelessWidget {
       context: context,
       barrierDismissible: canSkip,
       builder: (context) => VerificationRequiredDialog(
-        title: title ?? 'Phone Verification Required',
-        message: message ??
-            'Please verify your phone number to continue with this action.',
+        title: title ?? 'Xác minh số điện thoại',
+        message: message ?? 'Vui lòng xác minh số điện thoại để tiếp tục.',
         phone: phone,
         canSkip: canSkip,
         onVerifySuccess: onVerifySuccess,

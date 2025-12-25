@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:geolocator/geolocator.dart';
 import '../../widgets/navigation/animated_bottom_nav_item.dart';
 import '../../../core/services/socket_service.dart';
 import '../../../data/datasources/bookings_datasource.dart';
@@ -27,6 +27,9 @@ class _ProviderShellScreenState extends State<ProviderShellScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final BookingsDataSource _bookingsDataSource = BookingsDataSource();
   bool _isDialogShowing = false;
+  StreamSubscription? _bookingStatusSubscription;
+  String? _lastNotificationMessage;
+  Timer? _messageClearTimer;
 
   @override
   void initState() {
@@ -36,6 +39,8 @@ class _ProviderShellScreenState extends State<ProviderShellScreen> {
 
   @override
   void dispose() {
+    _bookingStatusSubscription?.cancel();
+    _messageClearTimer?.cancel();
     final socket = SocketService();
     socket.off('booking.new_request');
     socket.off('booking.accepted');
@@ -46,44 +51,18 @@ class _ProviderShellScreenState extends State<ProviderShellScreen> {
   void _setupSocketListeners() {
     final socket = SocketService();
 
-    socket.on('booking.new_request', (data) {
-      if (!mounted) return;
-      _showNotification(
-        'Có yêu cầu đặt việc mới gần bạn!',
-        icon: Icons.work_outline_rounded,
-        color: Colors.blue,
-      );
-      context.read<BookingsBloc>().add(const LoadProviderBookings());
-    });
-
-    socket.on('booking.accepted', (data) {
-      if (!mounted) return;
-      _showNotification(
-        'Chúc mừng! Bạn đã được nhận việc!',
-        icon: Icons.celebration_rounded,
-        color: Colors.orange,
-      );
-      context.read<BookingsBloc>().add(const LoadProviderBookings());
-
-      // Auto redirect to navigation map if location is available
-      if (data['latitude'] != null && data['longitude'] != null) {
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) {
-            context.push('/provider/navigation', extra: {
-              'lat': double.tryParse(data['latitude'].toString()) ?? 0.0,
-              'lng': double.tryParse(data['longitude'].toString()) ?? 0.0,
-              'address': data['addressText'],
-              'customerName': data['customerName'],
-            });
-          }
-        });
-      }
-    });
+    // NOTE: All booking status updates are now handled by bookingStatusStream to avoid duplicate notifications
+    // including new requests and acceptance.
 
     // NOTE: booking.confirmed is now handled by bookingStatusStream to avoid duplicate notifications
 
     // Listen to unified status updates
-    socket.bookingStatusStream.listen((update) {
+    _bookingStatusSubscription =
+        socket.bookingStatusStream.distinct((prev, next) {
+      return prev.status == next.status &&
+          prev.bookingId == next.bookingId &&
+          prev.message == next.message;
+    }).listen((update) {
       if (!mounted) return;
 
       // Refresh provider data
@@ -109,6 +88,23 @@ class _ProviderShellScreenState extends State<ProviderShellScreen> {
               ? AppColors.error
               : AppColors.primary,
         );
+      }
+
+      // Auto redirect to navigation map if accepted and location is available
+      if (update.status == 'accepted' &&
+          update.actorId != socket.currentUserId &&
+          update.latitude != null &&
+          update.longitude != null) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            context.push('/provider/navigation', extra: {
+              'lat': double.tryParse(update.latitude!.toString()) ?? 0.0,
+              'lng': double.tryParse(update.longitude!.toString()) ?? 0.0,
+              'address': update.addressText,
+              'customerName': update.customerName,
+            });
+          }
+        });
       }
     });
   }
@@ -320,6 +316,19 @@ class _ProviderShellScreenState extends State<ProviderShellScreen> {
   }
 
   void _showNotification(String message, {IconData? icon, Color? color}) {
+    // Tránh hiện lại tin nhắn cũ trong thời gian ngắn
+    if (_lastNotificationMessage == message) return;
+    _lastNotificationMessage = message;
+
+    // Clear cache sau 2 giây
+    _messageClearTimer?.cancel();
+    _messageClearTimer = Timer(const Duration(seconds: 2), () {
+      _lastNotificationMessage = null;
+    });
+
+    // Xóa snackbar cũ trước khi hiện cái mới
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,

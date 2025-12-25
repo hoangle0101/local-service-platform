@@ -12,22 +12,25 @@ class RoleSelectionScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: GestureDetector(
-            onTap: () => context.pop(),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.divider.withOpacity(0.5)),
-              ),
-              child: const Icon(Icons.close_rounded,
-                  size: 20, color: AppColors.textPrimary),
-            ),
-          ),
-        ),
+        leading: context.canPop()
+            ? Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: GestureDetector(
+                  onTap: () => context.pop(),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      shape: BoxShape.circle,
+                      border:
+                          Border.all(color: AppColors.divider.withOpacity(0.5)),
+                    ),
+                    child: const Icon(Icons.close_rounded,
+                        size: 20, color: AppColors.textPrimary),
+                  ),
+                ),
+              )
+            : null,
       ),
       body: SafeArea(
         child: Padding(
