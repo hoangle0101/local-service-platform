@@ -10,6 +10,8 @@ import '../bloc/auth/auth_bloc.dart';
 import '../bloc/auth/auth_event.dart';
 import 'reviews/provider_reviews_screen.dart';
 import '../widgets/minimalist_widgets.dart';
+import 'package:dio/dio.dart';
+import '../../data/storage/secure_storage.dart';
 
 class ServiceDetailsScreen extends StatefulWidget {
   final int serviceId;
@@ -28,6 +30,8 @@ class ServiceDetailsScreen extends StatefulWidget {
 class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
   late ServicesBloc _servicesBloc;
   ProviderService? _service;
+  List<Map<String, dynamic>> _serviceItems = [];
+  bool _loadingItems = false;
 
   @override
   void initState() {
@@ -37,6 +41,56 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
 
     if (_service == null) {
       _servicesBloc.add(LoadServiceDetails(widget.serviceId));
+    } else {
+      _loadServiceItems(_service!);
+    }
+  }
+
+  Future<void> _loadServiceItems(ProviderService service) async {
+    setState(() => _loadingItems = true);
+    try {
+      final url =
+          '/services/${service.serviceId}/provider/${service.providerUserId}/items';
+      print('[ServiceDetails] Loading items from: $url');
+      print(
+          '[ServiceDetails] serviceId: ${service.serviceId}, providerUserId: ${service.providerUserId}');
+
+      final dio = Dio(BaseOptions(baseUrl: 'http://10.0.2.2:3000'));
+      final token = await SecureStorage.getAccessToken();
+      final response = await dio.get(
+        url,
+        options: token != null
+            ? Options(headers: {'Authorization': 'Bearer $token'})
+            : null,
+      );
+
+      print('[ServiceDetails] Response status: ${response.statusCode}');
+      print('[ServiceDetails] Response data: ${response.data}');
+      print(
+          '[ServiceDetails] Response data type: ${response.data.runtimeType}');
+
+      if (mounted) {
+        // Handle both direct array and wrapped response {statusCode, message, data: [...]}
+        List<dynamic> rawItems;
+        if (response.data is List) {
+          rawItems = response.data;
+        } else if (response.data is Map && response.data['data'] is List) {
+          rawItems = response.data['data'];
+        } else {
+          rawItems = [];
+        }
+
+        final items = List<Map<String, dynamic>>.from(rawItems);
+        print('[ServiceDetails] Parsed ${items.length} items');
+        setState(() {
+          _serviceItems = items;
+          _loadingItems = false;
+        });
+      }
+    } catch (e, stack) {
+      print('[ServiceDetails] ERROR loading items: $e');
+      print('[ServiceDetails] Stack: $stack');
+      if (mounted) setState(() => _loadingItems = false);
     }
   }
 
@@ -44,6 +98,14 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
   void dispose() {
     _servicesBloc.close();
     super.dispose();
+  }
+
+  /// Parse price from dynamic (could be string or num) to num
+  num _parsePrice(dynamic price) {
+    if (price == null) return 0;
+    if (price is num) return price;
+    if (price is String) return num.tryParse(price) ?? 0;
+    return 0;
   }
 
   void _openProviderReviews(BuildContext context, ProviderService service) {
@@ -77,6 +139,12 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
             );
           } else if (state is ServiceDetailsLoaded) {
             _service = state.service;
+            // Load items if not already loading
+            if (!_loadingItems && _serviceItems.isEmpty) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _loadServiceItems(state.service);
+              });
+            }
             return _buildContent(state.service);
           } else if (state is ServicesError) {
             return Scaffold(
@@ -139,6 +207,10 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
                   _buildSectionLabel('DỊCH VỤ ĐƯỢC CUNG CẤP BỞI'),
                   const SizedBox(height: 16),
                   _buildProviderInfo(context, service),
+                  const SizedBox(height: 32),
+                  _buildSectionLabel('BẢNG GIÁ THAM KHẢO'),
+                  const SizedBox(height: 16),
+                  _buildServiceItems(service),
                   const SizedBox(height: 32),
                   _buildSectionLabel('MÔ TẢ CHI TIẾT'),
                   const SizedBox(height: 16),
@@ -338,13 +410,28 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
           ],
         ),
         const SizedBox(height: 16),
-        Text(
-          currencyFormat.format(service.price).replaceAll(',00', ''),
-          style: const TextStyle(
-            color: AppColors.primary,
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -1,
+        // Show "Contact for quote" instead of fixed price
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.request_quote_rounded,
+                  size: 18, color: AppColors.primary),
+              SizedBox(width: 8),
+              Text(
+                'Liên hệ báo giá',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -461,6 +548,141 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
     );
   }
 
+  Widget _buildServiceItems(ProviderService service) {
+    if (_loadingItems) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
+    if (_serviceItems.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.divider.withOpacity(0.3)),
+        ),
+        child: const Column(
+          children: [
+            Icon(Icons.receipt_long_rounded,
+                size: 32, color: AppColors.textTertiary),
+            SizedBox(height: 12),
+            Text(
+              'Chưa có bảng giá',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Thợ sẽ báo giá sau khi kiểm tra',
+              style: TextStyle(
+                color: AppColors.textTertiary,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.divider.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: _serviceItems.asMap().entries.map((entry) {
+          final index = entry.key;
+          final item = entry.value;
+          final isLast = index == _serviceItems.length - 1;
+
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: isLast
+                  ? null
+                  : Border(
+                      bottom: BorderSide(
+                          color: AppColors.divider.withOpacity(0.3))),
+            ),
+            child: Row(
+              children: [
+                // Image
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: AppColors.shelf,
+                    borderRadius: BorderRadius.circular(10),
+                    image: item['imageUrl'] != null
+                        ? DecorationImage(
+                            image: NetworkImage(item['imageUrl']),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
+                  ),
+                  child: item['imageUrl'] == null
+                      ? const Icon(Icons.build_rounded,
+                          size: 20, color: AppColors.textTertiary)
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                // Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item['name'] ?? '',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      if (item['description'] != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          item['description'],
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                // Price
+                Text(
+                  currencyFormat
+                      .format(_parsePrice(item['price']))
+                      .replaceAll(',00', ''),
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   Widget _buildBottomBar(BuildContext context, ProviderService service,
       NumberFormat currencyFormat) {
     final authState = context.read<AuthBloc>().state;
@@ -494,7 +716,7 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'TỔNG CỘNG TẠM TÍNH',
+                    'GIÁ DỊCH VỤ',
                     style: TextStyle(
                       color: AppColors.textTertiary,
                       fontSize: 10,
@@ -503,13 +725,12 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    currencyFormat.format(service.price).replaceAll(',00', ''),
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 24,
-                      letterSpacing: -1,
+                  const Text(
+                    'Liên hệ báo giá',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
                     ),
                   ),
                 ],

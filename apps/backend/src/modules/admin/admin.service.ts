@@ -1100,6 +1100,10 @@ export class AdminService {
                 category: { select: { name: true } },
               },
             },
+            items: {
+              where: { isActive: true },
+              orderBy: { sortOrder: 'asc' },
+            },
           },
         },
       },

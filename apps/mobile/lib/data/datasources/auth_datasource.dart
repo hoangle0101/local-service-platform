@@ -21,17 +21,20 @@ class AuthDataSource {
     required String phone,
     required String password,
     required String fullName,
+    String? role, // Optional: 'customer' or 'provider'
   }) async {
     try {
       print('📤 Sending registration request:');
       print('   Phone: $phone');
       print('   Password: ${password.replaceAll(RegExp(r'.'), '*')}');
       print('   Full Name: $fullName');
+      print('   Role: ${role ?? 'customer (default)'}');
 
       final response = await _dio.post('/auth/register', data: {
         'phone': phone,
         'password': password,
         'fullName': fullName,
+        if (role != null) 'role': role,
       });
 
       print('✅ Registration successful');

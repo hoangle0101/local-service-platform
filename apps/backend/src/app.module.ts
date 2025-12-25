@@ -18,6 +18,8 @@ import { AdminModule } from './modules/admin/admin.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ServiceQuotesModule } from './modules/service-quotes/service-quotes.module';
+import { ProviderServiceItemsModule } from './modules/provider-service-items/provider-service-items.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -42,6 +44,8 @@ import configuration from './config/configuration';
     ReviewsModule,
     PaymentModule,
     NotificationsModule,
+    ServiceQuotesModule,
+    ProviderServiceItemsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

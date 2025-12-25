@@ -226,8 +226,9 @@ export default function ProvidersPage() {
             Xem
           </Button>
 
-          {/* Provider Business Verification */}
-          {provider.verificationStatus === "pending" && (
+          {/* Provider Business Verification - show for pending or unverified */}
+          {(provider.verificationStatus === "pending" ||
+            provider.verificationStatus === "unverified") && (
             <>
               <Button
                 variant="outline"

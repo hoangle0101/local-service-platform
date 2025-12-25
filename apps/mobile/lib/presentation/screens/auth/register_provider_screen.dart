@@ -103,6 +103,7 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
                 phone: phone,
                 password: _passwordController.text,
                 fullName: _fullNameController.text,
+                role: 'provider', // Register as provider, not customer
               ),
             );
       }

@@ -120,6 +120,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         phone: event.phone,
         password: event.password,
         fullName: event.fullName,
+        role: event.role,
       );
 
       emit(RegistrationSuccess(

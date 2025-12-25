@@ -65,6 +65,7 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
         longitude: event.longitude,
         notes: event.notes,
         providerId: event.providerId, // Pass providerId for direct booking
+        selectedItems: event.selectedItems, // Pass selected service items
       );
 
       // Safely extract values with proper null handling and type conversion
