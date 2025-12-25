@@ -41,15 +41,17 @@ class RegisterRequested extends AuthEvent {
   final String phone;
   final String password;
   final String fullName;
+  final String? role; // Optional: 'customer' or 'provider'
 
   const RegisterRequested({
     required this.phone,
     required this.password,
     required this.fullName,
+    this.role,
   });
 
   @override
-  List<Object?> get props => [phone, password, fullName];
+  List<Object?> get props => [phone, password, fullName, role];
 }
 
 class OtpSendRequested extends AuthEvent {

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:dio/dio.dart';
 import 'dart:async';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/entities/entities.dart';
 import '../../../data/datasources/track_asia_datasource.dart';
+import '../../../data/storage/secure_storage.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../widgets/minimalist_widgets.dart';
@@ -44,6 +46,82 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
   List<AddressPrediction> _addressPredictions = [];
   Timer? _debounceTimer;
   bool _showPredictions = false;
+
+  // Service Items Selection
+  List<Map<String, dynamic>> _serviceItems = [];
+  Map<String, int> _selectedItemQuantities = {}; // itemId -> quantity
+  bool _loadingItems = false;
+  bool _letProviderQuote =
+      false; // true = don't select items, let provider quote
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.providerId != null) {
+      _loadServiceItems();
+    }
+  }
+
+  Future<void> _loadServiceItems() async {
+    debugPrint(
+        '[CreateBooking] _loadServiceItems called, providerId=${widget.providerId}');
+    if (widget.providerId == null) return;
+    setState(() => _loadingItems = true);
+    try {
+      final dio = Dio(BaseOptions(baseUrl: 'http://10.0.2.2:3000'));
+      final token = await SecureStorage.getAccessToken();
+      final url =
+          '/services/${widget.serviceId}/provider/${widget.providerId}/items';
+      debugPrint('[CreateBooking] Fetching items from: $url');
+      final response = await dio.get(
+        url,
+        options: token != null
+            ? Options(headers: {'Authorization': 'Bearer $token'})
+            : null,
+      );
+      debugPrint('[CreateBooking] Response: ${response.data}');
+      if (mounted) {
+        List<dynamic> rawItems;
+        if (response.data is List) {
+          rawItems = response.data;
+        } else if (response.data is Map && response.data['data'] is List) {
+          rawItems = response.data['data'];
+        } else {
+          rawItems = [];
+        }
+        debugPrint('[CreateBooking] Parsed ${rawItems.length} items');
+        setState(() {
+          _serviceItems = List<Map<String, dynamic>>.from(rawItems);
+          _loadingItems = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[CreateBooking] Load items error: $e');
+      if (mounted) setState(() => _loadingItems = false);
+    }
+  }
+
+  double get _totalFromSelectedItems {
+    double total = 0;
+    for (final entry in _selectedItemQuantities.entries) {
+      final item = _serviceItems.firstWhere(
+        (i) => i['id'].toString() == entry.key,
+        orElse: () => {},
+      );
+      if (item.isNotEmpty) {
+        final price = _parsePrice(item['price']);
+        total += price * entry.value;
+      }
+    }
+    return total;
+  }
+
+  num _parsePrice(dynamic price) {
+    if (price == null) return 0;
+    if (price is num) return price;
+    if (price is String) return num.tryParse(price) ?? 0;
+    return 0;
+  }
 
   @override
   void dispose() {
@@ -135,6 +213,13 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
                           const SizedBox(height: 16),
                           _buildDateTimeSection(),
                           const SizedBox(height: 32),
+                          // Service Items Selection (only for direct booking)
+                          if (widget.providerId != null) ...[
+                            _buildSectionLabel('CHỌN DỊCH VỤ CỤ THỂ'),
+                            const SizedBox(height: 16),
+                            _buildServiceItemsSection(),
+                            const SizedBox(height: 32),
+                          ],
                           _buildSectionLabel('ĐỊA ĐIỂM CỦA BẠN'),
                           const SizedBox(height: 16),
                           _buildLocationSection(),
@@ -591,9 +676,360 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
     );
   }
 
-  Widget _buildPriceSummary() {
-    final price = widget.service?.price ?? 0;
+  Widget _buildServiceItemsSection() {
+    if (_loadingItems) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
 
+    if (_serviceItems.isEmpty) {
+      return MinCard(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline_rounded,
+                size: 24, color: AppColors.warning),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Thợ chưa có bảng giá. Giá sẽ được báo sau khi kiểm tra.',
+                style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Let provider quote toggle
+        MinCard(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          onTap: () => setState(() => _letProviderQuote = !_letProviderQuote),
+          child: Row(
+            children: [
+              Icon(
+                _letProviderQuote
+                    ? Icons.check_box_rounded
+                    : Icons.check_box_outline_blank_rounded,
+                color: _letProviderQuote
+                    ? AppColors.primary
+                    : AppColors.textTertiary,
+                size: 22,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Để thợ báo giá sau khi kiểm tra',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: _letProviderQuote
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (!_letProviderQuote) ...[
+          const SizedBox(height: 16),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.divider.withOpacity(0.3)),
+            ),
+            child: Column(
+              children: _serviceItems.asMap().entries.map((entry) {
+                final index = entry.key;
+                final item = entry.value;
+                final itemId = item['id'].toString();
+                final isLast = index == _serviceItems.length - 1;
+                final quantity = _selectedItemQuantities[itemId] ?? 0;
+                final price = _parsePrice(item['price']);
+
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: isLast
+                        ? null
+                        : Border(
+                            bottom: BorderSide(
+                                color: AppColors.divider.withOpacity(0.3))),
+                  ),
+                  child: Row(
+                    children: [
+                      // Item info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item['name'] ?? '',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              currencyFormat
+                                  .format(price)
+                                  .replaceAll(',00', ''),
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Quantity controls
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              if (quantity > 0) {
+                                setState(() {
+                                  if (quantity == 1) {
+                                    _selectedItemQuantities.remove(itemId);
+                                  } else {
+                                    _selectedItemQuantities[itemId] =
+                                        quantity - 1;
+                                  }
+                                });
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: quantity > 0
+                                    ? AppColors.primary.withOpacity(0.1)
+                                    : AppColors.shelf,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.remove_rounded,
+                                size: 18,
+                                color: quantity > 0
+                                    ? AppColors.primary
+                                    : AppColors.textTertiary,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            width: 36,
+                            alignment: Alignment.center,
+                            child: Text(
+                              quantity.toString(),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                                color: quantity > 0
+                                    ? AppColors.primary
+                                    : AppColors.textTertiary,
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedItemQuantities[itemId] = quantity + 1;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.add_rounded,
+                                size: 18,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          if (_selectedItemQuantities.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Tổng dịch vụ đã chọn:',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textSecondary),
+                  ),
+                  Text(
+                    currencyFormat
+                        .format(_totalFromSelectedItems)
+                        .replaceAll(',00', ''),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPriceSummary() {
+    // Case 1: User selected "let provider quote later"
+    if (_letProviderQuote ||
+        (_serviceItems.isNotEmpty &&
+            _selectedItemQuantities.isEmpty &&
+            !_letProviderQuote == false)) {
+      // When provider will quote later - show pending message
+      if (_letProviderQuote) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppColors.divider.withOpacity(0.3)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.access_time_rounded,
+                        size: 24, color: AppColors.warning),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'CHỜ BÁO GIÁ',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                              color: AppColors.textPrimary,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Thợ sẽ kiểm tra và gửi báo giá cho bạn sau.',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+
+    // Case 2: User selected specific items - show their total
+    if (_selectedItemQuantities.isNotEmpty) {
+      final total = _totalFromSelectedItems;
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.divider.withOpacity(0.3)),
+        ),
+        child: Column(
+          children: [
+            ...(_selectedItemQuantities.entries.map((entry) {
+              final item = _serviceItems.firstWhere(
+                (i) => i['id'].toString() == entry.key,
+                orElse: () => {},
+              );
+              if (item.isEmpty) return const SizedBox.shrink();
+              final price = _parsePrice(item['price']);
+              final itemTotal = price * entry.value;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildPriceRow(
+                  '${item['name']} x${entry.value}',
+                  itemTotal.toDouble(),
+                ),
+              );
+            }).toList()),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Divider(height: 1, color: AppColors.divider),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'TỔNG CỘNG',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                      color: AppColors.textPrimary,
+                      letterSpacing: 0.5),
+                ),
+                Text(
+                  NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
+                      .format(total),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 22,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Case 3: Default - show base price
+    final price = widget.service?.price ?? 0;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -603,47 +1039,20 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
       ),
       child: Column(
         children: [
-          _buildPriceRow('Tiền dịch vụ', price),
-          const SizedBox(height: 16),
-          _buildPriceRow('Phí dịch vụ (tạm tính)', 0, isFree: true),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 20),
-            child: Divider(height: 1, color: AppColors.divider),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'TỔNG TẠM TÍNH',
-                style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13,
-                    color: AppColors.textPrimary,
-                    letterSpacing: 0.5),
-              ),
-              Text(
-                NumberFormat.currency(locale: 'vi_VN', symbol: '₫')
-                    .format(price),
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 22,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
-          ),
+          _buildPriceRow('Giá dịch vụ (tham khảo)', price),
           const SizedBox(height: 16),
           Row(
             children: const [
-              Icon(Icons.shield_rounded, size: 14, color: AppColors.success),
+              Icon(Icons.info_outline_rounded,
+                  size: 14, color: AppColors.textTertiary),
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Chi phí thực tế có thể thay đổi dựa trên thỏa thuận.',
+                  'Chọn dịch vụ cụ thể bên trên để xem giá chính xác.',
                   style: TextStyle(
                       color: AppColors.textTertiary,
                       fontSize: 11,
-                      fontWeight: FontWeight.w700),
+                      fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -693,6 +1102,16 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
         _selectedTime.minute,
       );
 
+      // Prepare selected items list for backend
+      List<Map<String, dynamic>>? selectedItems;
+      if (widget.providerId != null &&
+          !_letProviderQuote &&
+          _selectedItemQuantities.isNotEmpty) {
+        selectedItems = _selectedItemQuantities.entries
+            .map((e) => {'itemId': e.key, 'quantity': e.value})
+            .toList();
+      }
+
       context.read<BookingsBloc>().add(CreateBookingEvent(
             serviceId: widget.serviceId,
             scheduledAt: scheduledAt,
@@ -701,6 +1120,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
             longitude: _longitude,
             notes: _notesController.text.isEmpty ? null : _notesController.text,
             providerId: widget.providerId,
+            selectedItems: selectedItems,
           ));
     }
   }

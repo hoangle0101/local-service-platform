@@ -308,24 +308,80 @@ export default function ProviderDetailPage() {
         {provider.services && provider.services.length > 0 && (
           <Card className="md:col-span-2">
             <CardHeader>
-              <CardTitle>Services Offered</CardTitle>
+              <CardTitle>Services Offered & Price List</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {provider.services.map((service, index) => (
+              <div className="space-y-4">
+                {provider.services.map((service: any, index: number) => (
                   <div
                     key={service.id || index}
-                    className="p-3 rounded-lg bg-zinc-50"
+                    className="p-4 rounded-lg bg-zinc-50 border"
                   >
-                    <p className="font-medium">
-                      {service.service?.name || "Unknown Service"}
-                    </p>
-                    <p className="text-sm text-zinc-600">
-                      Base Price: {formatCurrency(service.basePrice)}
-                    </p>
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="font-semibold text-lg">
+                          {service.service?.name || "Unknown Service"}
+                        </p>
+                        <p className="text-sm text-zinc-600">
+                          Base Price:{" "}
+                          {formatCurrency(service.price || service.basePrice)}
+                        </p>
+                      </div>
+                      <StatusBadge
+                        status={service.isActive ? "active" : "inactive"}
+                      />
+                    </div>
                     {service.description && (
-                      <p className="text-xs text-zinc-500 mt-1">
+                      <p className="text-sm text-zinc-500 mb-3">
                         {service.description}
+                      </p>
+                    )}
+
+                    {/* Service Items / Price List */}
+                    {service.items && service.items.length > 0 && (
+                      <div className="mt-3 border-t pt-3">
+                        <p className="text-sm font-medium text-zinc-700 mb-2">
+                          📋 Bảng giá chi tiết ({service.items.length} mục)
+                        </p>
+                        <div className="grid gap-2">
+                          {service.items.map((item: any, itemIdx: number) => (
+                            <div
+                              key={item.id || itemIdx}
+                              className="flex items-center gap-3 p-2 bg-white rounded-md border"
+                            >
+                              {item.imageUrl ? (
+                                <img
+                                  src={item.imageUrl}
+                                  alt={item.name}
+                                  className="w-10 h-10 rounded object-cover"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded bg-zinc-100 flex items-center justify-center">
+                                  🔧
+                                </div>
+                              )}
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">
+                                  {item.name}
+                                </p>
+                                {item.description && (
+                                  <p className="text-xs text-zinc-500">
+                                    {item.description}
+                                  </p>
+                                )}
+                              </div>
+                              <p className="text-sm font-bold text-green-600">
+                                {formatCurrency(item.price)}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(!service.items || service.items.length === 0) && (
+                      <p className="text-xs text-zinc-400 mt-2 italic">
+                        Chưa có bảng giá chi tiết
                       </p>
                     )}
                   </div>

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import '../../core/entities/entities.dart';
 import '../bloc/favorites/favorites_bloc.dart';
 import '../../core/theme/app_colors.dart';
@@ -145,8 +144,6 @@ class _MetricRibbon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final priceFormat = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
@@ -170,13 +167,21 @@ class _MetricRibbon extends StatelessWidget {
                   AppColors.primary),
             ],
           ),
-          Text(
-            priceFormat.format(service.price).replaceAll(',00', ''),
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w900,
-              fontSize: 18,
-              letterSpacing: -0.5,
+          // Show "Liên hệ" instead of fixed price
+          // Actual price is only known after provider inspection
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              'Liên hệ báo giá',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
             ),
           ),
         ],

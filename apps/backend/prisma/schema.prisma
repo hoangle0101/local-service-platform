@@ -359,11 +359,33 @@ model ProviderService {
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-  provider ProviderProfile @relation(fields: [providerUserId], references: [userId], onDelete: Cascade)
-  service  Service         @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  provider ProviderProfile       @relation(fields: [providerUserId], references: [userId], onDelete: Cascade)
+  service  Service               @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  items    ProviderServiceItem[]
 
   @@id([providerUserId, serviceId])
   @@map("provider_services")
+}
+
+// Sub-services with specific prices and images defined by provider
+model ProviderServiceItem {
+  id             BigInt   @id @default(autoincrement())
+  providerUserId BigInt   @map("provider_user_id")
+  serviceId      Int      @map("service_id")
+  name           String   @db.VarChar(200)
+  description    String?  @db.Text
+  price          Decimal  @db.Decimal(12, 2)
+  imageUrl       String?  @map("image_url") @db.Text
+  isActive       Boolean  @default(true) @map("is_active")
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  providerService      ProviderService       @relation(fields: [providerUserId, serviceId], references: [providerUserId, serviceId], onDelete: Cascade)
+  bookingSelectedItems BookingSelectedItem[]
+
+  @@index([providerUserId, serviceId])
+  @@map("provider_service_items")
 }
 
 model Favorite {
@@ -424,9 +446,9 @@ model Booking {
   cancelledAt              DateTime?                            @map("cancelled_at") @db.Timestamptz(6)
   paidAt                   DateTime?                            @map("paid_at") @db.Timestamptz(6)
 
-  customer       User            @relation("CustomerBookings", fields: [customerId], references: [id], onDelete: Restrict)
-  providerUser   User?           @relation("ProviderBookings", fields: [providerId], references: [id], onDelete: Restrict)
-  service        Service         @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  customer       User                  @relation("CustomerBookings", fields: [customerId], references: [id], onDelete: Restrict)
+  providerUser   User?                 @relation("ProviderBookings", fields: [providerId], references: [id], onDelete: Restrict)
+  service        Service               @relation(fields: [serviceId], references: [id], onDelete: Restrict)
   bookingEvents  BookingEvent[]
   payments       Payment[]
   review         Review?
@@ -435,12 +457,31 @@ model Booking {
   bookingOffers  BookingOffer[]
   serviceQuotes  ServiceQuote[]
   bookingPayment BookingPayment?
+  selectedItems  BookingSelectedItem[]
 
   @@index([customerId, status])
   @@index([providerId, status])
   @@index([scheduledAt])
   @@index([status, scheduledAt])
   @@map("bookings")
+}
+
+// Items pre-selected by customer during booking
+model BookingSelectedItem {
+  id                    BigInt   @id @default(autoincrement())
+  bookingId             BigInt   @map("booking_id")
+  providerServiceItemId BigInt   @map("provider_service_item_id")
+  quantity              Int      @default(1)
+  unitPrice             Decimal  @map("unit_price") @db.Decimal(12, 2)
+  totalPrice            Decimal  @map("total_price") @db.Decimal(12, 2)
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  booking             Booking             @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  providerServiceItem ProviderServiceItem @relation(fields: [providerServiceItemId], references: [id], onDelete: Restrict)
+
+  @@unique([bookingId, providerServiceItemId])
+  @@index([bookingId])
+  @@map("booking_selected_items")
 }
 
 model BookingOffer {

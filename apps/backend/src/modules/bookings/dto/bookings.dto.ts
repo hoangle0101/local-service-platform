@@ -5,6 +5,8 @@ import {
   IsDateString,
   IsOptional,
   IsEnum,
+  IsArray,
+  ValidateNested,
   Min,
   Max,
 } from 'class-validator';
@@ -31,6 +33,20 @@ export class EstimateDto {
   @IsOptional()
   @IsNumber()
   longitude?: number;
+}
+
+// DTO for selected service items during booking
+export class SelectedItemDto {
+  @ApiProperty({ example: '1', description: 'Provider service item ID' })
+  @IsNotEmpty()
+  @IsString()
+  itemId: string;
+
+  @ApiPropertyOptional({ example: 1, default: 1 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  quantity?: number = 1;
 }
 
 export class CreateBookingDto {
@@ -72,6 +88,18 @@ export class CreateBookingDto {
   @IsOptional()
   @IsNumber()
   providerId?: number;
+
+  @ApiPropertyOptional({
+    type: [SelectedItemDto],
+    description:
+      'Pre-selected service items. If empty, provider will quote later.',
+    example: [{ itemId: '1', quantity: 1 }],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SelectedItemDto)
+  selectedItems?: SelectedItemDto[];
 }
 
 export class CancelBookingDto {

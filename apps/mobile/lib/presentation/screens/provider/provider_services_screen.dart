@@ -9,6 +9,7 @@ import '../../bloc/services/services_event_state.dart';
 import '../../bloc/categories/categories_bloc.dart';
 import '../../bloc/categories/categories_event_state.dart';
 import '../../widgets/minimalist_widgets.dart';
+import 'manage_service_items_screen.dart';
 
 // Helper to safely parse int
 int _safeInt(dynamic value, {int defaultValue = 0}) {
@@ -408,11 +409,28 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _buildActionButton(
+                    icon: Icons.receipt_long_rounded,
+                    label: 'Bảng giá',
+                    color: AppColors.primary,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ManageServiceItemsScreen(
+                          serviceId: serviceId,
+                          serviceName: serviceName,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildActionButton(
                     icon: isActive
                         ? Icons.pause_rounded
                         : Icons.play_arrow_rounded,
-                    label: isActive ? 'Tạm ngưng' : 'Kích hoạt',
-                    color: isActive ? AppColors.warning : AppColors.primary,
+                    label: isActive ? 'Tạm ngưng' : 'Bật',
+                    color: isActive ? AppColors.warning : AppColors.success,
                     onTap: () => _toggleService(serviceId, !isActive),
                   ),
                 ),

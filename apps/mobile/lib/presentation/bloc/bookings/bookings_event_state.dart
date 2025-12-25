@@ -32,6 +32,7 @@ class CreateBookingEvent extends BookingsEvent {
   final double longitude;
   final String? notes;
   final int? providerId; // For direct booking
+  final List<Map<String, dynamic>>? selectedItems; // Pre-selected service items
 
   const CreateBookingEvent({
     required this.serviceId,
@@ -41,6 +42,7 @@ class CreateBookingEvent extends BookingsEvent {
     required this.longitude,
     this.notes,
     this.providerId,
+    this.selectedItems,
   });
 
   @override
@@ -51,7 +53,8 @@ class CreateBookingEvent extends BookingsEvent {
         latitude,
         longitude,
         notes,
-        providerId
+        providerId,
+        selectedItems,
       ];
 }
 
