@@ -374,42 +374,6 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
     );
   }
 
-  Widget _buildToggleOption({
-    required String title,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive ? AppColors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(100),
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                        color: Colors.black.withOpacity(0.05), blurRadius: 10)
-                  ]
-                : null,
-          ),
-          child: Center(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 13,
-                color:
-                    isActive ? AppColors.textPrimary : AppColors.textTertiary,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildServiceSelector() {
     if (_selectedCategory == null) {
       return MinCard(

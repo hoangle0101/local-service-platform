@@ -297,24 +297,6 @@ class _ProviderShellScreenState extends State<ProviderShellScreen> {
     );
   }
 
-  Widget _buildDialogRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: AppColors.textTertiary),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(text,
-              style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
-        ),
-      ],
-    );
-  }
-
   void _showNotification(String message, {IconData? icon, Color? color}) {
     // Tránh hiện lại tin nhắn cũ trong thời gian ngắn
     if (_lastNotificationMessage == message) return;

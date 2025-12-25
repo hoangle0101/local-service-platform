@@ -6,7 +6,6 @@ import '../../../data/datasources/bookings_datasource.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../widgets/minimalist_widgets.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import 'create_quote_screen.dart';
 
@@ -708,28 +707,6 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
       'address': booking.addressText,
       'customerName': booking.customerName,
     });
-  }
-
-  Future<void> _openMap(double lat, double lng) async {
-    final googleUrl =
-        Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
-    final appleUrl = Uri.parse('https://maps.apple.com/?q=$lat,$lng');
-
-    try {
-      if (await canLaunchUrl(googleUrl)) {
-        await launchUrl(googleUrl, mode: LaunchMode.externalApplication);
-      } else if (await canLaunchUrl(appleUrl)) {
-        await launchUrl(appleUrl, mode: LaunchMode.externalApplication);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Không thể mở bản đồ')),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('[ProviderBookings] Error opening map: $e');
-    }
   }
 
   void _showCustomerReviewDialog(BookingReview review, {String? customerName}) {

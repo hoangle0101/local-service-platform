@@ -208,7 +208,6 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken,
           userPhone: phone);
-      final token = tokens.accessToken;
 
       await providerDataSource.createProviderProfile(
         displayName: _displayNameController.text,

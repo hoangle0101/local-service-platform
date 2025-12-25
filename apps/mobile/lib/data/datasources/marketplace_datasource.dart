@@ -157,18 +157,6 @@ class MarketplaceDataSource {
     }
   }
 
-  // Helper function to safely parse numbers (handles String, int, double, null)
-  double _parseDouble(dynamic value, {double defaultValue = 0.0}) {
-    if (value == null) return defaultValue;
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is String) {
-      final parsed = double.tryParse(value);
-      return parsed ?? defaultValue;
-    }
-    return defaultValue;
-  }
-
   int _parseInt(dynamic value, {int defaultValue = 0}) {
     if (value == null) return defaultValue;
     if (value is int) return value;
