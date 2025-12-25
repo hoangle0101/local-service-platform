@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -21,6 +22,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { GatewayModule } from './modules/gateway/gateway.module';
 import { ServiceQuotesModule } from './modules/service-quotes/service-quotes.module';
 import { ProviderServiceItemsModule } from './modules/provider-service-items/provider-service-items.module';
+import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import configuration from './config/configuration';
 
 @Module({
@@ -29,6 +31,7 @@ import configuration from './config/configuration';
       isGlobal: true,
       load: [configuration],
     }),
+    ScheduleModule.forRoot(),
     GatewayModule,
     PrismaModule,
     AuthModule,
@@ -52,4 +55,8 @@ import configuration from './config/configuration';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(LoggerMiddleware).forRoutes('*');
+  }
+}

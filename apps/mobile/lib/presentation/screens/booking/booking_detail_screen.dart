@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/quote_datasource.dart';
+import '../../../data/datasources/bookings_datasource.dart';
+import '../../../data/datasources/payment_datasource.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
+import '../../../core/services/socket_service.dart';
+import 'dart:async';
 import '../../widgets/minimalist_widgets.dart';
 import '../../widgets/booking_offers_dialog.dart';
 import '../provider/create_quote_screen.dart';
@@ -25,7 +33,37 @@ class BookingDetailScreen extends StatefulWidget {
 
 class _BookingDetailScreenState extends State<BookingDetailScreen> {
   final QuoteDataSource _quoteDataSource = QuoteDataSource();
+  final BookingsDataSource _bookingsDataSource = BookingsDataSource();
+  final PaymentDataSource _paymentDataSource = PaymentDataSource();
   bool _isActionLoading = false;
+  StreamSubscription? _bookingSocketSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initSocketListener();
+  }
+
+  void _initSocketListener() {
+    _bookingSocketSubscription =
+        SocketService().bookingStatusStream.listen((data) {
+      final bookingId = data.bookingId;
+      if (bookingId == widget.booking.id) {
+        // Refresh the booking data
+        if (mounted) {
+          context.read<BookingsBloc>().add(const LoadBookings());
+          // Optional: Force a local state update if needed,
+          // but BlocListener below usually handles this.
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _bookingSocketSubscription?.cancel();
+    super.dispose();
+  }
 
   void _onActionSuccess(String message) {
     if (mounted) {
@@ -55,7 +93,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     final currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
     final dateFormat = DateFormat('EEEE, dd/MM/yyyy');
     final timeFormat = DateFormat('HH:mm');
-    final price = double.tryParse(widget.booking.estimatedPrice ?? '0') ?? 0;
 
     return BlocListener<BookingsBloc, BookingsState>(
       listener: (context, state) {
@@ -65,52 +102,224 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           _onActionError(state.message);
         }
       },
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(
-          title: Text(
-            'Chi tiết đơn hàng',
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w900,
-              fontSize: 20,
-            ),
-          ),
-          centerTitle: true,
-          backgroundColor: AppColors.background,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                color: AppColors.textPrimary, size: 20),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Status Section
-              _buildStatusHeader(),
-              const SizedBox(height: 24),
+      child: BlocBuilder<BookingsBloc, BookingsState>(
+        builder: (context, state) {
+          Booking booking = widget.booking;
+          if (state is BookingsLoaded) {
+            try {
+              booking =
+                  state.bookings.firstWhere((b) => b.id == widget.booking.id);
+            } catch (_) {
+              // Stay with initial booking if not found in current loaded list
+            }
+          }
 
-              // Service Info
-              _buildSectionTitle('DỊCH VỤ'),
-              MinCard(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+          final price = double.tryParse(booking.estimatedPrice ?? '0') ?? 0;
+
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              title: Text(
+                'Chi tiết đơn hàng',
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 20,
+                ),
+              ),
+              centerTitle: true,
+              backgroundColor: AppColors.background,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                    color: AppColors.textPrimary, size: 20),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Status Section
+                  _buildStatusHeader(booking),
+                  const SizedBox(height: 24),
+
+                  // Service Info
+                  _buildSectionTitle('DỊCH VỤ'),
+                  MinCard(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(16),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Icon(Icons.cleaning_services_rounded,
+                                  color: AppColors.primary, size: 28),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    booking.serviceName ?? 'Dịch vụ',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  if (booking.categoryName != null)
+                                    Text(
+                                      booking.categoryName!,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textTertiary,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (booking.notes != null &&
+                            booking.notes!.isNotEmpty) ...[
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Divider(color: AppColors.divider),
                           ),
-                          child: Icon(Icons.cleaning_services_rounded,
-                              color: AppColors.primary, size: 28),
+                          const Text(
+                            'Ghi chú từ khách hàng:',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textTertiary,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            booking.notes!,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textPrimary,
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Time and Date
+                  _buildSectionTitle('THỜI GIAN'),
+                  MinCard(
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
+                      children: [
+                        _buildDateTimeItem(
+                          Icons.calendar_month_rounded,
+                          'Ngày thực hiện',
+                          booking.scheduledAt != null
+                              ? dateFormat.format(booking.scheduledAt!)
+                              : 'N/A',
+                        ),
+                        const SizedBox(width: 24),
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: AppColors.divider.withOpacity(0.5),
+                        ),
+                        const SizedBox(width: 24),
+                        _buildDateTimeItem(
+                          Icons.access_time_filled_rounded,
+                          'Giờ bắt đầu',
+                          booking.scheduledAt != null
+                              ? timeFormat.format(booking.scheduledAt!)
+                              : 'N/A',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Location Section
+                  _buildSectionTitle('ĐỊA ĐIỂM'),
+                  MinCard(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        _buildLocationRow(
+                          Icons.my_location_rounded,
+                          'Địa chỉ khách hàng',
+                          booking.addressText ?? 'N/A',
+                          AppColors.primary,
+                        ),
+                        if (booking.providerAddress != null) ...[
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Divider(color: AppColors.divider),
+                          ),
+                          _buildLocationRow(
+                            Icons.store_rounded,
+                            'Địa chỉ đối tác',
+                            booking.providerAddress!,
+                            AppColors.accent,
+                          ),
+                        ],
+                        if (booking.distance != null) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: AppColors.shelf.withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.directions_car_rounded,
+                                    size: 18, color: AppColors.textSecondary),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Khoảng cách: ${booking.distance! < 1000 ? "${booking.distance} m" : "${(booking.distance! / 1000).toStringAsFixed(1)} km"}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Provider/Customer Info
+                  _buildSectionTitle(
+                      widget.isProvider ? 'KHÁCH HÀNG' : 'ĐỐI TÁC'),
+                  MinCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        const CircleAvatar(
+                          radius: 24,
+                          backgroundColor: AppColors.shelf,
+                          child: Icon(Icons.person_rounded,
+                              color: AppColors.textTertiary),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -118,261 +327,106 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                widget.booking.serviceName ?? 'Dịch vụ',
+                                (widget.isProvider
+                                        ? booking.customerName
+                                        : booking.providerName) ??
+                                    'N/A',
                                 style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
                                   color: AppColors.textPrimary,
                                 ),
                               ),
-                              if (widget.booking.categoryName != null)
-                                Text(
-                                  widget.booking.categoryName!,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textTertiary,
-                                  ),
+                              Text(
+                                widget.isProvider
+                                    ? 'Khách hàng'
+                                    : 'Người cung cấp dịch vụ',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textTertiary,
                                 ),
+                              ),
                             ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {}, // TODO: Chat integration
+                          icon: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.chat_bubble_rounded,
+                                color: AppColors.primary, size: 18),
                           ),
                         ),
                       ],
                     ),
-                    if (widget.booking.notes != null &&
-                        widget.booking.notes!.isNotEmpty) ...[
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Divider(color: AppColors.divider),
-                      ),
-                      const Text(
-                        'Ghi chú từ khách hàng:',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textTertiary,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.booking.notes!,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textPrimary,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
+                  ),
+                  const SizedBox(height: 24),
 
-              // Time and Date
-              _buildSectionTitle('THỜI GIAN'),
-              MinCard(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  children: [
-                    _buildDateTimeItem(
-                      Icons.calendar_month_rounded,
-                      'Ngày thực hiện',
-                      widget.booking.scheduledAt != null
-                          ? dateFormat.format(widget.booking.scheduledAt!)
-                          : 'N/A',
-                    ),
-                    const SizedBox(width: 24),
-                    Container(
-                      width: 1,
-                      height: 40,
-                      color: AppColors.divider.withOpacity(0.5),
-                    ),
-                    const SizedBox(width: 24),
-                    _buildDateTimeItem(
-                      Icons.access_time_filled_rounded,
-                      'Giờ bắt đầu',
-                      widget.booking.scheduledAt != null
-                          ? timeFormat.format(widget.booking.scheduledAt!)
-                          : 'N/A',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Location Section
-              _buildSectionTitle('ĐỊA ĐIỂM'),
-              MinCard(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    _buildLocationRow(
-                      Icons.my_location_rounded,
-                      'Địa chỉ khách hàng',
-                      widget.booking.addressText ?? 'N/A',
-                      AppColors.primary,
-                    ),
-                    if (widget.booking.providerAddress != null) ...[
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Divider(color: AppColors.divider),
-                      ),
-                      _buildLocationRow(
-                        Icons.store_rounded,
-                        'Địa chỉ đối tác',
-                        widget.booking.providerAddress!,
-                        AppColors.accent,
-                      ),
-                    ],
-                    if (widget.booking.distance != null) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: AppColors.shelf.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
+                  // Payment Info
+                  _buildSectionTitle('THANH TOÁN'),
+                  MinCard(
+                    padding: const EdgeInsets.all(24),
+                    backgroundColor: AppColors.white,
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Icon(Icons.directions_car_rounded,
-                                size: 18, color: AppColors.textSecondary),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Khoảng cách: ${widget.booking.distance! < 1000 ? "${widget.booking.distance} m" : "${(widget.booking.distance! / 1000).toStringAsFixed(1)} km"}',
-                              style: const TextStyle(
-                                fontSize: 13,
+                            const Text(
+                              'Tổng thanh toán',
+                              style: TextStyle(
+                                fontSize: 14,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.textSecondary,
                               ),
                             ),
+                            Text(
+                              price > 0
+                                  ? currencyFormat
+                                      .format(price)
+                                      .replaceAll(',00', '')
+                                  : 'CHỜ BÁO GIÁ',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                color: price > 0
+                                    ? AppColors.success
+                                    : AppColors.warning,
+                              ),
+                            ),
                           ],
                         ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Provider/Customer Info
-              _buildSectionTitle(widget.isProvider ? 'KHÁCH HÀNG' : 'ĐỐI TÁC'),
-              MinCard(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    const CircleAvatar(
-                      radius: 24,
-                      backgroundColor: AppColors.shelf,
-                      child: Icon(Icons.person_rounded,
-                          color: AppColors.textTertiary),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            (widget.isProvider
-                                    ? widget.booking.customerName
-                                    : widget.booking.providerName) ??
-                                'N/A',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          Text(
-                            widget.isProvider
-                                ? 'Khách hàng'
-                                : 'Người cung cấp dịch vụ',
-                            style: const TextStyle(
+                        if (price == 0) ...[
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Thợ sẽ kiểm tra tình trạng thực tế và gửi báo giá lại cho bạn sau.',
+                            style: TextStyle(
                               fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w500,
                               color: AppColors.textTertiary,
+                              fontStyle: FontStyle.italic,
                             ),
+                            textAlign: TextAlign.center,
                           ),
                         ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () {}, // TODO: Chat integration
-                      icon: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.chat_bubble_rounded,
-                            color: AppColors.primary, size: 18),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Payment Info
-              _buildSectionTitle('THANH TOÁN'),
-              MinCard(
-                padding: const EdgeInsets.all(24),
-                backgroundColor: AppColors.white,
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Tổng thanh toán',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        Text(
-                          price > 0
-                              ? currencyFormat
-                                  .format(price)
-                                  .replaceAll(',00', '')
-                              : 'CHỜ BÁO GIÁ',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: price > 0
-                                ? AppColors.success
-                                : AppColors.warning,
-                          ),
-                        ),
                       ],
                     ),
-                    if (price == 0) ...[
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Thợ sẽ kiểm tra tình trạng thực tế và gửi báo giá lại cho bạn sau.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textTertiary,
-                          fontStyle: FontStyle.italic,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 40),
+                  ),
+                  const SizedBox(height: 40),
 
-              // Action Buttons
-              _buildActionButtons(context),
-              const SizedBox(height: 40),
-            ],
-          ),
-        ),
+                  // Action Buttons
+                  _buildActionButtons(context, booking),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -392,13 +446,13 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     );
   }
 
-  Widget _buildStatusHeader() {
+  Widget _buildStatusHeader(Booking booking) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildDetailStatusBadge(widget.booking.status),
+        _buildDetailStatusBadge(booking),
         Text(
-          '#${widget.booking.code}',
+          '#${booking.code}',
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w800,
@@ -410,7 +464,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     );
   }
 
-  Widget _buildDetailStatusBadge(String status) {
+  Widget _buildDetailStatusBadge(Booking booking) {
+    String status = booking.status;
     Color color = AppColors.textTertiary;
     String label = status.toUpperCase();
 
@@ -429,8 +484,13 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         label = 'ĐANG LÀM';
         break;
       case 'completed':
-        color = AppColors.success;
-        label = 'HOÀN THÀNH';
+        if (booking.paymentStatus == 'held') {
+          color = AppColors.accent;
+          label = 'ĐÃ THANH TOÁN';
+        } else {
+          color = AppColors.success;
+          label = 'HOÀN THÀNH';
+        }
         break;
       case 'cancelled':
         color = AppColors.error;
@@ -538,9 +598,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     );
   }
 
-  Widget _buildActionButtons(BuildContext context) {
-    final status = widget.booking.status;
-    final id = widget.booking.id;
+  Widget _buildActionButtons(BuildContext context, Booking booking) {
+    final status = booking.status;
+    final id = booking.id;
 
     if (widget.isProvider) {
       if (status == 'accepted' || status == 'confirmed') {
@@ -563,11 +623,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (ctx) => CreateQuoteScreen(
-                    bookingId: widget.booking.id,
-                    serviceName: widget.booking.serviceName,
-                    serviceId: widget.booking.serviceId,
-                    providerId: widget.booking.providerId,
-                    customerSelectedItems: widget.booking.selectedItems,
+                    bookingId: booking.id,
+                    serviceName: booking.serviceName,
+                    serviceId: booking.serviceId,
+                    providerId: booking.providerId,
+                    customerSelectedItems: booking.selectedItems,
                   ),
                 ),
               ),
@@ -585,6 +645,24 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           ],
         );
       }
+      if (status == 'pending_payment') {
+        // Provider sees confirmation button ONLY for COD
+        if (booking.paymentMethod == 'cod') {
+          return MinButton(
+            text: 'Xác nhận thu tiền mặt',
+            isFullWidth: true,
+            isLoading: _isActionLoading,
+            onPressed: _handleConfirmCod,
+            icon: Icons.payments_outlined,
+          );
+        }
+        // If MoMo or not set, provider just waits
+        return MinBadge(
+          label: 'Chờ khách thanh toán',
+          color: AppColors.warning.withOpacity(0.1),
+          textColor: AppColors.warning,
+        );
+      }
       if (status == 'disputed') {
         return MinButton(
           text: 'Đồng ý hủy đơn',
@@ -599,9 +677,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     } else {
       // Customer actions
       if (status == 'pending') {
-        if (!widget.booking.isDirectBooking) {
+        if (!booking.isDirectBooking) {
           return MinButton(
-            text: 'Xem các báo giá (${widget.booking.offersCount})',
+            text: 'Xem các báo giá (${booking.offersCount})',
             isFullWidth: true,
             onPressed: () => _showOffersDialog(context),
             icon: Icons.local_offer_rounded,
@@ -615,6 +693,72 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           icon: Icons.close_rounded,
         );
       }
+
+      if (status == 'pending_payment') {
+        return Column(
+          children: [
+            // Always show MoMo option unless already paid or explicitly COD only
+            // Actually, even if COD is selected, allow switching to MoMo
+            MinButton(
+              text: 'Thanh toán MoMo',
+              isFullWidth: true,
+              isLoading: _isActionLoading,
+              onPressed: _handleMomoPayment,
+              icon: Icons.wallet_outlined,
+            ),
+            const SizedBox(height: 12),
+            if (booking.paymentMethod != 'cod')
+              MinButton(
+                text: 'Dùng Tiền mặt (COD)',
+                isFullWidth: true,
+                isPrimary: false,
+                isLoading: _isActionLoading,
+                onPressed: _handleSelectCod,
+                icon: Icons.money_outlined,
+              ),
+            if (booking.paymentMethod == 'cod')
+              const MinBadge(
+                label: 'Đã chọn Tiền mặt (COD)',
+                color: AppColors.success,
+              ),
+            const SizedBox(height: 12),
+            MinButton(
+              text: 'Gửi khiếu nại',
+              isFullWidth: true,
+              isPrimary: false,
+              backgroundColor: AppColors.error.withOpacity(0.1),
+              foregroundColor: AppColors.error,
+              onPressed: _handleDispute,
+              icon: Icons.report_problem_rounded,
+            ),
+          ],
+        );
+      }
+
+      if (status == 'completed' && booking.paymentStatus == 'held') {
+        return Column(
+          children: [
+            MinButton(
+              text: 'Xác nhận hoàn tất & Trả tiền',
+              isFullWidth: true,
+              isLoading: _isActionLoading,
+              onPressed: _handleConfirmCompletion,
+              icon: Icons.check_circle_outline,
+            ),
+            const SizedBox(height: 12),
+            MinButton(
+              text: 'Khiếu nại / Báo cáo sự cố',
+              isFullWidth: true,
+              isPrimary: false,
+              backgroundColor: AppColors.error,
+              foregroundColor: AppColors.error,
+              onPressed: _handleDispute,
+              icon: Icons.report_problem_outlined,
+            ),
+          ],
+        );
+      }
+
       if (status == 'accepted' ||
           status == 'confirmed' ||
           status == 'in_progress') {
@@ -727,5 +871,272 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     } finally {
       if (mounted) setState(() => _isActionLoading = false);
     }
+  }
+
+  // Handle MoMo Payment for Customer
+  Future<void> _handleMomoPayment() async {
+    setState(() => _isActionLoading = true);
+    try {
+      final response = await _paymentDataSource.payWithMomo(widget.booking.id);
+      final payUrl = response['payUrl'] as String?;
+      final deeplink = response['deeplink'] as String?;
+      final orderId = response['orderId'] as String?;
+
+      if (payUrl != null) {
+        if (mounted) {
+          _showPaymentQrSheet(payUrl, deeplink, orderId);
+        }
+      } else {
+        throw 'Không nhận được liên kết thanh toán từ hệ thống';
+      }
+    } catch (e) {
+      _onActionError(e.toString());
+    } finally {
+      if (mounted) setState(() => _isActionLoading = false);
+    }
+  }
+
+  void _showPaymentQrSheet(String payUrl, String? deeplink, String? orderId) {
+    Timer? pollingTimer;
+
+    // Start polling for payment status
+    if (orderId != null) {
+      int attempts = 0;
+      const maxAttempts = 40; // 2 minutes
+
+      pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+        attempts++;
+        if (attempts > maxAttempts) {
+          timer.cancel();
+          return;
+        }
+
+        try {
+          // Check payment status via the /bookings/check-payment-status endpoint
+          final result =
+              await _paymentDataSource.checkBookingPaymentStatus(orderId);
+          final status = result['status'] as String?;
+
+          if (status == 'success') {
+            timer.cancel();
+            if (mounted) {
+              Navigator.pop(context);
+              _onActionSuccess('Thanh toán thành công!');
+              context.read<BookingsBloc>().add(const LoadBookings());
+            }
+          }
+        } catch (e) {
+          debugPrint('[BookingDetail] Polling error: $e');
+        }
+      });
+    }
+
+    // Listen for booking status changes while QR is showing
+    _bookingSocketSubscription?.cancel();
+    _bookingSocketSubscription =
+        SocketService().bookingStatusStream.listen((event) {
+      if (mounted &&
+          event.bookingId == widget.booking.id.toString() &&
+          event.status == 'completed') {
+        pollingTimer?.cancel();
+        // Automatically close sheet if payment confirmed (escrow held)
+        Navigator.pop(context);
+        _onActionSuccess('Thanh toán thành công!');
+        context.read<BookingsBloc>().add(const LoadBookings());
+      }
+    });
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Quét mã để thanh toán đơn hàng',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Thanh toán: ${NumberFormat.currency(locale: "vi_VN", symbol: "₫").format(double.tryParse(widget.booking.estimatedPrice ?? "0") ?? 0)}',
+              style: const TextStyle(
+                fontSize: 16,
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 32),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 20,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: QrImageView(
+                data: payUrl,
+                version: QrVersions.auto,
+                size: 200.0,
+                eyeStyle: const QrEyeStyle(
+                  eyeShape: QrEyeShape.square,
+                  color: AppColors.primary,
+                ),
+                dataModuleStyle: const QrDataModuleStyle(
+                  dataModuleShape: QrDataModuleShape.square,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: payUrl));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Đã sao chép liên kết')),
+                      );
+                    },
+                    icon: const Icon(Icons.copy_rounded, size: 20),
+                    label: const Text('Sao chép'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: const BorderSide(color: Colors.grey),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final uri = Uri.parse(deeplink ?? payUrl);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri,
+                            mode: LaunchMode.externalApplication);
+                      } else {
+                        await launchUrl(Uri.parse(payUrl),
+                            mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    icon: const Icon(Icons.open_in_new_rounded, size: 20),
+                    label: const Text('Mở MoMo'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: Colors.pink,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Giao dịch được bảo mật bởi MoMo. Đừng đóng cửa sổ này cho đến khi giao dịch hoàn thành.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textTertiary,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Quay lại chi tiết đơn hàng'),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Handle COD Selection for Customer
+  Future<void> _handleSelectCod() async {
+    setState(() => _isActionLoading = true);
+    try {
+      await _paymentDataSource.createPayment(
+        bookingId: widget.booking.id,
+        amount: int.parse(widget.booking.estimatedPrice ?? '0'),
+        paymentMethod: 'cod',
+      );
+      _onActionSuccess('Đã chọn thanh toán tiền mặt');
+      context.read<BookingsBloc>().add(const LoadBookings());
+    } catch (e) {
+      _onActionError(e.toString());
+    } finally {
+      if (mounted) setState(() => _isActionLoading = false);
+    }
+  }
+
+  // Handle COD Confirmation for Provider
+  Future<void> _handleConfirmCod() async {
+    setState(() => _isActionLoading = true);
+    try {
+      await _paymentDataSource.confirmBookingCod(widget.booking.id);
+      _onActionSuccess('Đã xác nhận thanh toán tiền mặt');
+      context.read<BookingsBloc>().add(const LoadBookings());
+    } catch (e) {
+      _onActionError(e.toString());
+    } finally {
+      if (mounted) setState(() => _isActionLoading = false);
+    }
+  }
+
+  // Handle Confirmation of Completion (Escrow Release)
+  Future<void> _handleConfirmCompletion() async {
+    setState(() => _isActionLoading = true);
+    try {
+      await _bookingsDataSource.confirmCompletion(widget.booking.id);
+      _onActionSuccess(
+          'Đã xác nhận hoàn tất dịch vụ. Tiền đã được chuyển cho thợ.');
+      context.read<BookingsBloc>().add(const LoadBookings());
+    } catch (e) {
+      _onActionError(e.toString());
+    } finally {
+      if (mounted) setState(() => _isActionLoading = false);
+    }
+  }
+
+  // Handle Dispute
+  void _handleDispute() {
+    GoRouter.of(context).push('/booking/dispute/${widget.booking.id}');
   }
 }

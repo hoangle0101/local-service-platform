@@ -81,6 +81,24 @@ export class DisputesService {
         data: { status: 'disputed' },
       });
 
+      // ESCROW: Update BookingPayment to block auto-release
+      const bookingPayment = await tx.bookingPayment.findUnique({
+        where: { bookingId: booking.id },
+      });
+
+      if (bookingPayment && bookingPayment.status === 'held') {
+        await tx.bookingPayment.update({
+          where: { id: bookingPayment.id },
+          data: {
+            status: 'disputed',
+            disputeId: dispute.id,
+          },
+        });
+        console.log(
+          `[Dispute] Blocked escrow release for booking ${booking.id}, payment ${bookingPayment.id}`,
+        );
+      }
+
       // Create timeline entry
       await tx.disputeTimeline.create({
         data: {

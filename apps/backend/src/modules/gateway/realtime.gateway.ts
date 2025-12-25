@@ -18,6 +18,7 @@ import { JwtService } from '@nestjs/jwt';
 export interface BookingStatusPayload {
   bookingId: string;
   status: string;
+  paymentStatus?: string; // Payment status for escrow tracking
   previousStatus?: string;
   providerId?: string;
   providerName?: string;
@@ -123,6 +124,7 @@ export const SocketEvents = {
   NEW_MESSAGE: 'new_message',
   USER_TYPING: 'user_typing',
   MESSAGE_READ: 'message_read',
+  WALLET_UPDATED: 'wallet_updated',
 } as const;
 
 // ========================
@@ -160,8 +162,7 @@ export class RealtimeGateway
 
   async handleConnection(client: Socket) {
     try {
-      const token =
-        client.handshake.auth.token || client.handshake.query.token;
+      const token = client.handshake.auth.token || client.handshake.query.token;
       if (!token) {
         this.logger.warn(`Client ${client.id} disconnected: no token`);
         client.disconnect();
@@ -436,7 +437,9 @@ export class RealtimeGateway
       timestamp: new Date().toISOString(),
     });
 
-    this.logger.log(`Provider ${userId} is now ${data.isAvailable ? 'online' : 'offline'}`);
+    this.logger.log(
+      `Provider ${userId} is now ${data.isAvailable ? 'online' : 'offline'}`,
+    );
     return { success: true };
   }
 
@@ -495,7 +498,9 @@ export class RealtimeGateway
     this.server.to(room).emit(SocketEvents.NEW_JOB_AVAILABLE, payload);
 
     // Also emit to 'all' room
-    this.server.to('job_market_all').emit(SocketEvents.NEW_JOB_AVAILABLE, payload);
+    this.server
+      .to('job_market_all')
+      .emit(SocketEvents.NEW_JOB_AVAILABLE, payload);
 
     this.logger.log(
       `New job ${payload.bookingId} emitted to category ${categoryId}`,
@@ -505,7 +510,11 @@ export class RealtimeGateway
   /**
    * Emit job taken event
    */
-  emitJobTaken(categoryId: number, bookingId: string, takenByProviderId: string) {
+  emitJobTaken(
+    categoryId: number,
+    bookingId: string,
+    takenByProviderId: string,
+  ) {
     const room = `job_market_${categoryId}`;
     this.server.to(room).emit(SocketEvents.JOB_TAKEN, {
       bookingId,
@@ -531,7 +540,11 @@ export class RealtimeGateway
   /**
    * Emit provider arriving/arrived events
    */
-  emitProviderArriving(customerId: string, bookingId: string, distanceMeters: number) {
+  emitProviderArriving(
+    customerId: string,
+    bookingId: string,
+    distanceMeters: number,
+  ) {
     this.notifyUser(customerId, SocketEvents.PROVIDER_ARRIVING, {
       bookingId,
       distanceMeters,
@@ -566,10 +579,23 @@ export class RealtimeGateway
   // ========================
 
   /**
+   * Emit wallet balance update
+   */
+  emitWalletUpdate(userId: string, balance: number) {
+    this.notifyUser(userId, SocketEvents.WALLET_UPDATED, {
+      userId,
+      balance,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
    * Check if user is online
    */
   isUserOnline(userId: string): boolean {
-    return this.userSockets.has(userId) && this.userSockets.get(userId)!.size > 0;
+    return (
+      this.userSockets.has(userId) && this.userSockets.get(userId)!.size > 0
+    );
   }
 
   /**
