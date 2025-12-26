@@ -323,6 +323,7 @@ class Booking {
   final String? addressText;
   final String? notes; // Customer instructions
   final String? estimatedPrice;
+  final String? actualPrice; // Price after provider marks complete
   final String? serviceName;
   final String? categoryName;
   final String? providerName;
@@ -353,6 +354,7 @@ class Booking {
     this.addressText,
     this.notes,
     this.estimatedPrice,
+    this.actualPrice,
     this.serviceName,
     this.categoryName,
     this.providerName,
@@ -375,6 +377,9 @@ class Booking {
     this.autoReleaseAt,
   });
 
+  /// Get the final price (actualPrice takes precedence over estimatedPrice)
+  String? get finalPrice => actualPrice ?? estimatedPrice;
+
   factory Booking.fromJson(Map<String, dynamic> json) {
     // Parse selectedItems if present
     List<Map<String, dynamic>>? selectedItems;
@@ -394,6 +399,7 @@ class Booking {
       addressText: json['addressText'] as String?,
       notes: json['notes'] as String?,
       estimatedPrice: json['estimatedPrice']?.toString(),
+      actualPrice: json['actualPrice']?.toString(),
       serviceName: json['service']?['name'] ?? json['serviceName'] ?? 'Dịch vụ',
       categoryName: json['categoryName'] as String?,
       providerName: json['provider']?['fullName'] ?? json['providerName'],

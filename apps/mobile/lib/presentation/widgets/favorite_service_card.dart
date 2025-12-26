@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'rating/star_rating.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/datasources/favorites_datasource.dart';
 import 'favorite_button.dart';
-import 'star_rating.dart';
 import 'minimalist_widgets.dart';
 
 /// Modern card for displaying a favorite service item

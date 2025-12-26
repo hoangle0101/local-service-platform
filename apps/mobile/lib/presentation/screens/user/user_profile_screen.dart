@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/data/repositories/user_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../data/datasources/user_datasource.dart';
 import '../../bloc/auth/auth_bloc.dart';
 import '../../widgets/user_avatar.dart';
 import '../../widgets/minimalist_widgets.dart';
@@ -16,7 +16,7 @@ class UserProfileScreen extends StatefulWidget {
 }
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
-  final UserDataSource _userDataSource = UserDataSource();
+  final UserRepository _userRepository = UserRepository();
   String? _defaultAddress;
 
   @override
@@ -27,7 +27,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   Future<void> _loadDefaultAddress() async {
     try {
-      final addresses = await _userDataSource.getAddresses();
+      final addresses = await _userRepository.getAddresses();
       if (addresses.isNotEmpty && mounted) {
         final defaultAddr = addresses.firstWhere(
           (a) => a['isDefault'] == true,

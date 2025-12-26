@@ -9,19 +9,40 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiProperty } from '@nestjs/swagger';
 import { PaymentService } from './payment.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from 'src/common/decorators/public.decorator';
 
+import {
+  IsNotEmpty,
+  IsString,
+  IsNumber,
+  IsEnum,
+} from 'class-validator';
+
 class CreatePaymentDto {
+  @ApiProperty({ example: '1' })
+  @IsNotEmpty()
+  @IsString()
   bookingId: string;
+
+  @ApiProperty({ example: 100000 })
+  @IsNotEmpty()
+  @IsNumber()
   amount: number;
-  paymentMethod: 'COD' | 'MOMO';
+
+  @ApiProperty({ enum: ['COD', 'MOMO', 'cod', 'momo'] })
+  @IsNotEmpty()
+  @IsEnum(['COD', 'MOMO', 'cod', 'momo'])
+  paymentMethod: 'COD' | 'MOMO' | 'cod' | 'momo';
 }
 
 class ConfirmCodDto {
+  @ApiProperty({ example: '1' })
+  @IsNotEmpty()
+  @IsString()
   bookingPaymentId: string;
 }
 
@@ -41,7 +62,7 @@ export class PaymentController {
     return this.paymentService.createBookingPayment({
       bookingId: BigInt(dto.bookingId),
       amount: dto.amount,
-      paymentMethod: dto.paymentMethod,
+      paymentMethod: dto.paymentMethod.toUpperCase() as 'COD' | 'MOMO',
     });
   }
 

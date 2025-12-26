@@ -4,16 +4,16 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/entities/entities.dart';
 import '../../../core/theme/app_colors.dart';
-import '../bloc/services/services_bloc.dart';
-import '../bloc/services/services_event_state.dart';
-import '../bloc/auth/auth_bloc.dart';
-import '../bloc/auth/auth_event.dart';
-import 'reviews/provider_reviews_screen.dart';
+import '../../bloc/services/services_bloc.dart';
+import '../../bloc/services/services_event_state.dart';
+import '../../bloc/auth/auth_bloc.dart';
+import '../../bloc/auth/auth_event.dart';
+import '../reviews/provider_reviews_screen.dart';
 import 'package:dio/dio.dart';
-import '../../data/storage/secure_storage.dart';
-import '../bloc/favorites/favorites_bloc.dart';
-import '../widgets/favorite_button.dart';
-import '../widgets/minimalist_widgets.dart';
+import '../../../data/storage/secure_storage.dart';
+import '../../bloc/favorites/favorites_bloc.dart';
+import '../../widgets/favorite_button.dart';
+import '../../widgets/minimalist_widgets.dart';
 
 class ServiceDetailsScreen extends StatefulWidget {
   final int serviceId;
@@ -116,6 +116,7 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
         builder: (context) => ProviderReviewsScreen(
           providerId: service.providerUserId,
           providerName: service.provider.displayName,
+          providerAvatarUrl: service.provider.avatarUrl,
           ratingAvg: service.provider.ratingAvg,
           ratingCount: service.provider.ratingCount,
         ),

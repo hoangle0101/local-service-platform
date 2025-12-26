@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:mobile/data/repositories/quote_repository.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../data/datasources/quote_datasource.dart';
 import '../../../data/storage/secure_storage.dart';
 import '../../widgets/minimalist_widgets.dart';
 
@@ -139,8 +139,8 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final quoteDataSource = QuoteDataSource();
-      await quoteDataSource.createQuote(
+      final quoteRepository = QuoteRepository();
+      await quoteRepository.createQuote(
         bookingId: widget.bookingId,
         diagnosis: _diagnosisController.text,
         items: _items

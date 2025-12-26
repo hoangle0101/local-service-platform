@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/data/repositories/payment_repository.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -13,7 +14,7 @@ class ProviderWithdrawScreen extends StatefulWidget {
 }
 
 class _ProviderWithdrawScreenState extends State<ProviderWithdrawScreen> {
-  final PaymentDataSource _paymentDataSource = PaymentDataSource();
+  final PaymentRepository _paymentRepository = PaymentRepository();
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _bankNameController = TextEditingController();
@@ -48,7 +49,7 @@ class _ProviderWithdrawScreenState extends State<ProviderWithdrawScreen> {
 
   Future<void> _loadBalance() async {
     try {
-      final balance = await _paymentDataSource.getBalance();
+      final balance = await _paymentRepository.getBalance();
       if (mounted) {
         setState(() {
           _availableBalance = balance.balance;
@@ -88,7 +89,7 @@ class _ProviderWithdrawScreenState extends State<ProviderWithdrawScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      await _paymentDataSource.createWithdrawal(
+      await _paymentRepository.createWithdrawal(
         amount: _withdrawAmount.toInt(),
         method: _selectedMethod,
         bankName: _selectedMethod == 'BANK' ? _bankNameController.text : null,

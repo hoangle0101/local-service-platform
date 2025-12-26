@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../core/theme/app_colors.dart';
-import '../../data/datasources/reviews_datasource.dart';
-import 'star_rating.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../data/datasources/reviews_datasource.dart';
+import '../rating/star_rating.dart';
 
 /// Beautiful review card widget with modern glassmorphism design
 class ReviewCard extends StatelessWidget {
@@ -125,6 +125,16 @@ class ReviewCard extends StatelessWidget {
   }
 
   Widget _buildAvatar() {
+    // Construct full avatar URL
+    String? fullAvatarUrl;
+    if (review.reviewer.avatarUrl != null &&
+        review.reviewer.avatarUrl!.isNotEmpty) {
+      final url = review.reviewer.avatarUrl!;
+      fullAvatarUrl = url.startsWith('http')
+          ? url
+          : 'http://10.0.2.2:3000${url.startsWith('/') ? '' : '/'}$url';
+    }
+
     return Container(
       width: 48,
       height: 48,
@@ -138,25 +148,29 @@ class ReviewCard extends StatelessWidget {
             AppColors.primaryDark.withOpacity(0.3),
           ],
         ),
-        image: review.reviewer.avatarUrl != null
-            ? DecorationImage(
-                image: NetworkImage(review.reviewer.avatarUrl!),
-                fit: BoxFit.cover,
-              )
-            : null,
       ),
-      child: review.reviewer.avatarUrl == null
-          ? Center(
-              child: Text(
-                _getInitials(review.reviewer.fullName),
-                style: TextStyle(
-                  color: AppColors.primaryDark,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-            )
-          : null,
+      child: ClipOval(
+        child: fullAvatarUrl != null
+            ? Image.network(
+                fullAvatarUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _buildAvatarPlaceholder(),
+              )
+            : _buildAvatarPlaceholder(),
+      ),
+    );
+  }
+
+  Widget _buildAvatarPlaceholder() {
+    return Center(
+      child: Text(
+        _getInitials(review.reviewer.fullName),
+        style: TextStyle(
+          color: AppColors.primaryDark,
+          fontWeight: FontWeight.bold,
+          fontSize: 16,
+        ),
+      ),
     );
   }
 

@@ -260,6 +260,9 @@ class SocketEvents {
   // Notifications
   static const String newNotification = 'new_notification';
 
+  // Payment Events
+  static const String paymentMethodSelected = 'payment_method_selected';
+
   // Chat Events
   static const String joinConversation = 'join_conversation';
   static const String leaveConversation = 'leave_conversation';
@@ -325,6 +328,11 @@ class SocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get walletUpdateStream =>
       _walletUpdateController.stream;
+
+  final _paymentMethodController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get paymentMethodStream =>
+      _paymentMethodController.stream;
 
   // Legacy getters for compatibility
   IO.Socket? get socket => _socket;
@@ -483,6 +491,14 @@ class SocketService {
         _walletUpdateController.add(data as Map<String, dynamic>);
       }
     });
+
+    // Payment method selected (for provider to see COD confirmation button)
+    _socket!.on(SocketEvents.paymentMethodSelected, (data) {
+      debugPrint('[SocketService] Payment method selected: $data');
+      if (data != null) {
+        _paymentMethodController.add(data as Map<String, dynamic>);
+      }
+    });
   }
 
   /// Disconnect from socket
@@ -494,6 +510,24 @@ class SocketService {
       _isConnected = false;
       _connectionController.add(false);
     }
+  }
+
+  /// Dispose all resources - MUST be called when the app is closing
+  /// This prevents memory leaks from StreamControllers
+  void dispose() {
+    disconnect();
+
+    // Close all StreamControllers to prevent memory leaks
+    _connectionController.close();
+    _bookingStatusController.close();
+    _locationUpdateController.close();
+    _newJobController.close();
+    _jobTakenController.close();
+    _notificationController.close();
+    _typingController.close();
+    _messageController.close();
+
+    debugPrint('[SocketService] All resources disposed');
   }
 
   /// Generic event listener for compatibility

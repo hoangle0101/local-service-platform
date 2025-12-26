@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/data/repositories/payment_repository.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -16,7 +17,7 @@ class InvoiceScreen extends StatefulWidget {
 }
 
 class _InvoiceScreenState extends State<InvoiceScreen> {
-  final PaymentDataSource _paymentDataSource = PaymentDataSource();
+  final PaymentRepository _paymentRepository = PaymentRepository();
 
   Map<String, dynamic>? _invoice;
   bool _isLoading = true;
@@ -36,7 +37,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     });
 
     try {
-      final invoice = await _paymentDataSource.getInvoice(widget.bookingId);
+      final invoice = await _paymentRepository.getInvoice(widget.bookingId);
       setState(() {
         _invoice = invoice;
         _isLoading = false;
@@ -55,7 +56,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     setState(() => _isProcessing = true);
 
     try {
-      final result = await _paymentDataSource.payWithMomo(widget.bookingId);
+      final result = await _paymentRepository.payWithMomo(widget.bookingId);
       final payUrl = result['payUrl'] as String?;
       final deeplink = result['deeplink'] as String?;
 

@@ -1,11 +1,13 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../data/datasources/marketplace_datasource.dart';
+import '../../../data/repositories/marketplace_repository.dart';
 import 'services_event_state.dart';
 
 class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
-  final MarketplaceDataSource _marketplaceDataSource = MarketplaceDataSource();
+  final MarketplaceRepository _repository;
 
-  ServicesBloc() : super(ServicesInitial()) {
+  ServicesBloc([MarketplaceRepository? repository])
+      : _repository = repository ?? MarketplaceRepository(),
+        super(ServicesInitial()) {
     on<LoadServices>(_onLoadServices);
     on<LoadServicesByCategory>(_onLoadServicesByCategory);
     on<LoadGenericServices>(_onLoadGenericServices);
@@ -20,8 +22,7 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
     emit(ServicesLoading());
     try {
       print('[ServicesBloc] Loading services...');
-      final services =
-          await _marketplaceDataSource.searchServices(limit: event.limit);
+      final services = await _repository.searchServices(limit: event.limit);
       print('[ServicesBloc] Loaded ${services.length} services');
       emit(ServicesLoaded(services));
     } catch (e, stackTrace) {
@@ -37,7 +38,7 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
   ) async {
     emit(ServicesLoading());
     try {
-      final services = await _marketplaceDataSource.searchServices(
+      final services = await _repository.searchServices(
         limit: event.limit,
         categoryId: event.categoryId,
       );
@@ -53,7 +54,7 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
   ) async {
     emit(ServicesLoading());
     try {
-      final services = await _marketplaceDataSource.searchServices(
+      final services = await _repository.searchServices(
         serviceId: event.serviceId,
         latitude: event.latitude,
         longitude: event.longitude,
@@ -71,8 +72,7 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
   ) async {
     emit(ServicesLoading());
     try {
-      final services =
-          await _marketplaceDataSource.getGenericServices(event.categoryId);
+      final services = await _repository.getGenericServices(event.categoryId);
       emit(GenericServicesLoaded(services));
     } catch (e) {
       emit(ServicesError(e.toString()));
@@ -85,8 +85,7 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
   ) async {
     emit(ServicesLoading());
     try {
-      final service =
-          await _marketplaceDataSource.getServiceById(event.serviceId);
+      final service = await _repository.getServiceById(event.serviceId);
       emit(ServiceDetailsLoaded(service));
     } catch (e) {
       emit(ServicesError(e.toString()));

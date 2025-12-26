@@ -6,7 +6,6 @@ import '../../../core/theme/app_colors.dart';
 import '../bloc/services/services_bloc.dart';
 import '../bloc/services/services_event_state.dart';
 import '../widgets/service_card.dart';
-import '../widgets/minimalist_widgets.dart';
 import '../widgets/loading/shimmer_loading.dart';
 
 class CategoryServicesScreen extends StatefulWidget {
@@ -345,46 +344,6 @@ class _CategoryServicesScreenState extends State<CategoryServicesScreen> {
               child: ServiceCardWidget(service: svc),
             )),
       ],
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                  color: AppColors.error.withOpacity(0.05),
-                  shape: BoxShape.circle),
-              child: const Icon(Icons.error_outline_rounded,
-                  size: 64, color: AppColors.error),
-            ),
-            const SizedBox(height: 32),
-            Text('Đã có lỗi xảy ra',
-                style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: 12),
-            const Text(
-              'Không thể tải danh sách dịch vụ. Vui lòng kiểm tra kết nối mạng và thử lại.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary, height: 1.5),
-            ),
-            const SizedBox(height: 40),
-            MinButton(
-              text: 'Thử lại',
-              onPressed: () {
-                _servicesBloc.add(LoadServicesByCategory(
-                    categoryId: widget.categoryId, limit: 20));
-                _servicesBloc
-                    .add(LoadGenericServices(categoryId: widget.categoryId));
-              },
-            ),
-          ],
-        ),
-      ),
     );
   }
 

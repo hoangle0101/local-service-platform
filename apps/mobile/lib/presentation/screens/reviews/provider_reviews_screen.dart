@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/reviews_datasource.dart';
-import '../../widgets/review_card.dart';
-import '../../widgets/star_rating.dart';
+import '../../widgets/review/review_card.dart';
+import '../../widgets/rating/star_rating.dart';
 
 /// Modern provider reviews screen with beautiful UI
 class ProviderReviewsScreen extends StatefulWidget {
   final String providerId;
   final String providerName;
+  final String? providerAvatarUrl;
   final double? ratingAvg;
   final int? ratingCount;
 
@@ -15,6 +16,7 @@ class ProviderReviewsScreen extends StatefulWidget {
     super.key,
     required this.providerId,
     required this.providerName,
+    this.providerAvatarUrl,
     this.ratingAvg,
     this.ratingCount,
   });
@@ -224,31 +226,7 @@ class _ProviderReviewsScreenState extends State<ProviderReviewsScreen> {
                 child: Column(
                   children: [
                     // Avatar
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          _getInitials(widget.providerName),
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primaryDark,
-                          ),
-                        ),
-                      ),
-                    ),
+                    _buildProviderAvatar(),
                     const SizedBox(height: 12),
 
                     // Provider name
@@ -517,6 +495,56 @@ class _ProviderReviewsScreenState extends State<ProviderReviewsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProviderAvatar() {
+    // Construct full avatar URL
+    String? fullAvatarUrl;
+    if (widget.providerAvatarUrl != null &&
+        widget.providerAvatarUrl!.isNotEmpty) {
+      final url = widget.providerAvatarUrl!;
+      fullAvatarUrl = url.startsWith('http')
+          ? url
+          : 'http://10.0.2.2:3000${url.startsWith('/') ? '' : '/'}$url';
+    }
+
+    return Container(
+      width: 80,
+      height: 80,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: fullAvatarUrl != null
+            ? Image.network(
+                fullAvatarUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _buildAvatarPlaceholder(),
+              )
+            : _buildAvatarPlaceholder(),
+      ),
+    );
+  }
+
+  Widget _buildAvatarPlaceholder() {
+    return Center(
+      child: Text(
+        _getInitials(widget.providerName),
+        style: const TextStyle(
+          fontSize: 28,
+          fontWeight: FontWeight.bold,
+          color: AppColors.primaryDark,
+        ),
       ),
     );
   }

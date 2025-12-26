@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/data/repositories/payment_repository.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/payment_datasource.dart';
-import '../../widgets/wallet_balance_card.dart';
-import '../../widgets/wallet_widgets.dart';
+import '../../widgets/wallet/wallet_balance_card.dart';
+import '../../widgets/wallet/wallet_widgets.dart';
 
 class ProviderWalletScreen extends StatefulWidget {
   const ProviderWalletScreen({super.key});
@@ -15,7 +16,7 @@ class ProviderWalletScreen extends StatefulWidget {
 
 class _ProviderWalletScreenState extends State<ProviderWalletScreen>
     with SingleTickerProviderStateMixin {
-  final PaymentDataSource _paymentDataSource = PaymentDataSource();
+  final PaymentRepository _paymentRepository = PaymentRepository();
   late TabController _tabController;
 
   WalletBalance? _balance;
@@ -45,9 +46,9 @@ class _ProviderWalletScreenState extends State<ProviderWalletScreen>
 
     try {
       final results = await Future.wait([
-        _paymentDataSource.getBalance(),
-        _paymentDataSource.getTransactions(),
-        _paymentDataSource.getMyWithdrawals(),
+        _paymentRepository.getBalance(),
+        _paymentRepository.getTransactions(),
+        _paymentRepository.getMyWithdrawals(),
       ]);
 
       if (mounted) {

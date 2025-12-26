@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/data/datasources/directions_datasource.dart';
+import 'package:mobile/data/datasources/payment_datasource.dart';
+import 'package:mobile/data/repositories/bookings_repository.dart';
+import 'package:mobile/data/repositories/directions_repository.dart';
+import 'package:mobile/data/repositories/provider_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/socket_service.dart';
-import '../../../data/datasources/provider_datasource.dart';
-import '../../../data/datasources/bookings_datasource.dart';
-import '../../../data/datasources/directions_datasource.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../widgets/minimalist_widgets.dart';
@@ -44,10 +46,11 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
   // Active booking tracking
   Booking? _activeBooking;
   bool _isLoadingActiveBooking = false;
-  final BookingsDataSource _bookingsDataSource = BookingsDataSource();
+  bool _isProcessingAction = false; // Prevent double-tap
+  final BookingsRepository _bookingsRepository = BookingsRepository();
 
   // Route polyline for active booking
-  final DirectionsDataSource _directionsDataSource = DirectionsDataSource();
+  final DirectionsRepository _directionsRepository = DirectionsRepository();
   List<LatLng> _routePoints = [];
   DirectionsResult? _directionsResult;
 
@@ -61,6 +64,9 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
 
   // Socket service for sending location updates only
   final SocketService _socketService = SocketService();
+
+  // Stream subscription for booking status updates
+  StreamSubscription<BookingStatusUpdate>? _bookingStatusSubscription;
 
   // Default location (Hanoi center) as backup
   final LatLng _defaultLocation = const LatLng(21.0285, 105.8542);
@@ -77,16 +83,40 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
   @override
   void dispose() {
     _positionStream?.cancel();
+    _bookingStatusSubscription?.cancel();
     _mapController.dispose();
     _audioPlayer.dispose();
     super.dispose();
   }
 
-  /// Initialize socket connection for sending location updates
+  /// Initialize socket connection and listen for booking status updates
   void _initSocketConnection() async {
     await _socketService.connectAsync();
-    // NOTE: Booking status updates are handled globally by ProviderShellScreen
-    // to avoid duplicate popups. This screen only refreshes via BlocListener.
+
+    // Listen for booking status changes to refresh active booking
+    _bookingStatusSubscription =
+        _socketService.bookingStatusStream.listen((update) {
+      debugPrint(
+          '[ProviderHomeScreen] Received booking status update: ${update.status}');
+
+      // Refresh active booking and statistics when status changes
+      if (update.status == 'accepted' ||
+          update.status == 'in_progress' ||
+          update.status == 'completed' ||
+          update.status == 'confirmed') {
+        debugPrint(
+            '[ProviderHomeScreen] Refreshing data after status change...');
+        _loadActiveBooking();
+        _loadStatistics();
+      }
+    });
+
+    // Listen for payment method selected (customer chose COD)
+    _socketService.paymentMethodStream.listen((data) {
+      debugPrint('[ProviderHomeScreen] Payment method selected: $data');
+      // Refresh to show confirm payment button
+      _loadActiveBooking();
+    });
   }
 
   Future<void> _determinePosition() async {
@@ -187,7 +217,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
     if (!mounted) return;
     setState(() => _isLoadingStats = true);
     try {
-      final stats = await ProviderDataSource().getStatistics();
+      final stats = await ProviderRepository().getStatistics();
       if (!mounted) return;
       setState(() {
         _statistics = stats;
@@ -208,7 +238,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
     setState(() => _isLoadingActiveBooking = true);
     try {
       debugPrint('[ProviderHomeScreen] Loading active booking...');
-      final activeBooking = await _bookingsDataSource.getActiveBooking();
+      final activeBooking = await _bookingsRepository.getActiveBooking();
       debugPrint(
           '[ProviderHomeScreen] Active booking result: ${activeBooking?.id} - ${activeBooking?.status}');
       debugPrint(
@@ -245,7 +275,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
 
     try {
       debugPrint('[ProviderHomeScreen] Fetching route...');
-      final result = await _directionsDataSource.getRoute(
+      final result = await _directionsRepository.getRoute(
         origin: _currentLocation!,
         destination:
             LatLng(_activeBooking!.latitude!, _activeBooking!.longitude!),
@@ -269,7 +299,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
     setState(() => _isAvailable = newStatus);
 
     try {
-      await ProviderDataSource().updateAvailability(newStatus);
+      await ProviderRepository().updateAvailability(newStatus);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isAvailable = !newStatus); // Rollback
@@ -757,7 +787,9 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
     final currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
     final isPending = booking.status == 'pending';
     final isInProgress = booking.status == 'in_progress';
+    final isPendingPayment = booking.status == 'pending_payment';
     final isPendingCompletion = booking.status == 'pending_completion';
+    final isAccepted = booking.status == 'accepted';
 
     String statusText;
     Color statusColor;
@@ -768,13 +800,21 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
       statusColor = AppColors.primary;
       statusIcon = Icons.new_releases_rounded;
     } else if (isPendingCompletion) {
-      statusText = 'Chờ khách xác nhận';
+      statusText = 'Chờ xác nhận thu tiền';
+      statusColor = AppColors.success;
+      statusIcon = Icons.payments_rounded;
+    } else if (isPendingPayment) {
+      statusText = 'Chờ thanh toán';
       statusColor = AppColors.warning;
-      statusIcon = Icons.hourglass_top_rounded;
+      statusIcon = Icons.payment_rounded;
     } else if (isInProgress) {
       statusText = 'Đang thực hiện';
       statusColor = AppColors.primary;
       statusIcon = Icons.construction_rounded;
+    } else if (isAccepted) {
+      statusText = 'Đã nhận việc';
+      statusColor = AppColors.accent;
+      statusIcon = Icons.check_circle_rounded;
     } else {
       statusText = 'Đã nhận việc';
       statusColor = AppColors.accent;
@@ -921,13 +961,13 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
                 color: AppColors.warning,
                 onTap: () {},
               )
-            else if (!isInProgress && !isPendingCompletion)
+            else if (!isInProgress && !isPendingPayment && isAccepted)
               _buildActionIcon(
                 icon: Icons.play_circle_filled_rounded,
                 label: 'Bắt đầu',
                 color: AppColors.primary,
                 onTap: () async {
-                  await _bookingsDataSource.startService(booking.id);
+                  await _bookingsRepository.startService(booking.id);
                   _loadActiveBooking();
                 },
               )
@@ -936,15 +976,83 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
                 icon: Icons.check_circle_rounded,
                 label: 'Hoàn thành',
                 color: AppColors.success,
-                onTap: () async {
-                  await _bookingsDataSource.completeService(booking.id);
-                  _loadActiveBooking();
-                },
+                onTap: _isProcessingAction
+                    ? null
+                    : () async {
+                        if (_isProcessingAction) return; // Prevent double-tap
+                        setState(() => _isProcessingAction = true);
+                        try {
+                          await _bookingsRepository.completeService(booking.id);
+                          // Reload booking data and refresh UI
+                          await _loadActiveBooking();
+                          await _loadStatistics();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'Dịch vụ đã hoàn thành! Chờ khách thanh toán.'),
+                                backgroundColor: AppColors.success,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Lỗi: ${e.toString()}'),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                          }
+                        } finally {
+                          if (mounted)
+                            setState(() => _isProcessingAction = false);
+                        }
+                      },
               )
             else if (isPendingCompletion)
               _buildActionIcon(
-                icon: Icons.pending_rounded,
-                label: 'Chờ xác nhận',
+                icon: Icons.payments_rounded,
+                label: 'Xác nhận tiền',
+                color: AppColors.success,
+                onTap: _isProcessingAction
+                    ? null
+                    : () async {
+                        if (_isProcessingAction) return;
+                        setState(() => _isProcessingAction = true);
+                        try {
+                          await PaymentDataSource()
+                              .confirmBookingCod(booking.id);
+                          await _loadActiveBooking();
+                          await _loadStatistics();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content:
+                                    Text('Đã xác nhận thanh toán thành công!'),
+                                backgroundColor: AppColors.success,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Lỗi: ${e.toString()}'),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                          }
+                        } finally {
+                          if (mounted)
+                            setState(() => _isProcessingAction = false);
+                        }
+                      },
+              )
+            else if (isPendingPayment)
+              _buildActionIcon(
+                icon: Icons.payment_rounded,
+                label: 'Chờ thanh toán',
                 color: AppColors.warning,
                 onTap: () {},
               ),
@@ -980,7 +1088,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen> {
     required IconData icon,
     required String label,
     required Color color,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
   }) {
     return GestureDetector(
       onTap: onTap,

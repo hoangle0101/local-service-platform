@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/data/repositories/track_asia_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -43,7 +44,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
   double _longitude = 105.8542;
 
   // Track Asia API for address autocomplete
-  final TrackAsiaDataSource _trackAsiaDataSource = TrackAsiaDataSource();
+  final TrackAsiaRepository _trackAsiaRepository = TrackAsiaRepository();
   List<AddressPrediction> _addressPredictions = [];
   Timer? _debounceTimer;
   bool _showPredictions = false;
@@ -145,7 +146,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
 
     _debounceTimer = Timer(const Duration(milliseconds: 400), () async {
       try {
-        final predictions = await _trackAsiaDataSource.searchAddress(query);
+        final predictions = await _trackAsiaRepository.searchAddress(query);
         if (mounted) {
           setState(() {
             _addressPredictions = predictions;
@@ -163,7 +164,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
 
     try {
       final detail =
-          await _trackAsiaDataSource.getPlaceDetail(prediction.placeId);
+          await _trackAsiaRepository.getPlaceDetail(prediction.placeId);
       if (mounted && detail != null) {
         final fullAddress = FullAddress.fromPlaceDetail(detail);
         setState(() {
@@ -681,7 +682,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
       );
 
       // 3. Reverse Geocode
-      final fullAddress = await _trackAsiaDataSource.reverseGeocode(
+      final fullAddress = await _trackAsiaRepository.reverseGeocode(
         position.latitude,
         position.longitude,
       );

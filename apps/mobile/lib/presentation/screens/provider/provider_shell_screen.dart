@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../widgets/navigation/animated_bottom_nav_item.dart';
 import '../../../core/services/socket_service.dart';
-import '../../../data/datasources/bookings_datasource.dart';
+import '../../../data/repositories/bookings_repository.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../../core/theme/app_colors.dart';
@@ -25,7 +25,7 @@ class ProviderShellScreen extends StatefulWidget {
 
 class _ProviderShellScreenState extends State<ProviderShellScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
-  final BookingsDataSource _bookingsDataSource = BookingsDataSource();
+  final BookingsRepository _bookingsRepository = BookingsRepository();
   bool _isDialogShowing = false;
   StreamSubscription? _bookingStatusSubscription;
   String? _lastNotificationMessage;
@@ -212,7 +212,7 @@ class _ProviderShellScreenState extends State<ProviderShellScreen> {
                     onTap: () {
                       Navigator.of(dialogContext).pop();
                       setState(() => _isDialogShowing = false);
-                      _bookingsDataSource.cancelBooking(
+                      _bookingsRepository.cancelBooking(
                           update.bookingId, 'Thợ từ chối yêu cầu');
                     },
                   ),
@@ -225,7 +225,7 @@ class _ProviderShellScreenState extends State<ProviderShellScreen> {
                       Navigator.of(dialogContext).pop();
                       setState(() => _isDialogShowing = false);
                       try {
-                        await _bookingsDataSource
+                        await _bookingsRepository
                             .acceptBookingLegacy(update.bookingId);
                       } catch (e) {
                         if (mounted) {

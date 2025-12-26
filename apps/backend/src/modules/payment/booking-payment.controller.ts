@@ -9,14 +9,31 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  IsOptional,
+} from 'class-validator';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BookingPaymentService } from './booking-payment.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 class UpdateFinalPriceDto {
+  @ApiProperty({ example: 100000 })
+  @IsNotEmpty()
+  @IsNumber()
   actualPrice: number;
+
+  @ApiPropertyOptional({ example: 10000 })
+  @IsOptional()
+  @IsNumber()
   additionalCosts?: number;
+
+  @ApiPropertyOptional({ example: 'Vật tư phát sinh' })
+  @IsOptional()
+  @IsString()
   additionalNotes?: string;
 }
 

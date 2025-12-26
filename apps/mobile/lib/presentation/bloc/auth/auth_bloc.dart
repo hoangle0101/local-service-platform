@@ -1,16 +1,17 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/entities/auth_entities.dart';
-import '../../../data/datasources/auth_datasource.dart';
+import '../../../data/repositories/auth_repository.dart';
+import '../../../data/datasources/auth_datasource.dart' show OtpPurpose;
 import '../../../data/storage/secure_storage.dart';
 import 'auth_event.dart';
 
 export 'auth_event.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
-  final AuthDataSource _authDataSource;
+  final AuthRepository _authRepository;
 
-  AuthBloc({AuthDataSource? authDataSource})
-      : _authDataSource = authDataSource ?? AuthDataSource(),
+  AuthBloc({AuthRepository? authRepository})
+      : _authRepository = authRepository ?? AuthRepository(),
         super(AuthInitial()) {
     on<AuthCheckRequested>(_onAuthCheckRequested);
     on<LoginRequested>(_onLoginRequested);
@@ -33,7 +34,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       if (accessToken != null && refreshToken != null) {
         try {
           // Fetch user profile to get role information
-          final user = await _authDataSource.getUserProfile(accessToken);
+          final user = await _authRepository.getUserProfile(accessToken);
           emit(Authenticated(
             tokens: AuthTokens(
               accessToken: accessToken,
@@ -57,7 +58,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     try {
-      final tokens = await _authDataSource.login(
+      final tokens = await _authRepository.login(
         phone: event.phone,
         password: event.password,
       );
@@ -69,7 +70,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
 
       // Fetch user profile to determine role
-      final user = await _authDataSource.getUserProfile(tokens.accessToken);
+      final user = await _authRepository.getUserProfile(tokens.accessToken);
 
       emit(Authenticated(tokens: tokens, user: user));
     } catch (e) {
@@ -83,7 +84,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     try {
-      final tokens = await _authDataSource.loginWithOtp(
+      final tokens = await _authRepository.loginWithOtp(
         phone: event.phone,
         code: event.code,
       );
@@ -95,7 +96,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
 
       // Fetch user profile to determine role
-      final user = await _authDataSource.getUserProfile(tokens.accessToken);
+      final user = await _authRepository.getUserProfile(tokens.accessToken);
 
       emit(Authenticated(tokens: tokens, user: user));
     } catch (e) {
@@ -116,7 +117,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       _tempPhone = event.phone;
       _tempPassword = event.password;
 
-      final result = await _authDataSource.register(
+      final result = await _authRepository.register(
         phone: event.phone,
         password: event.password,
         fullName: event.fullName,
@@ -142,7 +143,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     try {
       final purpose = _stringToOtpPurpose(event.purpose);
-      final result = await _authDataSource.sendOtp(
+      final result = await _authRepository.sendOtp(
         phone: event.phone,
         purpose: purpose,
       );
@@ -164,7 +165,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     try {
       final purpose = _stringToOtpPurpose(event.purpose);
-      final result = await _authDataSource.verifyOtp(
+      final result = await _authRepository.verifyOtp(
         phone: event.phone,
         code: event.code,
         purpose: purpose,
@@ -175,7 +176,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           _tempPhone == event.phone &&
           _tempPassword != null) {
         try {
-          final tokens = await _authDataSource.login(
+          final tokens = await _authRepository.login(
             phone: _tempPhone!,
             password: _tempPassword!,
           );
@@ -215,7 +216,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final refreshToken = await SecureStorage.getRefreshToken();
       if (refreshToken != null) {
-        await _authDataSource.logout(refreshToken);
+        await _authRepository.logout(refreshToken);
       }
       await SecureStorage.clearAuthData();
       emit(Unauthenticated());
@@ -238,7 +239,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
 
       print('[AuthBloc] ProfileFetchRequested - fetching profile...');
-      final user = await _authDataSource.getUserProfile(accessToken);
+      final user = await _authRepository.getUserProfile(accessToken);
       print('[AuthBloc] Profile fetched for user: ${user.profile?.fullName}');
       print('[AuthBloc] Avatar URL: ${user.profile?.avatarUrl}');
       print('[AuthBloc] Provider address: ${user.providerProfile?.address}');
