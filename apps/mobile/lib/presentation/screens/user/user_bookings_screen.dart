@@ -5,10 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'dart:async';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/socket_service.dart';
-import '../../../data/datasources/bookings_datasource.dart';
+import '../../../data/repositories/bookings_repository.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
-import '../../widgets/review_dialog.dart';
+import '../../widgets/review/review_dialog.dart';
 import '../../widgets/minimalist_widgets.dart';
 import '../../widgets/booking_offers_dialog.dart';
 import '../../widgets/quote_view_widget.dart';
@@ -718,16 +718,49 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
     );
   }
 
+  void _showDisputeDialog(String bookingId) {
+    final reasonController = TextEditingController();
+    MinDialog.show(
+      context: context,
+      title: 'Khiếu nại dịch vụ',
+      icon: Icons.error_outline_rounded,
+      content: MinTextField(
+        controller: reasonController,
+        hint: 'Nhập lý do khiếu nại...',
+        maxLines: 3,
+      ),
+      primaryLabel: 'Gửi khiếu nại',
+      isDestructive: true,
+      secondaryLabel: 'Hủy',
+      onPrimaryPressed: () async {
+        await BookingsRepository()
+            .disputeBooking(bookingId, reasonController.text);
+        _refreshBookings();
+      },
+    );
+  }
+
   void _showReviewDialog(String bookingId, {String? serviceName}) {
     ReviewDialog.show(
       context,
       bookingId: bookingId,
       serviceName: serviceName,
       onSubmit: (rating, comment) async {
-        await BookingsDataSource().reviewBooking(bookingId, rating, comment);
+        await BookingsRepository().reviewBooking(bookingId, rating, comment);
         _refreshBookings();
       },
     );
+  }
+
+  Future<void> _confirmCompletion(String bookingId) async {
+    try {
+      await BookingsRepository().confirmCompletion(bookingId);
+      _showSnackBar('Đã xác nhận hoàn thành dịch vụ!', isError: false);
+      _refreshBookings();
+      _showReviewDialog(bookingId);
+    } catch (e) {
+      _showSnackBar('Lỗi: $e', isError: true);
+    }
   }
 
   void _showSnackBar(String message, {required bool isError}) {

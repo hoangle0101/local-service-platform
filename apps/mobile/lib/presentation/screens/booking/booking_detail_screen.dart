@@ -114,7 +114,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             }
           }
 
-          final price = double.tryParse(booking.estimatedPrice ?? '0') ?? 0;
+          final price = double.tryParse(booking.finalPrice ?? '0') ?? 0;
 
           return Scaffold(
             backgroundColor: AppColors.background,
@@ -483,6 +483,14 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         color = AppColors.primary;
         label = 'ĐANG LÀM';
         break;
+      case 'pending_payment':
+        color = AppColors.warning;
+        label = 'CHỜ THANH TOÁN';
+        break;
+      case 'pending_completion':
+        color = AppColors.success;
+        label = 'CHỜ THỢ XÁC NHẬN';
+        break;
       case 'completed':
         if (booking.paymentStatus == 'held') {
           color = AppColors.accent;
@@ -647,7 +655,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       }
       if (status == 'pending_payment') {
         // Provider sees confirmation button ONLY for COD
-        if (booking.paymentMethod == 'cod') {
+        if (booking.paymentMethod?.toUpperCase() == 'COD') {
           return MinButton(
             text: 'Xác nhận thu tiền mặt',
             isFullWidth: true,
@@ -697,8 +705,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       if (status == 'pending_payment') {
         return Column(
           children: [
-            // Always show MoMo option unless already paid or explicitly COD only
-            // Actually, even if COD is selected, allow switching to MoMo
+            // MoMo payment option
             MinButton(
               text: 'Thanh toán MoMo',
               isFullWidth: true,
@@ -707,20 +714,15 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               icon: Icons.wallet_outlined,
             ),
             const SizedBox(height: 12),
-            if (booking.paymentMethod != 'cod')
-              MinButton(
-                text: 'Dùng Tiền mặt (COD)',
-                isFullWidth: true,
-                isPrimary: false,
-                isLoading: _isActionLoading,
-                onPressed: _handleSelectCod,
-                icon: Icons.money_outlined,
-              ),
-            if (booking.paymentMethod == 'cod')
-              const MinBadge(
-                label: 'Đã chọn Tiền mặt (COD)',
-                color: AppColors.success,
-              ),
+            // COD payment option - always show
+            MinButton(
+              text: 'Dùng Tiền mặt (COD)',
+              isFullWidth: true,
+              isPrimary: false,
+              isLoading: _isActionLoading,
+              onPressed: _handleSelectCod,
+              icon: Icons.money_outlined,
+            ),
             const SizedBox(height: 12),
             MinButton(
               text: 'Gửi khiếu nại',
@@ -730,6 +732,37 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               foregroundColor: AppColors.error,
               onPressed: _handleDispute,
               icon: Icons.report_problem_rounded,
+            ),
+          ],
+        );
+      }
+
+      // Customer waiting for provider to confirm COD payment
+      if (status == 'pending_completion') {
+        return Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.success.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.success.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle_outline, color: AppColors.success),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Đã chọn thanh toán tiền mặt.\nChờ thợ xác nhận đã thu tiền.',
+                      style: TextStyle(
+                        color: AppColors.success,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         );
@@ -898,6 +931,23 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
 
   void _showPaymentQrSheet(String payUrl, String? deeplink, String? orderId) {
     Timer? pollingTimer;
+    bool paymentProcessed = false; // Prevent double processing
+
+    // Helper function to handle successful payment
+    void handlePaymentSuccess() {
+      if (paymentProcessed) return; // Already processed
+      paymentProcessed = true;
+      pollingTimer?.cancel();
+
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      if (mounted) {
+        _onActionSuccess('Thanh toán thành công!');
+        context.read<BookingsBloc>().add(const LoadBookings());
+      }
+    }
 
     // Start polling for payment status
     if (orderId != null) {
@@ -905,6 +955,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       const maxAttempts = 40; // 2 minutes
 
       pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+        if (paymentProcessed) {
+          timer.cancel();
+          return;
+        }
+
         attempts++;
         if (attempts > maxAttempts) {
           timer.cancel();
@@ -918,12 +973,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           final status = result['status'] as String?;
 
           if (status == 'success') {
-            timer.cancel();
-            if (mounted) {
-              Navigator.pop(context);
-              _onActionSuccess('Thanh toán thành công!');
-              context.read<BookingsBloc>().add(const LoadBookings());
-            }
+            handlePaymentSuccess();
           }
         } catch (e) {
           debugPrint('[BookingDetail] Polling error: $e');
@@ -932,17 +982,13 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     }
 
     // Listen for booking status changes while QR is showing
-    _bookingSocketSubscription?.cancel();
-    _bookingSocketSubscription =
-        SocketService().bookingStatusStream.listen((event) {
-      if (mounted &&
+    StreamSubscription? tempSubscription;
+    tempSubscription = SocketService().bookingStatusStream.listen((event) {
+      if (!paymentProcessed &&
           event.bookingId == widget.booking.id.toString() &&
           event.status == 'completed') {
-        pollingTimer?.cancel();
-        // Automatically close sheet if payment confirmed (escrow held)
-        Navigator.pop(context);
-        _onActionSuccess('Thanh toán thành công!');
-        context.read<BookingsBloc>().add(const LoadBookings());
+        handlePaymentSuccess();
+        tempSubscription?.cancel();
       }
     });
 
@@ -1094,8 +1140,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     try {
       await _paymentDataSource.createPayment(
         bookingId: widget.booking.id,
-        amount: int.parse(widget.booking.estimatedPrice ?? '0'),
-        paymentMethod: 'cod',
+        amount: int.parse(widget.booking.finalPrice ?? '0'),
+        paymentMethod: 'COD',
       );
       _onActionSuccess('Đã chọn thanh toán tiền mặt');
       context.read<BookingsBloc>().add(const LoadBookings());

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/data/repositories/track_asia_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -37,7 +38,7 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
   double _latitude = 21.0285;
   double _longitude = 105.8542;
 
-  final TrackAsiaDataSource _trackAsiaDataSource = TrackAsiaDataSource();
+  final TrackAsiaRepository _trackAsiaRepository = TrackAsiaRepository();
   List<AddressPrediction> _addressPredictions = [];
   Timer? _debounceTimer;
   bool _showPredictions = false;
@@ -69,7 +70,7 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
 
     _debounceTimer = Timer(const Duration(milliseconds: 400), () async {
       try {
-        final predictions = await _trackAsiaDataSource.searchAddress(query);
+        final predictions = await _trackAsiaRepository.searchAddress(query);
         if (mounted) {
           setState(() {
             _addressPredictions = predictions;
@@ -86,7 +87,7 @@ class _CompleteBookingScreenState extends State<CompleteBookingScreen> {
     setState(() => _showPredictions = false);
     try {
       final detail =
-          await _trackAsiaDataSource.getPlaceDetail(prediction.placeId);
+          await _trackAsiaRepository.getPlaceDetail(prediction.placeId);
       if (mounted && detail != null) {
         final fullAddress = FullAddress.fromPlaceDetail(detail);
         setState(() {

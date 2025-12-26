@@ -7,7 +7,7 @@ import 'package:audioplayers/audioplayers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/entities/entities.dart';
 import '../../../core/services/socket_service.dart';
-import '../../../data/datasources/bookings_datasource.dart';
+import '../../../data/repositories/bookings_repository.dart';
 import '../../bloc/categories/categories_bloc.dart';
 import '../../bloc/categories/categories_event_state.dart';
 import '../../bloc/services/services_bloc.dart';
@@ -27,7 +27,7 @@ class _JobMarketScreenState extends State<JobMarketScreen> {
   Service? _selectedService;
   List<Booking> _jobs = [];
   bool _isLoadingJobs = false;
-  final BookingsDataSource _bookingsDataSource = BookingsDataSource();
+  final BookingsRepository _bookingsRepository = BookingsRepository();
 
   // Socket service for real-time updates
   final SocketService _socketService = SocketService();
@@ -75,6 +75,9 @@ class _JobMarketScreenState extends State<JobMarketScreen> {
               content: Text('Có việc mới: ${event.serviceName}'),
               backgroundColor: AppColors.success,
               behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
               duration: const Duration(seconds: 3),
               action: SnackBarAction(
                 label: 'XEM',
@@ -105,8 +108,11 @@ class _JobMarketScreenState extends State<JobMarketScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: const Text('Một đơn hàng đã có người nhận'),
-                backgroundColor: Colors.grey,
+                backgroundColor: AppColors.textSecondary,
                 behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                margin: const EdgeInsets.all(16),
                 duration: const Duration(seconds: 2),
               ),
             );
@@ -129,35 +135,47 @@ class _JobMarketScreenState extends State<JobMarketScreen> {
   }
 
   Future<void> _fetchJobs() async {
+    if (!mounted) return;
     setState(() => _isLoadingJobs = true);
     try {
-      final jobs = await _bookingsDataSource.getGlobalRequests(
+      final jobs = await _bookingsRepository.getGlobalRequests(
         serviceId: _selectedService?.id,
         categoryId: _selectedCategory?.id,
       );
+      if (!mounted) return;
       setState(() {
         _jobs = jobs;
         _isLoadingJobs = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoadingJobs = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi: $e'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
     }
   }
 
   Future<void> _acceptJob(Booking job) async {
     try {
       final result =
-          await _bookingsDataSource.acceptBookingRequest(int.parse(job.id));
+          await _bookingsRepository.acceptBookingRequest(int.parse(job.id));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result['message'] ?? 'Đã gửi báo giá thành công!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
           ),
         );
         // Navigate to home to see the active job
@@ -168,7 +186,14 @@ class _JobMarketScreenState extends State<JobMarketScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Lỗi: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ),
         );
       }
     }

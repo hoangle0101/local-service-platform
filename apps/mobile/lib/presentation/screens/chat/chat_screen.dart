@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../../../core/theme/app_colors.dart';
-import '../../../data/datasources/chat_datasource.dart';
+import '../../../data/repositories/chat_repository.dart';
 
 /// Chat screen with WebSocket real-time messaging
 class ChatScreen extends StatefulWidget {
@@ -22,7 +22,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final ChatDataSource _chatDataSource = ChatDataSource();
+  final ChatRepository _chatRepository = ChatRepository();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
@@ -88,7 +88,7 @@ class _ChatScreenState extends State<ChatScreen> {
       debugPrint(
           '[ChatScreen] Getting conversation for bookingId: ${widget.bookingId}');
       final conversation =
-          await _chatDataSource.getOrCreateConversation(widget.bookingId);
+          await _chatRepository.getOrCreateConversation(widget.bookingId);
       debugPrint('[ChatScreen] Conversation response: $conversation');
       _conversationId = conversation['id'];
       debugPrint('[ChatScreen] Conversation ID: $_conversationId');
@@ -96,7 +96,7 @@ class _ChatScreenState extends State<ChatScreen> {
       // Load initial messages
       debugPrint(
           '[ChatScreen] Loading messages for conversation: $_conversationId');
-      final messages = await _chatDataSource.getMessages(_conversationId!);
+      final messages = await _chatRepository.getMessages(_conversationId!);
       debugPrint('[ChatScreen] Loaded ${messages.length} messages');
       setState(() => _messages = messages);
 
@@ -241,9 +241,9 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       } else {
         // Fallback to REST API
-        await _chatDataSource.sendMessage(_conversationId!, text);
+        await _chatRepository.sendMessage(_conversationId!, text);
         // Reload messages
-        final messages = await _chatDataSource.getMessages(_conversationId!);
+        final messages = await _chatRepository.getMessages(_conversationId!);
         setState(() => _messages = messages);
       }
       _scrollToBottom();

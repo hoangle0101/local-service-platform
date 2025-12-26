@@ -74,9 +74,13 @@ export class BookingPaymentService {
    * Provider marks service as complete → pending_payment
    */
   async markServiceComplete(bookingId: bigint, providerId: bigint) {
+    console.log('[markServiceComplete] START - bookingId:', bookingId.toString(), 'providerId:', providerId.toString());
+    
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
     });
+
+    console.log('[markServiceComplete] Booking:', booking ? { id: booking.id.toString(), status: booking.status, providerId: booking.providerId?.toString() } : 'NOT FOUND');
 
     if (!booking) {
       throw new NotFoundException('Booking không tồn tại');
@@ -86,8 +90,11 @@ export class BookingPaymentService {
       throw new ForbiddenException('Bạn không có quyền cập nhật booking này');
     }
 
-    if (!['confirmed', 'in_progress'].includes(booking.status)) {
-      throw new BadRequestException('Không thể hoàn thành ở trạng thái này');
+    if (!['accepted', 'in_progress'].includes(booking.status)) {
+      console.log('[markServiceComplete] Invalid status:', booking.status);
+      throw new BadRequestException(
+        `Không thể hoàn thành ở trạng thái này (Hiện tại: ${booking.status})`,
+      );
     }
 
     // If no actual price set, use estimated price
@@ -238,25 +245,37 @@ export class BookingPaymentService {
    * Flow: Provider collected cash → Platform deducts locked fee → Complete booking
    */
   async confirmCodPayment(bookingId: bigint, providerId: bigint) {
+    console.log('[confirmCodPayment] Called with:', { bookingId: bookingId.toString(), providerId: providerId.toString() });
+    
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
     });
+
+    console.log('[confirmCodPayment] Booking found:', booking ? {
+      id: booking.id.toString(),
+      status: booking.status,
+      providerId: booking.providerId?.toString(),
+      paymentMethod: booking.paymentMethod,
+    } : 'null');
 
     if (!booking) {
       throw new NotFoundException('Booking không tồn tại');
     }
 
     if (booking.providerId !== providerId) {
+      console.log('[confirmCodPayment] Provider mismatch:', { bookingProviderId: booking.providerId?.toString(), requestProviderId: providerId.toString() });
       throw new ForbiddenException('Bạn không có quyền xác nhận booking này');
     }
 
-    if (booking.status !== 'pending_payment') {
+    if (booking.status !== 'pending_completion') {
+      console.log('[confirmCodPayment] Status mismatch:', { currentStatus: booking.status });
       throw new BadRequestException(
-        'Booking không ở trạng thái chờ thanh toán',
+        'Booking không ở trạng thái chờ xác nhận thanh toán',
       );
     }
 
-    if (booking.paymentMethod !== 'cod') {
+    if (booking.paymentMethod?.toLowerCase() !== 'cod') {
+      console.log('[confirmCodPayment] PaymentMethod mismatch:', { paymentMethod: booking.paymentMethod });
       throw new BadRequestException('Booking không dùng phương thức COD');
     }
 

@@ -4,8 +4,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/reviews_datasource.dart';
 import '../../bloc/auth/auth_bloc.dart';
 import '../../bloc/auth/auth_event.dart';
-import '../../widgets/review_card.dart';
-import '../../widgets/star_rating.dart';
+import '../../widgets/review/review_card.dart';
+import '../../widgets/rating/star_rating.dart';
 
 /// Beautiful "My Reviews" screen for providers to see customer feedback
 class ProviderMyReviewsScreen extends StatefulWidget {

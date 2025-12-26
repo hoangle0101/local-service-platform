@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import '../bloc/notifications/notifications_bloc.dart';
-import '../bloc/notifications/notifications_event.dart';
-import '../bloc/notifications/notifications_state.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/entities/entities.dart';
+import '../../bloc/notifications/notifications_bloc.dart';
+import '../../bloc/notifications/notifications_event.dart';
+import '../../bloc/notifications/notifications_state.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/entities/entities.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../../theme/app_colors.dart';
 
 /// StarRatingBar - Interactive star rating widget
 /// Allows users to select rating by tapping or dragging

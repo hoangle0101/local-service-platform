@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/data/repositories/provider_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/entities/entities.dart';
 import '../../../data/datasources/provider_datasource.dart';
-import '../../bloc/services/services_bloc.dart';
-import '../../bloc/services/services_event_state.dart';
 import '../../bloc/categories/categories_bloc.dart';
 import '../../bloc/categories/categories_event_state.dart';
-import '../../widgets/minimalist_widgets.dart';
+import '../../bloc/services/services_bloc.dart';
+import '../../bloc/services/services_event_state.dart';
+import '../../widgets/provider/add_service_sheet.dart';
+import '../../widgets/provider/edit_service_sheet.dart';
 import 'manage_service_items_screen.dart';
 
 // Helper to safely parse int
@@ -39,7 +40,7 @@ class ProviderServicesScreen extends StatefulWidget {
 class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
   bool _isLoading = false;
   List<Map<String, dynamic>> _services = [];
-  final ProviderDataSource _providerDataSource = ProviderDataSource();
+  final ProviderRepository _providerRepository = ProviderRepository();
 
   @override
   void initState() {
@@ -52,7 +53,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
   Future<void> _loadServices() async {
     setState(() => _isLoading = true);
     try {
-      final services = await _providerDataSource.getMyServices();
+      final services = await _providerRepository.getMyServices();
       setState(() {
         _services = services;
         _isLoading = false;
@@ -72,7 +73,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _AddServiceSheet(onServiceAdded: () {
+      builder: (context) => AddServiceSheet(onServiceAdded: () {
         Navigator.pop(context);
         _loadServices();
       }),
@@ -84,7 +85,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _EditServiceSheet(
+      builder: (context) => EditServiceSheet(
         service: service,
         onServiceUpdated: () {
           Navigator.pop(context);
@@ -458,23 +459,28 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         decoration: BoxDecoration(
           color: color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18, color: color),
+            Icon(icon, size: 16, color: color),
             if (label.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: color,
-                  fontWeight: FontWeight.w800,
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],
@@ -491,7 +497,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
 
   Future<void> _toggleService(int serviceId, bool isActive) async {
     try {
-      await _providerDataSource.updateService(
+      await _providerRepository.updateService(
           serviceId: serviceId, isActive: isActive);
       await _loadServices();
       if (mounted) {
@@ -534,7 +540,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               try {
-                await _providerDataSource.deleteService(serviceId);
+                await _providerRepository.deleteService(serviceId);
                 await _loadServices();
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -556,399 +562,6 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
             child: const Text('Xóa'),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Add Service Sheet - Modern Design
-class _AddServiceSheet extends StatefulWidget {
-  final VoidCallback onServiceAdded;
-  const _AddServiceSheet({required this.onServiceAdded});
-
-  @override
-  State<_AddServiceSheet> createState() => _AddServiceSheetState();
-}
-
-class _AddServiceSheetState extends State<_AddServiceSheet> {
-  final _formKey = GlobalKey<FormState>();
-  final _priceController = TextEditingController();
-  final ProviderDataSource _providerDataSource = ProviderDataSource();
-
-  Category? _selectedCategory;
-  Service? _selectedService;
-  bool _isSubmitting = false;
-
-  @override
-  void dispose() {
-    _priceController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate() || _selectedService == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Vui lòng điền đầy đủ thông tin'),
-            backgroundColor: Colors.orange),
-      );
-      return;
-    }
-
-    setState(() => _isSubmitting = true);
-    try {
-      await _providerDataSource.addService(
-        serviceId: _selectedService!.id,
-        price: double.parse(_priceController.text.replaceAll(',', '')),
-      );
-      widget.onServiceAdded();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Thêm dịch vụ thành công!'),
-              backgroundColor: Colors.green),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.divider.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.add_task_rounded,
-                        color: AppColors.primary),
-                  ),
-                  const SizedBox(width: 16),
-                  const Text(
-                    'Thêm dịch vụ mới',
-                    style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.textPrimary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-              _buildLabel('Danh mục dịch vụ'),
-              BlocBuilder<CategoriesBloc, CategoriesState>(
-                builder: (context, state) {
-                  if (state is CategoriesLoaded) {
-                    return _buildDropdown<Category>(
-                      value: _selectedCategory,
-                      hint: 'Chọn một danh mục',
-                      items: state.categories,
-                      itemBuilder: (cat) => Text(cat.name,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 14)),
-                      onChanged: (cat) {
-                        if (cat != null) {
-                          setState(() {
-                            _selectedCategory = cat;
-                            _selectedService = null;
-                          });
-                          context
-                              .read<ServicesBloc>()
-                              .add(LoadGenericServices(categoryId: cat.id));
-                        }
-                      },
-                    );
-                  }
-                  return const Center(
-                      child: LinearProgressIndicator(color: AppColors.primary));
-                },
-              ),
-              const SizedBox(height: 24),
-              _buildLabel('Tên dịch vụ cụ thể'),
-              BlocBuilder<ServicesBloc, ServicesState>(
-                builder: (context, state) {
-                  if (state is GenericServicesLoaded) {
-                    return _buildDropdown<Service>(
-                      value: _selectedService,
-                      hint: 'Chọn một dịch vụ cụ thể',
-                      items: state.services,
-                      itemBuilder: (svc) => Text(svc.name,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 14)),
-                      onChanged: (svc) =>
-                          setState(() => _selectedService = svc),
-                    );
-                  }
-                  if (state is ServicesLoading) {
-                    return const Center(
-                        child:
-                            LinearProgressIndicator(color: AppColors.primary));
-                  }
-                  return _buildDropdown<Service>(
-                    value: null,
-                    hint: _selectedCategory == null
-                        ? 'Vui lòng chọn danh mục trước'
-                        : 'Chọn một dịch vụ',
-                    items: [],
-                    itemBuilder: (svc) => const SizedBox(),
-                    onChanged: null,
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
-              MinTextField(
-                label: 'Giá dịch vụ của bạn (VND)',
-                hint: 'Ví dụ: 150,000',
-                controller: _priceController,
-                keyboardType: TextInputType.number,
-                prefixIcon: const Icon(Icons.payments_rounded,
-                    color: AppColors.textTertiary, size: 20),
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Vui lòng nhập giá';
-                  if (double.tryParse(v.replaceAll(',', '')) == null) {
-                    return 'Giá không hợp lệ';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 48),
-              MinButton(
-                text: 'Xác nhận thêm dịch vụ',
-                isLoading: _isSubmitting,
-                isFullWidth: true,
-                onPressed: _submit,
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(text,
-          style: TextStyle(
-              fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
-    );
-  }
-
-  Widget _buildDropdown<T>({
-    required T? value,
-    required String hint,
-    required List<T> items,
-    required Widget Function(T) itemBuilder,
-    required void Function(T?)? onChanged,
-  }) {
-    return DropdownButtonFormField<T>(
-      value: value,
-      decoration: InputDecoration(
-        hintText: hint,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        filled: true,
-        fillColor: Colors.grey.shade50,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      ),
-      items: items
-          .map(
-              (item) => DropdownMenuItem(value: item, child: itemBuilder(item)))
-          .toList(),
-      onChanged: onChanged,
-    );
-  }
-}
-
-/// Edit Service Sheet - Modern Design
-class _EditServiceSheet extends StatefulWidget {
-  final Map<String, dynamic> service;
-  final VoidCallback onServiceUpdated;
-  const _EditServiceSheet(
-      {required this.service, required this.onServiceUpdated});
-
-  @override
-  State<_EditServiceSheet> createState() => _EditServiceSheetState();
-}
-
-class _EditServiceSheetState extends State<_EditServiceSheet> {
-  final _formKey = GlobalKey<FormState>();
-  final _priceController = TextEditingController();
-  final ProviderDataSource _providerDataSource = ProviderDataSource();
-  bool _isSubmitting = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _priceController.text =
-        _safeDouble(widget.service['price']).toStringAsFixed(0);
-  }
-
-  @override
-  void dispose() {
-    _priceController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isSubmitting = true);
-    try {
-      final serviceId =
-          _safeInt(widget.service['serviceId'] ?? widget.service['service_id']);
-      await _providerDataSource.updateService(
-        serviceId: serviceId,
-        price: double.parse(_priceController.text.replaceAll(',', '')),
-      );
-      widget.onServiceUpdated();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Cập nhật thành công!'),
-              backgroundColor: Colors.green),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final serviceName =
-        (widget.service['service']?['name'] ?? 'Dịch vụ').toString();
-
-    return Container(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.divider.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.info.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.edit_note_rounded,
-                        color: AppColors.info),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Chỉnh sửa giá',
-                          style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.textPrimary),
-                        ),
-                        Text(
-                          serviceName,
-                          style: const TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-              MinTextField(
-                label: 'Cập nhật giá mới (VND)',
-                hint: 'Ví dụ: 180,000',
-                controller: _priceController,
-                keyboardType: TextInputType.number,
-                prefixIcon: const Icon(Icons.payments_rounded,
-                    color: AppColors.textTertiary, size: 20),
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Vui lòng nhập giá';
-                  if (double.tryParse(v.replaceAll(',', '')) == null) {
-                    return 'Giá không hợp lệ';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 48),
-              MinButton(
-                text: 'Lưu thay đổi',
-                isLoading: _isSubmitting,
-                isFullWidth: true,
-                onPressed: _submit,
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
       ),
     );
   }

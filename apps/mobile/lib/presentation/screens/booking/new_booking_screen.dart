@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/data/repositories/track_asia_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -41,7 +42,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
   int _currentStep = 0;
 
   // Track Asia API for address autocomplete
-  final TrackAsiaDataSource _trackAsiaDataSource = TrackAsiaDataSource();
+  final TrackAsiaRepository _trackAsiaRepository = TrackAsiaRepository();
   List<AddressPrediction> _addressPredictions = [];
   Timer? _debounceTimer;
   bool _showPredictions = false;
@@ -75,7 +76,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
 
     _debounceTimer = Timer(const Duration(milliseconds: 400), () async {
       try {
-        final predictions = await _trackAsiaDataSource.searchAddress(query);
+        final predictions = await _trackAsiaRepository.searchAddress(query);
         if (mounted) {
           setState(() {
             _addressPredictions = predictions;
@@ -94,7 +95,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
 
     try {
       final detail =
-          await _trackAsiaDataSource.getPlaceDetail(prediction.placeId);
+          await _trackAsiaRepository.getPlaceDetail(prediction.placeId);
       if (mounted && detail != null) {
         // Use FullAddress for better display
         final fullAddress = FullAddress.fromPlaceDetail(detail);
@@ -119,7 +120,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
       child: Scaffold(
         backgroundColor: AppColors.backgroundPrimary,
         appBar: AppBar(
-          title: const Text('Book a Service'),
+          title: const Text('Đặt dịch vụ'),
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
           elevation: 0,
@@ -147,7 +148,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
               },
               steps: [
                 Step(
-                  title: const Text('Select Service'),
+                  title: const Text('Chọn dịch vụ'),
                   subtitle: _selectedService != null
                       ? Text(_selectedService!.service.name)
                       : null,
@@ -157,7 +158,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
                   content: _buildServiceSelectionStep(),
                 ),
                 Step(
-                  title: const Text('Schedule'),
+                  title: const Text('Lịch hẹn'),
                   subtitle: _currentStep > 1
                       ? Text(DateFormat('EEE, dd MMM • HH:mm').format(DateTime(
                           _selectedDate.year,
@@ -172,14 +173,14 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
                   content: _buildScheduleStep(),
                 ),
                 Step(
-                  title: const Text('Location & Details'),
+                  title: const Text('Địa điểm'),
                   isActive: _currentStep >= 2,
                   state:
                       _currentStep > 2 ? StepState.complete : StepState.indexed,
                   content: _buildLocationStep(),
                 ),
                 Step(
-                  title: const Text('Confirm'),
+                  title: const Text('Xác nhận'),
                   isActive: _currentStep >= 3,
                   content: _buildConfirmationStep(),
                 ),
@@ -201,7 +202,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Choose the service you need:',
+                'Chọn dịch vụ bạn cần:',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 16),
@@ -212,17 +213,17 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
           return Center(
             child: Column(
               children: [
-                Text('Error: ${state.message}'),
+                Text('Lỗi: ${state.message}'),
                 ElevatedButton(
                   onPressed: () =>
                       context.read<ServicesBloc>().add(const LoadServices()),
-                  child: const Text('Retry'),
+                  child: const Text('Thử lại'),
                 ),
               ],
             ),
           );
         }
-        return const Center(child: Text('Loading services...'));
+        return const Center(child: Text('Đang tải dịch vụ...'));
       },
     );
   }
@@ -318,14 +319,13 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'When do you need the service?',
+          'Bạn cần dịch vụ khi nào?',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 16),
 
         // Date Selection
-        const Text('Select Date',
-            style: TextStyle(fontWeight: FontWeight.w500)),
+        const Text('Chọn ngày', style: TextStyle(fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
         SizedBox(
           height: 80,
@@ -392,8 +392,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
         const SizedBox(height: 24),
 
         // Time Selection
-        const Text('Select Time',
-            style: TextStyle(fontWeight: FontWeight.w500)),
+        const Text('Chọn giờ', style: TextStyle(fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -572,7 +571,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
 
   Widget _buildConfirmationStep() {
     if (_selectedService == null) {
-      return const Center(child: Text('Please select a service first'));
+      return const Center(child: Text('Vui lòng chọn dịch vụ trước'));
     }
 
     final scheduledAt = DateTime(
@@ -587,7 +586,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Booking Summary',
+          'Tóm tắt đặt lịch',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
@@ -602,28 +601,28 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
               children: [
                 _buildSummaryRow(
                   Icons.home_repair_service,
-                  'Service',
+                  'Dịch vụ',
                   _selectedService!.service.name,
                 ),
                 const Divider(height: 24),
                 _buildSummaryRow(
                   Icons.calendar_today,
-                  'Date & Time',
+                  'Ngày & Giờ',
                   DateFormat('EEE, dd MMM yyyy • HH:mm').format(scheduledAt),
                 ),
                 const Divider(height: 24),
                 _buildSummaryRow(
                   Icons.location_on,
-                  'Location',
+                  'Địa điểm',
                   _addressController.text.isNotEmpty
                       ? _addressController.text
-                      : 'Not specified',
+                      : 'Chưa chỉ định',
                 ),
                 if (_notesController.text.isNotEmpty) ...[
                   const Divider(height: 24),
                   _buildSummaryRow(
                     Icons.note,
-                    'Notes',
+                    'Ghi chú',
                     _notesController.text,
                   ),
                 ],
@@ -645,7 +644,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Estimated Price',
+                'Giá ước tính',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
               Text(
@@ -663,7 +662,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
 
         const SizedBox(height: 8),
         Text(
-          '* Final price may vary based on the actual work required',
+          '* Giá cuối cùng có thể thay đổi tùy theo công việc thực tế',
           style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
         ),
       ],
@@ -718,7 +717,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
             Expanded(
               child: OutlinedButton(
                 onPressed: isLoading ? null : details.onStepCancel,
-                child: const Text('Back'),
+                child: const Text('Quay lại'),
               ),
             ),
           if (_currentStep > 0) const SizedBox(width: 12),
@@ -740,7 +739,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
                         strokeWidth: 2,
                       ),
                     )
-                  : Text(isLastStep ? 'Confirm Booking' : 'Continue'),
+                  : Text(isLastStep ? 'Xác nhận đặt lịch' : 'Tiếp tục'),
             ),
           ),
         ],
@@ -753,7 +752,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
       if (_selectedService == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Please select a service'),
+            content: Text('Vui lòng chọn một dịch vụ'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -786,9 +785,9 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
       if (!user.isVerified) {
         final shouldProceed = await VerificationRequiredDialog.show(
           context,
-          title: 'Verify Phone to Book',
+          title: 'Xác minh để đặt lịch',
           message:
-              'Please verify your phone number before creating a booking to ensure service providers can contact you.',
+              'Vui lòng xác minh số điện thoại trước khi đặt lịch để thợ có thể liên hệ với bạn.',
           phone: user.phone,
           canSkip: true,
         );
@@ -798,7 +797,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                  'Booking created without phone verification. You may miss important updates.'),
+                  'Đã đặt lịch nhưng chưa xác minh số điện thoại. Bạn có thể bỏ lỡ thông báo quan trọng.'),
               duration: Duration(seconds: 4),
             ),
           );
@@ -830,94 +829,92 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child:
-                  const Icon(Icons.check_circle, color: Colors.green, size: 64),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Booking Confirmed!',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Booking Code: ${state.bookingCode}',
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            if (state.nearbyProviderIds.isEmpty)
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Success Icon
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.success.withOpacity(0.1),
+                  shape: BoxShape.circle,
                 ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.orange),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'No providers nearby. We will notify you when one is available.',
-                        style: TextStyle(color: Colors.orange, fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.people, color: Colors.green),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${state.nearbyProviderIds.length} provider(s) found nearby!',
-                        style: const TextStyle(
-                            color: Colors.green, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
+                child: const Icon(
+                  Icons.check_rounded,
+                  color: AppColors.success,
+                  size: 40,
                 ),
               ),
-          ],
+              const SizedBox(height: 16),
+
+              // Title
+              const Text(
+                'Đặt lịch thành công!',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 6),
+
+              // Booking Code
+              Text(
+                'Mã: ${state.bookingCode}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 2 buttons in a row with icons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Home button
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      context.go('/user/home');
+                    },
+                    icon: const Icon(Icons.home_outlined, size: 20),
+                    label: const Text('Trang chủ'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // View booking button
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      context.go('/user/bookings');
+                    },
+                    icon: const Icon(Icons.receipt_long_outlined, size: 20),
+                    label: const Text('Xem đơn'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              context.go('/user/bookings');
-            },
-            child: const Text('View My Bookings'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              context.go('/user/home');
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Done'),
-          ),
-        ],
       ),
     );
   }
@@ -934,7 +931,7 @@ class _NewBookingScreenState extends State<NewBookingScreen> {
           children: [
             Icon(Icons.location_on, color: Colors.white),
             SizedBox(width: 8),
-            Text('Using default location (Hanoi)'),
+            Text('Đang sử dụng vị trí mặc định (Hà Nội)'),
           ],
         ),
         backgroundColor: AppColors.primary,

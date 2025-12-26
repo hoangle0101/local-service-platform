@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/data/repositories/payment_repository.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
@@ -17,7 +18,7 @@ class ProviderCompleteJobScreen extends StatefulWidget {
 }
 
 class _ProviderCompleteJobScreenState extends State<ProviderCompleteJobScreen> {
-  final PaymentDataSource _paymentDataSource = PaymentDataSource();
+  final PaymentRepository _paymentRepository = PaymentRepository();
   final _formKey = GlobalKey<FormState>();
 
   final _actualPriceController = TextEditingController();
@@ -51,7 +52,7 @@ class _ProviderCompleteJobScreenState extends State<ProviderCompleteJobScreen> {
     });
 
     try {
-      final invoice = await _paymentDataSource.getInvoice(widget.bookingId);
+      final invoice = await _paymentRepository.getInvoice(widget.bookingId);
       setState(() {
         _invoice = invoice;
         _isLoading = false;
@@ -89,7 +90,7 @@ class _ProviderCompleteJobScreenState extends State<ProviderCompleteJobScreen> {
       }
 
       // Update price
-      await _paymentDataSource.updateFinalPrice(
+      await _paymentRepository.updateFinalPrice(
         bookingId: widget.bookingId,
         actualPrice: actualPrice,
         additionalCosts: additionalCosts,
@@ -97,7 +98,7 @@ class _ProviderCompleteJobScreenState extends State<ProviderCompleteJobScreen> {
       );
 
       // Mark as complete
-      await _paymentDataSource.markServiceComplete(widget.bookingId);
+      await _paymentRepository.markServiceComplete(widget.bookingId);
 
       if (mounted) {
         _showSuccessDialog();
@@ -117,7 +118,7 @@ class _ProviderCompleteJobScreenState extends State<ProviderCompleteJobScreen> {
     setState(() => _isProcessing = true);
 
     try {
-      await _paymentDataSource.confirmBookingCod(widget.bookingId);
+      await _paymentRepository.confirmBookingCod(widget.bookingId);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

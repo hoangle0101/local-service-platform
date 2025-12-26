@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/data/repositories/bookings_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../data/datasources/bookings_datasource.dart';
-import '../../../data/datasources/quote_datasource.dart';
+import 'package:mobile/data/repositories/quote_repository.dart';
 import '../../bloc/bookings/bookings_bloc.dart';
 import '../../bloc/bookings/bookings_event_state.dart';
 import '../../widgets/minimalist_widgets.dart';
@@ -21,8 +21,8 @@ class ProviderBookingsScreen extends StatefulWidget {
 class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final BookingsDataSource _bookingsDataSource = BookingsDataSource();
-  final QuoteDataSource _quoteDataSource = QuoteDataSource();
+  final BookingsRepository _bookingsRepository = BookingsRepository();
+  final QuoteRepository _quoteRepository = QuoteRepository();
 
   List<Booking> _myRequests = [];
   List<Booking> _globalRequests = [];
@@ -52,7 +52,7 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
     if (!mounted) return;
     setState(() => _isLoadingMyRequests = true);
     try {
-      final requests = await _bookingsDataSource.getProviderRequests();
+      final requests = await _bookingsRepository.getProviderRequests();
       if (mounted) {
         setState(() {
           _myRequests = requests;
@@ -71,7 +71,7 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
     setState(() => _isLoadingGlobalRequests = true);
     try {
       final requests =
-          await _bookingsDataSource.getGlobalRequests(onlyFar: true);
+          await _bookingsRepository.getGlobalRequests(onlyFar: true);
       if (mounted) {
         setState(() {
           _globalRequests = requests;
@@ -530,7 +530,6 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
       return Row(
         children: [
           Expanded(
-            flex: 2,
             child: MinButton(
               text: 'Bắt đầu ngay',
               onPressed: () => _startService(booking),
@@ -539,14 +538,11 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
           ),
           if (booking.latitude != null && booking.longitude != null) ...[
             const SizedBox(width: 12),
-            Expanded(
-              flex: 1,
-              child: MinButton(
-                text: 'Chỉ đường',
-                isPrimary: false,
-                onPressed: () => _openNavigation(booking),
-                icon: Icons.map_rounded,
-              ),
+            MinButton(
+              text: '',
+              isPrimary: false,
+              onPressed: () => _openNavigation(booking),
+              icon: Icons.navigation_rounded,
             ),
           ],
         ],
@@ -567,7 +563,6 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
           Row(
             children: [
               Expanded(
-                flex: 2,
                 child: MinButton(
                   text: 'Hoàn thành việc',
                   onPressed: () => _completeService(booking),
@@ -576,14 +571,11 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
               ),
               if (booking.latitude != null && booking.longitude != null) ...[
                 const SizedBox(width: 12),
-                Expanded(
-                  flex: 1,
-                  child: MinButton(
-                    text: 'Chỉ đường',
-                    isPrimary: false,
-                    onPressed: () => _openNavigation(booking),
-                    icon: Icons.map_rounded,
-                  ),
+                MinButton(
+                  text: '',
+                  isPrimary: false,
+                  onPressed: () => _openNavigation(booking),
+                  icon: Icons.navigation_rounded,
                 ),
               ],
             ],
@@ -687,7 +679,7 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
   Future<void> _acceptRequest(Booking booking) async {
     try {
       final bookingId = int.tryParse(booking.id) ?? 0;
-      await _bookingsDataSource.acceptBookingRequest(bookingId);
+      await _bookingsRepository.acceptBookingRequest(bookingId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -709,7 +701,7 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
 
   Future<void> _startService(Booking booking) async {
     try {
-      await _bookingsDataSource.startService(booking.id);
+      await _bookingsRepository.startService(booking.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -729,7 +721,7 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
 
   Future<void> _completeService(Booking booking) async {
     try {
-      await _bookingsDataSource.completeService(booking.id);
+      await _bookingsRepository.completeService(booking.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -778,7 +770,7 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
 
     try {
       // Need to get quote ID - we'll use the latest rejected quote for this booking
-      final quotes = await _quoteDataSource.getQuotesForBooking(booking.id);
+      final quotes = await _quoteRepository.getQuotesForBooking(booking.id);
       final rejectedQuote = quotes.firstWhere(
         (q) => q['status'] == 'rejected',
         orElse: () => <String, dynamic>{},
@@ -788,7 +780,7 @@ class _ProviderBookingsScreenState extends State<ProviderBookingsScreen>
         throw Exception('Không tìm thấy báo giá bị từ chối');
       }
 
-      await _quoteDataSource
+      await _quoteRepository
           .providerAgreeReject(rejectedQuote['id'].toString());
 
       if (mounted) {

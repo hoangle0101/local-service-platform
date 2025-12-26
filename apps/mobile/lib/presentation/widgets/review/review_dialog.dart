@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
-import 'star_rating.dart';
+import '../../../core/theme/app_colors.dart';
+import '../rating/star_rating.dart';
 
 /// Modern review dialog with beautiful animations and feedback
 class ReviewDialog extends StatefulWidget {

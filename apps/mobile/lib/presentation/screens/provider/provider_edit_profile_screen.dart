@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/data/repositories/provider_repository.dart';
+import 'package:mobile/data/repositories/track_asia_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -25,8 +27,8 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
   final _bioController = TextEditingController();
   final _addressController = TextEditingController();
 
-  final ProviderDataSource _providerDataSource = ProviderDataSource();
-  final TrackAsiaDataSource _trackAsiaDataSource = TrackAsiaDataSource();
+  final ProviderRepository _providerRepository = ProviderRepository();
+  final TrackAsiaRepository _trackAsiaRepository = TrackAsiaRepository();
   final ImagePicker _imagePicker = ImagePicker();
 
   bool _isSaving = false;
@@ -101,7 +103,7 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
 
     _debounce = Timer(const Duration(milliseconds: 400), () async {
       try {
-        final suggestions = await _trackAsiaDataSource.searchAddress(query);
+        final suggestions = await _trackAsiaRepository.searchAddress(query);
         if (mounted) {
           setState(() {
             _addressSuggestions = suggestions;
@@ -119,7 +121,7 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
 
     try {
       final detail =
-          await _trackAsiaDataSource.getPlaceDetail(prediction.placeId);
+          await _trackAsiaRepository.getPlaceDetail(prediction.placeId);
       if (mounted && detail != null) {
         setState(() {
           _addressController.text = prediction.description;
@@ -290,7 +292,7 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      final address = await _trackAsiaDataSource.reverseGeocode(
+      final address = await _trackAsiaRepository.reverseGeocode(
         position.latitude,
         position.longitude,
       );
@@ -357,14 +359,14 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
         debugPrint('[EditProfile] Uploading avatar...');
         try {
           final avatarUrl =
-              await _providerDataSource.uploadAvatar(_selectedImage!.path);
+              await _providerRepository.uploadAvatar(_selectedImage!.path);
           debugPrint('[EditProfile] Avatar uploaded successfully: $avatarUrl');
         } catch (e) {
           debugPrint('[EditProfile] Avatar upload error: $e');
         }
       }
 
-      await _providerDataSource.updateProviderProfile(
+      await _providerRepository.updateProviderProfile(
         displayName: _displayNameController.text.trim(),
         bio: _bioController.text.trim().isEmpty
             ? null

@@ -596,7 +596,7 @@ export class BookingsService {
     );
 
     return {
-      message: 'Offer sent',
+      message: 'Đã gửi báo giá thành công',
       offerId: offerResult[0].id.toString(),
       bookingId: bookingId.toString(),
       customerId: booking.customerId.toString(),
@@ -690,7 +690,7 @@ export class BookingsService {
       }
 
       const result = {
-        message: 'Provider selected',
+        message: 'Đã chọn thợ thành công',
         bookingId: updatedBooking.id.toString(),
         providerId: providerId.toString(),
         latitude: loc?.latitude,
@@ -708,6 +708,24 @@ export class BookingsService {
         {
           type: 'booking_accepted',
           ...result,
+        },
+      );
+
+      // Emit real-time socket event to provider for immediate UI update
+      this.realtimeGateway.emitBookingStatusChange(
+        customerId.toString(),
+        providerId.toString(),
+        {
+          bookingId: updatedBooking.id.toString(),
+          status: 'accepted',
+          message: `Chúc mừng! Khách hàng ${updatedBooking.customer.profile?.fullName || ''} đã chọn bạn cho dịch vụ ${bookingDetails?.service?.name || ''}.`,
+          actorId: customerId.toString(),
+          customerName: updatedBooking.customer.profile?.fullName ?? undefined,
+          providerId: providerId.toString(),
+          serviceName: bookingDetails?.service?.name,
+          latitude: loc?.latitude,
+          longitude: loc?.longitude,
+          addressText: updatedBooking.addressText,
         },
       );
 
@@ -1053,6 +1071,13 @@ export class BookingsService {
               },
             },
           },
+          bookingPayment: {
+            select: {
+              id: true,
+              paymentMethod: true,
+              status: true,
+            },
+          },
           _count: {
             select: { bookingOffers: true },
           },
@@ -1144,6 +1169,10 @@ export class BookingsService {
             return Math.round(R * c);
           })(),
           offersCount: b._count?.bookingOffers || 0,
+          // Payment info
+          paymentMethod: b.bookingPayment?.paymentMethod?.toUpperCase() || null,
+          paymentStatus: b.bookingPayment?.status || null,
+          bookingPaymentId: b.bookingPayment?.id?.toString() || null,
           // Customer pre-selected items for quote
           selectedItems:
             b.selectedItems?.map((item: any) => ({

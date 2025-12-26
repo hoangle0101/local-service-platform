@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:mobile/data/repositories/directions_repository.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -30,7 +31,7 @@ class NavigationScreen extends StatefulWidget {
 
 class _NavigationScreenState extends State<NavigationScreen> {
   final MapController _mapController = MapController();
-  final DirectionsDataSource _directionsDataSource = DirectionsDataSource();
+  final DirectionsRepository _directionsRepository = DirectionsRepository();
 
   LatLng? _currentPosition;
   LatLng get _destination =>
@@ -101,7 +102,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
     if (_currentPosition == null) return;
 
     try {
-      final result = await _directionsDataSource.getRoute(
+      final result = await _directionsRepository.getRoute(
         origin: _currentPosition!,
         destination: _destination,
       );

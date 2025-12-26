@@ -1,11 +1,13 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../data/datasources/bookings_datasource.dart';
+import '../../../data/repositories/bookings_repository.dart';
 import 'bookings_event_state.dart';
 
 class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
-  final BookingsDataSource _dataSource = BookingsDataSource();
+  final BookingsRepository _repository;
 
-  BookingsBloc() : super(BookingsInitial()) {
+  BookingsBloc([BookingsRepository? repository])
+      : _repository = repository ?? BookingsRepository(),
+        super(BookingsInitial()) {
     on<LoadBookings>(_onLoadBookings);
     on<LoadUserBookingsEvent>(_onLoadUserBookings);
     on<CreateBookingEvent>(_onCreateBooking);
@@ -28,7 +30,7 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
     print('[BookingsBloc] _onLoadBookings called');
     emit(BookingsLoading());
     try {
-      final bookings = await _dataSource.getUserBookings();
+      final bookings = await _repository.getUserBookings();
       print('[BookingsBloc] Loaded ${bookings.length} bookings');
       emit(BookingsLoaded(bookings));
       print('[BookingsBloc] Emitted BookingsLoaded state');
@@ -44,7 +46,7 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
   ) async {
     emit(BookingsLoading());
     try {
-      final bookings = await _dataSource.getUserBookings(status: event.status);
+      final bookings = await _repository.getUserBookings(status: event.status);
       emit(UserBookingsLoaded(bookings));
     } catch (e) {
       emit(BookingsError(e.toString()));
@@ -57,7 +59,7 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
   ) async {
     emit(BookingsLoading());
     try {
-      final result = await _dataSource.createBooking(
+      final result = await _repository.createBooking(
         serviceId: event.serviceId,
         scheduledAt: event.scheduledAt,
         addressText: event.addressText,
@@ -86,7 +88,7 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
         providerId: providerId,
       ));
     } catch (e) {
-      emit(BookingsError('Failed to create booking: ${e.toString()}'));
+      emit(BookingsError('Không thể tạo đặt lịch: ${e.toString()}'));
     }
   }
 
@@ -96,7 +98,7 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
   ) async {
     emit(BookingsLoading());
     try {
-      final offers = await _dataSource.getBookingOffers(event.bookingId);
+      final offers = await _repository.getBookingOffers(event.bookingId);
       emit(BookingOffersLoaded(offers));
     } catch (e) {
       emit(BookingsError(e.toString()));
@@ -109,7 +111,7 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
   ) async {
     emit(BookingsLoading());
     try {
-      final result = await _dataSource.selectProvider(
+      final result = await _repository.selectProvider(
         event.bookingId,
         event.providerId,
       );
@@ -128,10 +130,10 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
   ) async {
     emit(BookingsLoading());
     try {
-      await _dataSource.cancelBooking(event.bookingId, event.reason);
-      emit(const BookingActionSuccess('Booking cancelled successfully'));
+      await _repository.cancelBooking(event.bookingId, event.reason);
+      emit(const BookingActionSuccess('Đã hủy đơn đặt lịch thành công'));
       // Reload bookings
-      final bookings = await _dataSource.getUserBookings();
+      final bookings = await _repository.getUserBookings();
       emit(BookingsLoaded(bookings));
     } catch (e) {
       emit(BookingsError(e.toString()));
@@ -144,11 +146,11 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
   ) async {
     emit(BookingsLoading());
     try {
-      await _dataSource.reviewBooking(
+      await _repository.reviewBooking(
           event.bookingId, event.rating, event.comment);
-      emit(const BookingActionSuccess('Review submitted successfully'));
+      emit(const BookingActionSuccess('Đánh giá đã được gửi thành công'));
       // Reload bookings
-      final bookings = await _dataSource.getUserBookings();
+      final bookings = await _repository.getUserBookings();
       emit(BookingsLoaded(bookings));
     } catch (e) {
       emit(BookingsError(e.toString()));
@@ -161,7 +163,7 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
   ) async {
     emit(BookingsLoading());
     try {
-      final bookings = await _dataSource.getProviderBookings();
+      final bookings = await _repository.getProviderBookings();
       emit(BookingsLoaded(bookings));
     } catch (e) {
       emit(BookingsError(e.toString()));
@@ -174,7 +176,7 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
   ) async {
     emit(BookingsLoading());
     try {
-      final requests = await _dataSource.getProviderRequests();
+      final requests = await _repository.getProviderRequests();
       emit(ProviderRequestsLoaded(requests));
     } catch (e) {
       emit(BookingsError(e.toString()));
@@ -187,7 +189,7 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
   ) async {
     emit(BookingsLoading());
     try {
-      final result = await _dataSource.acceptBookingRequest(event.bookingId);
+      final result = await _repository.acceptBookingRequest(event.bookingId);
       emit(BookingOfferSent(result['offerId']));
     } catch (e) {
       emit(BookingsError(e.toString()));
@@ -200,10 +202,10 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
   ) async {
     emit(BookingsLoading());
     try {
-      await _dataSource.acceptBookingLegacy(event.bookingId);
-      emit(const BookingActionSuccess('Booking accepted'));
+      await _repository.acceptBookingLegacy(event.bookingId);
+      emit(const BookingActionSuccess('Đã chấp nhận đặt lịch'));
       // Reload bookings
-      final bookings = await _dataSource.getProviderBookings();
+      final bookings = await _repository.getProviderBookings();
       emit(BookingsLoaded(bookings));
     } catch (e) {
       emit(BookingsError(e.toString()));
@@ -216,10 +218,10 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
   ) async {
     emit(BookingsLoading());
     try {
-      await _dataSource.startService(event.bookingId);
-      emit(const BookingActionSuccess('Service started'));
+      await _repository.startService(event.bookingId);
+      emit(const BookingActionSuccess('Đã bắt đầu dịch vụ'));
       // Reload bookings
-      final bookings = await _dataSource.getProviderBookings();
+      final bookings = await _repository.getProviderBookings();
       emit(BookingsLoaded(bookings));
     } catch (e) {
       emit(BookingsError(e.toString()));
@@ -232,10 +234,10 @@ class BookingsBloc extends Bloc<BookingsEvent, BookingsState> {
   ) async {
     emit(BookingsLoading());
     try {
-      await _dataSource.completeService(event.bookingId);
-      emit(const BookingActionSuccess('Service completed'));
+      await _repository.completeService(event.bookingId);
+      emit(const BookingActionSuccess('Đã hoàn thành dịch vụ'));
       // Reload bookings
-      final bookings = await _dataSource.getProviderBookings();
+      final bookings = await _repository.getProviderBookings();
       emit(BookingsLoaded(bookings));
     } catch (e) {
       emit(BookingsError(e.toString()));

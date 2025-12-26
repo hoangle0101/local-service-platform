@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import '../bloc/categories/categories_bloc.dart';
-import '../bloc/categories/categories_event_state.dart';
-import '../bloc/services/services_bloc.dart';
-import '../bloc/services/services_event_state.dart';
-import '../bloc/auth/auth_bloc.dart';
-import '../../core/theme/app_colors.dart';
-import '../widgets/service_card.dart';
-import '../widgets/minimalist_widgets.dart';
-import '../widgets/animations/fade_in_animation.dart';
-import '../widgets/animations/slide_in_animation.dart';
-import '../widgets/loading/shimmer_loading.dart';
+import 'package:mobile/presentation/bloc/categories/categories_bloc.dart';
+import 'package:mobile/presentation/bloc/categories/categories_event_state.dart';
+import 'package:mobile/presentation/bloc/services/services_bloc.dart';
+import 'package:mobile/presentation/bloc/services/services_event_state.dart';
+import 'package:mobile/presentation/bloc/auth/auth_bloc.dart';
+import 'package:mobile/core/theme/app_colors.dart';
+import 'package:mobile/presentation/widgets/service_card.dart';
+import 'package:mobile/presentation/widgets/minimalist_widgets.dart';
+import 'package:mobile/presentation/widgets/animations/fade_in_animation.dart';
+import 'package:mobile/presentation/widgets/animations/slide_in_animation.dart';
+import 'package:mobile/presentation/widgets/loading/shimmer_loading.dart';
 
 class GuestHomeScreen extends StatelessWidget {
   const GuestHomeScreen({super.key});

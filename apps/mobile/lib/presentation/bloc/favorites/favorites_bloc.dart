@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../data/datasources/favorites_datasource.dart';
+import '../../../data/repositories/favorites_repository.dart';
+import '../../../data/datasources/favorites_datasource.dart' show FavoriteItem;
 
 // Events
 abstract class FavoritesEvent {}
@@ -50,10 +51,10 @@ class FavoritesError extends FavoritesState {
 
 // BLoC
 class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
-  final FavoritesDataSource _dataSource;
+  final FavoritesRepository _repository;
 
-  FavoritesBloc({FavoritesDataSource? dataSource})
-      : _dataSource = dataSource ?? FavoritesDataSource(),
+  FavoritesBloc({FavoritesRepository? repository})
+      : _repository = repository ?? FavoritesRepository(),
         super(const FavoritesInitial()) {
     on<LoadFavorites>(_onLoadFavorites);
     on<ToggleFavorite>(_onToggleFavorite);
@@ -67,7 +68,7 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
     emit(FavoritesLoading(favoriteIds: state.favoriteIds));
 
     try {
-      final items = await _dataSource.getFavorites();
+      final items = await _repository.getFavorites();
       final favoriteIds = items.map((item) => item.serviceId).toSet();
 
       emit(FavoritesLoaded(items: items, favoriteIds: favoriteIds));
@@ -110,9 +111,9 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
     // Perform API call
     bool success;
     if (isFavorite) {
-      success = await _dataSource.removeFavorite(event.serviceId);
+      success = await _repository.removeFavorite(event.serviceId);
     } else {
-      success = await _dataSource.addFavorite(event.serviceId);
+      success = await _repository.addFavorite(event.serviceId);
     }
 
     // Handle result
@@ -154,7 +155,7 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
     }
 
     // Perform API call
-    final success = await _dataSource.removeFavorite(event.serviceId);
+    final success = await _repository.removeFavorite(event.serviceId);
 
     // Handle result
     if (!success) {

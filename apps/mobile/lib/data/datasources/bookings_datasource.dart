@@ -377,9 +377,10 @@ class BookingsDataSource {
       print(
           '[BookingsDataSource] Total bookings found: ${bookingsData.length}');
 
-      // Find an active booking (accepted, confirmed, in_progress, pending_completion)
+      // Find an active booking (in_progress, pending_payment, pending_completion, accepted, pending)
       const activeStatuses = [
         'in_progress',
+        'pending_payment',
         'pending_completion',
         'accepted',
         'confirmed',
@@ -491,7 +492,7 @@ class BookingsDataSource {
   Future<void> completeService(String bookingId) async {
     try {
       // Use the mark-complete endpoint which sets status to 'pending_payment'
-      await _dio.post('/bookings/$bookingId/mark-complete');
+      await _dio.post('/booking-payments/$bookingId/mark-complete');
     } catch (e) {
       throw Exception('Failed to complete service: $e');
     }

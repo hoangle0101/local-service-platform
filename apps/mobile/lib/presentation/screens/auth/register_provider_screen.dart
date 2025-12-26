@@ -3,9 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../data/datasources/provider_datasource.dart';
-import '../../../data/datasources/auth_datasource.dart';
-import '../../../data/datasources/track_asia_datasource.dart';
+import '../../../data/repositories/provider_repository.dart';
+import '../../../data/repositories/auth_repository.dart';
+import '../../../data/repositories/track_asia_repository.dart';
 import '../../../data/storage/secure_storage.dart';
 import '../../bloc/auth/auth_bloc.dart';
 import '../../widgets/minimalist_widgets.dart';
@@ -80,7 +80,7 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
         });
 
         // Reverse geocode to get address text
-        final trackAsia = TrackAsiaDataSource();
+        final trackAsia = TrackAsiaRepository();
         final address = await trackAsia.reverseGeocode(
           position.latitude,
           position.longitude,
@@ -188,7 +188,7 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
     setState(() => _isCreatingProvider = true);
 
     try {
-      final providerDataSource = ProviderDataSource();
+      final providerRepository = ProviderRepository();
       final skillsList = _skillsController.text
           .split(',')
           .map((s) => s.trim())
@@ -197,19 +197,19 @@ class _RegisterProviderScreenState extends State<RegisterProviderScreen> {
 
       // Always login with new credentials to get the correct token for this user
       // Don't use cached token - it may belong to a different user
-      final authDataSource = AuthDataSource();
+      final authRepository = AuthRepository();
       String phone = _phoneController.text.trim();
       if (!phone.startsWith('+'))
         phone = '+84${phone.substring(phone.startsWith('0') ? 1 : 0)}';
 
-      final tokens = await authDataSource.login(
+      final tokens = await authRepository.login(
           phone: phone, password: _passwordController.text);
       await SecureStorage.saveAuthData(
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken,
           userPhone: phone);
 
-      await providerDataSource.createProviderProfile(
+      await providerRepository.createProviderProfile(
         displayName: _displayNameController.text,
         bio: _bioController.text.isNotEmpty ? _bioController.text : null,
         skills: skillsList,

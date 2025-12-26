@@ -1,12 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:mobile/data/repositories/user_repository.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../data/datasources/user_datasource.dart';
 import '../../bloc/auth/auth_bloc.dart';
 import '../../widgets/address_input_widget.dart';
 import '../../widgets/minimalist_widgets.dart';
@@ -23,7 +23,7 @@ class _UserEditProfileScreenState extends State<UserEditProfileScreen> {
   final _fullNameController = TextEditingController();
   final _bioController = TextEditingController();
 
-  final UserDataSource _userDataSource = UserDataSource();
+  final UserRepository _userRepository = UserRepository();
   final ImagePicker _imagePicker = ImagePicker();
 
   bool _isSaving = false;
@@ -518,14 +518,14 @@ class _UserEditProfileScreenState extends State<UserEditProfileScreen> {
       String? avatarUrl;
       if (_selectedImage != null) {
         try {
-          avatarUrl = await _userDataSource.uploadAvatar(_selectedImage!.path);
+          avatarUrl = await _userRepository.uploadAvatar(_selectedImage!.path);
           debugPrint('[UserEditProfile] Avatar uploaded: $avatarUrl');
         } catch (e) {
           debugPrint('[UserEditProfile] Avatar upload failed: $e');
         }
       }
 
-      await _userDataSource.updateProfile(
+      await _userRepository.updateProfile(
         fullName: _fullNameController.text,
         bio: _bioController.text.isNotEmpty ? _bioController.text : null,
         gender: _selectedGender.isNotEmpty ? _selectedGender : null,
@@ -535,7 +535,7 @@ class _UserEditProfileScreenState extends State<UserEditProfileScreen> {
 
       // Save address if selected
       if (_selectedAddress != null && _selectedAddress!.isNotEmpty) {
-        await _userDataSource.addAddress(
+        await _userRepository.addAddress(
           addressText: _selectedAddress!,
           isDefault: true,
         );

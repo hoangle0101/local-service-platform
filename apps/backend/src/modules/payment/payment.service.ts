@@ -163,7 +163,64 @@ export class PaymentService {
     });
 
     if (existingPayment) {
-      throw new BadRequestException('Payment already exists for this booking');
+      // COD selected - need to change status to pending_completion
+      if (dto.paymentMethod.toUpperCase() === 'COD' && booking.status === 'pending_payment') {
+        // Update booking payment method if different
+        if (existingPayment.paymentMethod !== 'cod') {
+          await this.prisma.bookingPayment.update({
+            where: { id: existingPayment.id },
+            data: { paymentMethod: 'cod' as any },
+          });
+          console.log('[Payment] Updated existing payment method to: COD');
+        }
+        
+        // Update booking status to pending_completion
+        await this.prisma.booking.update({
+          where: { id: dto.bookingId },
+          data: { 
+            paymentMethod: 'cod' as any,
+            status: 'pending_completion' as any,
+          },
+        });
+        
+        // Create booking event
+        await this.prisma.bookingEvent.create({
+          data: {
+            bookingId: dto.bookingId,
+            previousStatus: 'pending_payment' as any,
+            newStatus: 'pending_completion' as any,
+            actorUserId: booking.customerId,
+            note: 'Khách hàng chọn thanh toán tiền mặt (COD)',
+          },
+        });
+        
+        // Notify provider
+        if (booking.providerId) {
+          this.realtimeGateway.emitBookingStatusChange(
+            booking.providerId.toString(),
+            booking.customerId.toString(),
+            {
+              bookingId: dto.bookingId.toString(),
+              status: 'pending_completion',
+              previousStatus: 'pending_payment',
+              message: 'Khách đã chọn thanh toán tiền mặt - Chờ xác nhận thu tiền',
+            },
+          );
+        }
+        
+        console.log('[Payment] Changed booking status to pending_completion');
+        return {
+          bookingPayment: this.formatBookingPayment(existingPayment),
+          message: 'Đã chọn thanh toán tiền mặt - Chờ thợ xác nhận thu tiền',
+        };
+      }
+      
+      // For other cases (e.g., MoMo or already in pending_completion), just return existing
+      console.log('[Payment] Returning existing payment:', existingPayment.id.toString());
+      return {
+        bookingPayment: this.formatBookingPayment(existingPayment),
+        message: 'Payment đã tồn tại',
+      };
     }
 
     // Calculate fees
@@ -216,10 +273,44 @@ export class PaymentService {
       };
     }
 
-    // COD - just return payment info
+    // COD - Update booking status to pending_completion and notify provider
+    if (dto.paymentMethod === 'COD' && booking.providerId) {
+      // Update booking paymentMethod and status to pending_completion
+      await this.prisma.booking.update({
+        where: { id: dto.bookingId },
+        data: { 
+          paymentMethod: 'cod' as any,
+          status: 'pending_completion' as any,
+        },
+      });
+      
+      // Create booking event
+      await this.prisma.bookingEvent.create({
+        data: {
+          bookingId: dto.bookingId,
+          previousStatus: 'pending_payment' as any,
+          newStatus: 'pending_completion' as any,
+          actorUserId: booking.customerId,
+          note: 'Khách hàng chọn thanh toán tiền mặt (COD)',
+        },
+      });
+      
+      // Notify provider that customer selected COD - waiting for confirmation
+      this.realtimeGateway.emitBookingStatusChange(
+        booking.providerId.toString(),
+        booking.customerId.toString(),
+        {
+          bookingId: dto.bookingId.toString(),
+          status: 'pending_completion',
+          previousStatus: 'pending_payment',
+          message: 'Khách đã chọn thanh toán tiền mặt - Chờ xác nhận thu tiền',
+        },
+      );
+    }
+    
     return {
       bookingPayment: this.formatBookingPayment(bookingPayment),
-      message: 'Thanh toán tiền mặt khi hoàn thành dịch vụ',
+      message: 'Đã chọn thanh toán tiền mặt - Chờ thợ xác nhận thu tiền',
     };
   }
 

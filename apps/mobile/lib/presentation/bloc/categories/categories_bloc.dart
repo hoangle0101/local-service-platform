@@ -1,11 +1,13 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../data/datasources/marketplace_datasource.dart';
+import '../../../data/repositories/marketplace_repository.dart';
 import 'categories_event_state.dart';
 
 class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
-  final MarketplaceDataSource _marketplaceDataSource = MarketplaceDataSource();
+  final MarketplaceRepository _repository;
 
-  CategoriesBloc() : super(CategoriesInitial()) {
+  CategoriesBloc([MarketplaceRepository? repository])
+      : _repository = repository ?? MarketplaceRepository(),
+        super(CategoriesInitial()) {
     on<LoadCategories>(_onLoadCategories);
   }
 
@@ -16,7 +18,7 @@ class CategoriesBloc extends Bloc<CategoriesEvent, CategoriesState> {
     emit(CategoriesLoading());
     try {
       print('[CategoriesBloc] Loading categories...');
-      final categories = await _marketplaceDataSource.getCategories();
+      final categories = await _repository.getCategories();
       print('[CategoriesBloc] Loaded ${categories.length} categories');
       emit(CategoriesLoaded(categories));
     } catch (e, stackTrace) {

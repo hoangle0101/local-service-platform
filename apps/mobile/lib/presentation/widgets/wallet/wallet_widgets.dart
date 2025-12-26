@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../core/theme/app_colors.dart';
-import '../../data/datasources/payment_datasource.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../data/datasources/payment_datasource.dart';
 
 /// Transaction list item with icon and amount
 class TransactionItem extends StatelessWidget {

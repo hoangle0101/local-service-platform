@@ -171,7 +171,7 @@ class PaymentDataSource {
 
   /// Get invoice for booking
   Future<Map<String, dynamic>> getInvoice(String bookingId) async {
-    final response = await _dio.get('/bookings/$bookingId/invoice');
+    final response = await _dio.get('/booking-payments/$bookingId/invoice');
     final data = response.data;
     if (data is Map<String, dynamic>) {
       return data.containsKey('data') ? data['data'] : data;
@@ -187,7 +187,7 @@ class PaymentDataSource {
     String? additionalNotes,
   }) async {
     final response =
-        await _dio.post('/bookings/$bookingId/update-price', data: {
+        await _dio.post('/booking-payments/$bookingId/update-price', data: {
       'actualPrice': actualPrice,
       if (additionalCosts != null) 'additionalCosts': additionalCosts,
       if (additionalNotes != null) 'additionalNotes': additionalNotes,
@@ -201,7 +201,8 @@ class PaymentDataSource {
 
   /// Provider marks service as complete (pending_payment)
   Future<Map<String, dynamic>> markServiceComplete(String bookingId) async {
-    final response = await _dio.post('/bookings/$bookingId/mark-complete');
+    final response =
+        await _dio.post('/booking-payments/$bookingId/mark-complete');
     final data = response.data;
     if (data is Map<String, dynamic>) {
       return data.containsKey('data') ? data['data'] : data;
@@ -211,7 +212,8 @@ class PaymentDataSource {
 
   /// Provider confirms COD payment received for booking
   Future<Map<String, dynamic>> confirmBookingCod(String bookingId) async {
-    final response = await _dio.post('/bookings/$bookingId/confirm-cod');
+    final response =
+        await _dio.post('/booking-payments/$bookingId/confirm-cod');
     final data = response.data;
     if (data is Map<String, dynamic>) {
       return data.containsKey('data') ? data['data'] : data;

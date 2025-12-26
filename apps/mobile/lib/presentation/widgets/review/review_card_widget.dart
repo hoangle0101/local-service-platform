@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../../data/models/review_model.dart';
-import 'star_rating_bar.dart';
+import '../../theme/app_colors.dart';
+import '../../../data/models/review_model.dart';
+import '../rating/star_rating_bar.dart';
 
 /// ReviewCardWidget - Display a single review
 class ReviewCardWidget extends StatelessWidget {
@@ -149,7 +149,7 @@ class ReviewCardWidget extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: Text(
-                'Was this review helpful?',
+                'Đánh giá này có hữu ích không?',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.textSecondary,
                       fontSize: 11,
@@ -167,19 +167,19 @@ class ReviewCardWidget extends StatelessWidget {
     final difference = now.difference(dateTime);
 
     if (difference.inDays == 0) {
-      return 'Today';
+      return 'Hôm nay';
     } else if (difference.inDays == 1) {
-      return 'Yesterday';
+      return 'Hôm qua';
     } else if (difference.inDays < 7) {
-      return '${difference.inDays} days ago';
+      return '${difference.inDays} ngày trước';
     } else if (difference.inDays < 30) {
       final weeks = (difference.inDays / 7).floor();
-      return '$weeks ${weeks == 1 ? 'week' : 'weeks'} ago';
+      return '$weeks tuần trước';
     } else if (difference.inDays < 365) {
       final months = (difference.inDays / 30).floor();
-      return '$months ${months == 1 ? 'month' : 'months'} ago';
+      return '$months tháng trước';
     } else {
-      return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}';
+      return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
     }
   }
 }
