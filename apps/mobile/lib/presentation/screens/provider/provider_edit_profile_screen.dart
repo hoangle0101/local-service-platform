@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import 'dart:async';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/provider_datasource.dart';
 import '../../../data/datasources/track_asia_datasource.dart';
@@ -522,7 +523,9 @@ class _ProviderEditProfileScreenState extends State<ProviderEditProfileScreen> {
                         )
                       : (_existingImageUrl != null)
                           ? Image.network(
-                              _existingImageUrl!,
+                              _existingImageUrl!.startsWith('http')
+                                  ? _existingImageUrl!
+                                  : '${AppConstants.apiBaseUrl}${_existingImageUrl!.startsWith('/') ? '' : '/'}$_existingImageUrl',
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) =>
                                   _buildAvatarPlaceholder(),

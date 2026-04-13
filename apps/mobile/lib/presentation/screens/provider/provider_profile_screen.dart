@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../bloc/auth/auth_bloc.dart';
 import '../../widgets/user_avatar.dart';
@@ -40,7 +41,7 @@ class ProviderProfileScreen extends StatelessWidget {
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
       fullAvatarUrl = avatarUrl.startsWith('http')
           ? avatarUrl
-          : 'http://10.0.2.2:3000${avatarUrl.startsWith('/') ? '' : '/'}$avatarUrl';
+          : '${AppConstants.apiBaseUrl}${avatarUrl.startsWith('/') ? '' : '/'}$avatarUrl';
     }
 
     return RefreshIndicator(

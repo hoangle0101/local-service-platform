@@ -424,7 +424,7 @@ class _QuoteViewWidgetState extends State<QuoteViewWidget> {
                     icon: Icons.close_rounded,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   child: MinButton(
                     text: 'Chấp nhận',

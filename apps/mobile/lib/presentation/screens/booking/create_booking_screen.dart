@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
 import 'dart:async';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import 'package:geolocator/geolocator.dart'; // Added geolocator
 import '../../../core/entities/entities.dart';
@@ -70,7 +71,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
     if (widget.providerId == null) return;
     setState(() => _loadingItems = true);
     try {
-      final dio = Dio(BaseOptions(baseUrl: 'http://10.0.2.2:3000'));
+      final dio = Dio(BaseOptions(baseUrl: AppConstants.apiBaseUrl));
       final token = await SecureStorage.getAccessToken();
       final url =
           '/services/${widget.serviceId}/provider/${widget.providerId}/items';

@@ -1081,6 +1081,12 @@ export class BookingsService {
           _count: {
             select: { bookingOffers: true },
           },
+          serviceQuotes: {
+            select: {
+              status: true,
+              finalPrice: true,
+            },
+          },
         },
         skip: (page - 1) * limit,
         take: limit,
@@ -1130,6 +1136,9 @@ export class BookingsService {
           longitude: loc?.longitude ?? null,
           estimatedPrice: b.estimatedPrice?.toString(),
           actualPrice: b.actualPrice?.toString(),
+          hasPendingQuote: b.serviceQuotes?.some((q: any) => q.status === 'pending') || false,
+          isQuoteAccepted: b.serviceQuotes?.some((q: any) => q.status === 'accepted') || false,
+          acceptedPrice: b.serviceQuotes?.find((q: any) => q.status === 'accepted')?.finalPrice?.toString() || null,
           serviceId: b.serviceId,
           providerId: b.providerId ? b.providerId.toString() : null,
           service: {

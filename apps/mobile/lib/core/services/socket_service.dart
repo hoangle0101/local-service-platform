@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import '../constants/app_constants.dart';
 
 // ========================
 // Socket Event Models
@@ -295,8 +296,8 @@ class SocketService {
   String? _currentUserId;
   String? get currentUserId => _currentUserId;
 
-  // Base URL (can be configured)
-  String _baseUrl = 'http://10.0.2.2:3000'; // Default for Android emulator
+  // Base URL (using centralized constant)
+  String _baseUrl = AppConstants.socketUrl; 
 
   // Stream controllers for events
   final _connectionController = StreamController<bool>.broadcast();

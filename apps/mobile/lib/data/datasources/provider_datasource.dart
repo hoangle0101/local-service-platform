@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../../core/constants/app_constants.dart';
 import '../storage/secure_storage.dart';
 
 class ProviderDataSource {
@@ -7,7 +8,7 @@ class ProviderDataSource {
   ProviderDataSource()
       : _dio = Dio(
           BaseOptions(
-            baseUrl: 'http://10.0.2.2:3000',
+            baseUrl: AppConstants.apiBaseUrl,
             connectTimeout: const Duration(seconds: 10),
             receiveTimeout: const Duration(seconds: 10),
             headers: {'Content-Type': 'application/json'},

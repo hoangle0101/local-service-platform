@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/reviews_datasource.dart';
 import '../../widgets/review/review_card.dart';
@@ -507,7 +508,7 @@ class _ProviderReviewsScreenState extends State<ProviderReviewsScreen> {
       final url = widget.providerAvatarUrl!;
       fullAvatarUrl = url.startsWith('http')
           ? url
-          : 'http://10.0.2.2:3000${url.startsWith('/') ? '' : '/'}$url';
+          : '${AppConstants.apiBaseUrl}${url.startsWith('/') ? '' : '/'}$url';
     }
 
     return Container(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:mobile/data/repositories/quote_repository.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/storage/secure_storage.dart';
 import '../../widgets/minimalist_widgets.dart';
@@ -65,7 +66,7 @@ class _CreateQuoteScreenState extends State<CreateQuoteScreen> {
   Future<void> _loadProviderServiceItems() async {
     if (widget.serviceId == null || widget.providerId == null) return;
     try {
-      final dio = Dio(BaseOptions(baseUrl: 'http://10.0.2.2:3000'));
+      final dio = Dio(BaseOptions(baseUrl: AppConstants.apiBaseUrl));
       final token = await SecureStorage.getAccessToken();
       final response = await dio.get(
         '/services/${widget.serviceId}/provider/${widget.providerId}/items',

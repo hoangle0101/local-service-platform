@@ -830,7 +830,7 @@ export class AdminService {
       },
     });
 
-    const userMap = new Map(users.map((u) => [u.id, u]));
+    const userMap = new Map<bigint, any>(users.map((u) => [u.id, u]));
 
     return {
       data: withdrawals.map((withdrawal) => {
@@ -1429,9 +1429,9 @@ export class AdminService {
       _sum: { providerEarning: true },
     });
 
-    const statsMap = new Map(
+    const statsMap = new Map<string, any>(
       bookingStats.map((stat) => [
-        stat.providerId?.toString(),
+        stat.providerId?.toString() || '',
         {
           totalBookings: stat._count,
           totalEarnings: stat._sum.providerEarning,

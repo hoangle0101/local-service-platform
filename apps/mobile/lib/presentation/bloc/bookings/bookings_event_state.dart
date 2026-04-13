@@ -345,6 +345,9 @@ class Booking {
   final String? paymentMethod;
   final String? bookingPaymentId;
   final DateTime? autoReleaseAt;
+  final bool hasPendingQuote;
+  final bool isQuoteAccepted;
+  final String? acceptedPrice;
 
   Booking({
     required this.id,
@@ -375,6 +378,9 @@ class Booking {
     this.paymentMethod,
     this.bookingPaymentId,
     this.autoReleaseAt,
+    this.hasPendingQuote = false,
+    this.isQuoteAccepted = false,
+    this.acceptedPrice,
   });
 
   /// Get the final price (actualPrice takes precedence over estimatedPrice)
@@ -429,6 +435,9 @@ class Booking {
       autoReleaseAt: json['autoReleaseAt'] != null
           ? DateTime.tryParse(json['autoReleaseAt'].toString())
           : null,
+      hasPendingQuote: json['hasPendingQuote'] == true,
+      isQuoteAccepted: json['isQuoteAccepted'] == true,
+      acceptedPrice: json['acceptedPrice']?.toString(),
     );
   }
 

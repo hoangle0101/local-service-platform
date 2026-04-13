@@ -87,11 +87,15 @@ class MinButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) Icon(icon, size: 20),
-              if (icon != null && text.isNotEmpty) const SizedBox(width: 8),
+              if (icon != null && text.isNotEmpty) const SizedBox(width: 4),
               if (text.isNotEmpty)
-                Text(
-                  text,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                Flexible(
+                  child: Text(
+                    text,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
                 ),
             ],
           );

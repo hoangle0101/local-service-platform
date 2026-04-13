@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/datasources/reviews_datasource.dart';
 import '../rating/star_rating.dart';
@@ -132,7 +133,7 @@ class ReviewCard extends StatelessWidget {
       final url = review.reviewer.avatarUrl!;
       fullAvatarUrl = url.startsWith('http')
           ? url
-          : 'http://10.0.2.2:3000${url.startsWith('/') ? '' : '/'}$url';
+          : '${AppConstants.apiBaseUrl}${url.startsWith('/') ? '' : '/'}$url';
     }
 
     return Container(

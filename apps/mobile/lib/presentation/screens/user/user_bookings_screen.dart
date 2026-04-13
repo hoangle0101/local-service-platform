@@ -280,7 +280,6 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
   Widget _buildBookingMinCard(Booking booking) {
     final currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
     final dateFormat = DateFormat('EEE, dd/MM • HH:mm');
-    final price = double.tryParse(booking.estimatedPrice ?? '0') ?? 0;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
@@ -303,7 +302,7 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildMinStatusBadge(booking.status),
+                      _buildMinStatusBadge(booking),
                       Text(
                         '#${booking.code}',
                         style: const TextStyle(
@@ -376,11 +375,15 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.5)),
                       Text(
-                        price > 0
-                            ? currencyFormat.format(price).replaceAll(',00', '')
+                        booking.isQuoteAccepted == true
+                            ? currencyFormat
+                                .format(double.tryParse(
+                                        booking.acceptedPrice ?? '0') ??
+                                    0)
+                                .replaceAll(',00', '')
                             : 'Chờ báo giá',
                         style: TextStyle(
-                            color: price > 0
+                            color: booking.isQuoteAccepted == true
                                 ? AppColors.success
                                 : AppColors.warning,
                             fontWeight: FontWeight.w900,
@@ -425,11 +428,12 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
     );
   }
 
-  Widget _buildMinStatusBadge(String status) {
+  Widget _buildMinStatusBadge(Booking booking) {
     Color color;
     String label;
+    final status = booking.status.toLowerCase();
 
-    switch (status.toLowerCase()) {
+    switch (status) {
       case 'cancelled':
         color = AppColors.error;
         label = 'Đã hủy';
@@ -449,7 +453,13 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
       case 'confirmed':
       case 'accepted':
         color = AppColors.accent;
-        label = 'Đã nhận';
+        if (booking.isQuoteAccepted == true) {
+          label = 'Đã nhận';
+        } else if (booking.hasPendingQuote == true) {
+          label = 'Đã gửi báo giá';
+        } else {
+          label = 'Chờ báo giá';
+        }
         break;
       case 'in_progress':
         color = AppColors.primary;
@@ -531,7 +541,7 @@ class _UserBookingsScreenState extends State<UserBookingsScreen>
           }),
         ],
       );
-    } else if (status == 'completed' && !booking.hasReview) {
+    } else if (status == 'completed' && booking.hasReview == false) {
       return _buildActionButton(
           'Đánh giá',
           () => _showReviewDialog(

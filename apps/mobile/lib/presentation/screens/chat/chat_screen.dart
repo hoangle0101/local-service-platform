@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/repositories/chat_repository.dart';
 
@@ -121,10 +122,10 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    debugPrint('[ChatScreen] Connecting to socket: http://10.0.2.2:3000/chat');
-
+    debugPrint('[ChatScreen] Connecting to socket: ${AppConstants.socketUrl}/chat');
+    
     _socket = IO.io(
-      'http://10.0.2.2:3000/chat',
+      '${AppConstants.socketUrl}/chat',
       IO.OptionBuilder()
           .setTransports(['websocket', 'polling']) // Allow polling fallback
           .setAuth({'token': token})
