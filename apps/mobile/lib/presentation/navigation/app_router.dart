@@ -36,6 +36,7 @@ import '../screens/wallet/wallet_deposit_screen.dart';
 import '../screens/booking/booking_detail_screen.dart';
 import '../screens/booking/booking_dispute_screen.dart';
 import '../bloc/bookings/bookings_event_state.dart';
+import '../screens/ai/ai_vision_diagnosis_screen.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -294,6 +295,9 @@ final router = GoRouter(
           service: extra['service'] as ProviderService?,
           providerId: extra['providerId'] as int?, // For direct booking
           genericServiceName: extra['genericServiceName'] as String?,
+          aiNotes: extra['aiNotes'] as String?,
+          aiMinPrice: extra['aiMinPrice'] as int?,
+          aiMaxPrice: extra['aiMaxPrice'] as int?,
         );
       },
     ),
@@ -324,6 +328,10 @@ final router = GoRouter(
         final id = state.pathParameters['id']!;
         return BookingDisputeScreen(bookingId: id);
       },
+    ),
+    GoRoute(
+      path: '/ai-vision',
+      builder: (context, state) => const AIVisionDiagnosisScreen(),
     ),
   ],
 );

@@ -20,6 +20,9 @@ class CreateBookingScreen extends StatefulWidget {
   final ProviderService? service;
   final int? providerId; // For direct booking
   final String? genericServiceName; // For public request
+  final String? aiNotes;
+  final int? aiMinPrice;
+  final int? aiMaxPrice;
 
   const CreateBookingScreen({
     super.key,
@@ -27,6 +30,9 @@ class CreateBookingScreen extends StatefulWidget {
     this.service,
     this.providerId,
     this.genericServiceName,
+    this.aiNotes,
+    this.aiMinPrice,
+    this.aiMaxPrice,
   });
 
   @override
@@ -60,6 +66,9 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.aiNotes != null) {
+      _notesController.text = widget.aiNotes!;
+    }
     if (widget.providerId != null) {
       _loadServiceItems();
     }
@@ -1078,8 +1087,7 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
       );
     }
 
-    // Case 3: Default - show base price
-    final price = widget.service?.price ?? 0;
+    // Case 3: Default - show base price or AI estimated price
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -1089,7 +1097,11 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
       ),
       child: Column(
         children: [
-          _buildPriceRow('Giá dịch vụ (tham khảo)', price),
+          if (widget.aiMinPrice != null && widget.aiMaxPrice != null) ...[
+            _buildPriceRangeRow('Giá phân tích bởi AI (ước tính)', widget.aiMinPrice!, widget.aiMaxPrice!),
+          ] else ...[
+            _buildPriceRow('Giá dịch vụ (tham khảo)', widget.service?.price ?? 0.0),
+          ],
           const SizedBox(height: 16),
           Row(
             children: const [
@@ -1109,6 +1121,35 @@ class _CreateBookingScreenState extends State<CreateBookingScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPriceRangeRow(String label, int minPrice, int maxPrice) {
+    final formatStr = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
+    final minStr = formatStr.format(minPrice).replaceAll(',00', '');
+    final maxStr = formatStr.format(maxPrice).replaceAll(',00', '');
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+        ),
+        Text(
+          '$minStr - $maxStr',
+          style: const TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 15,
+            color: AppColors.primary, // using primary to match UI style
+          ),
+        ),
+      ],
     );
   }
 
