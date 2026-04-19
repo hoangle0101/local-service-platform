@@ -22,6 +22,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { GatewayModule } from './modules/gateway/gateway.module';
 import { ServiceQuotesModule } from './modules/service-quotes/service-quotes.module';
 import { ProviderServiceItemsModule } from './modules/provider-service-items/provider-service-items.module';
+import { AiModule } from './modules/ai/ai.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import configuration from './config/configuration';
 
@@ -51,6 +52,7 @@ import configuration from './config/configuration';
     NotificationsModule,
     ServiceQuotesModule,
     ProviderServiceItemsModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [AppService],
